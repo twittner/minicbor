@@ -1,4 +1,3 @@
-mod cbor;
 mod encoder;
 mod error;
 mod iter;
