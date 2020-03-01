@@ -1,0 +1,6 @@
+[workspace]
+members = ["minicbor", "minicbor-derive", "minicbor-tests"]
+
+[profile.bench]
+lto = true
+codegen-units = 1

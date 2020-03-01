@@ -1,0 +1,26 @@
+[package]
+publish     = false
+name        = "minicbor-tests"
+version     = "0.1.0"
+authors     = ["Toralf Wittner <tw@dtex.org>"]
+license     = "BlueOak-1.0.0"
+edition     = "2018"
+description = "minicbor test suite"
+repository  = "https://gitlab.com/twittner/minicbor"
+
+[dependencies]
+minicbor = { path = "../minicbor", features = ["std", "half", "derive", "smallvec"] }
+
+[dev-dependencies]
+criterion  = "0.3"
+hex        = "0.4.1"
+quickcheck = "0.9"
+rand       = "0.7"
+serde      = { version = "1.0", features = ["derive"] }
+serde_cbor = "0.11"
+smallvec   = { version = "1.0", features = ["serde"] }
+
+[[bench]]
+name = "benchmark"
+harness = false
+

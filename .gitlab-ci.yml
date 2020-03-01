@@ -1,0 +1,28 @@
+stages:
+  - test
+  - deploy
+
+test-stable:
+  stage: test
+  image: "rust:latest"
+  script:
+    - cargo test --all-features
+
+test-nightly:
+  stage: test
+  image: "rustlang/rust:nightly"
+  script:
+    - cargo test --all-features
+
+pages:
+  stage: deploy
+  image: "rustlang/rust:nightly"
+  script:
+    - cargo doc --all-features
+    - mv target/doc public
+  artifacts:
+    paths:
+      - public
+  only:
+    - master
+

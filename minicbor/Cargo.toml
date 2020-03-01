@@ -1,0 +1,22 @@
+[package]
+name        = "minicbor"
+version     = "0.1.0"
+authors     = ["Toralf Wittner <tw@dtex.org>"]
+license     = "BlueOak-1.0.0"
+edition     = "2018"
+description = "A small CBOR codec suitable for no_std environments."
+repository  = "https://gitlab.com/twittner/minicbor"
+keywords    = ["cbor", "encoding", "binary"]
+categories  = ["encoding"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[features]
+std = []
+derive = ["minicbor-derive"]
+
+[dependencies]
+minicbor-derive = { version = "0.1.0", path = "../minicbor-derive", optional = true }
+half            = { version = "1", default-features = false, optional = true }
+smallvec        = { version = "1", default-features = false, optional = true }
