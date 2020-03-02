@@ -6,13 +6,13 @@ test-stable:
   stage: test
   image: "rust:latest"
   script:
-    - cargo test --all-features
+    - cargo test --all --all-features
 
 test-nightly:
   stage: test
   image: "rustlang/rust:nightly"
   script:
-    - cargo test --all-features
+    - cargo test --all --all-features
 
 pages:
   stage: deploy
