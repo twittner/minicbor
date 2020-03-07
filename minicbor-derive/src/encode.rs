@@ -19,7 +19,7 @@ pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     proc_macro::TokenStream::from(result.unwrap_or_else(|e| e.to_compile_error()))
 }
 
-/// Create `Encode` impl for (tuple) structs.
+/// Create an `Encode` impl for (tuple) structs.
 fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct) -> syn::Result<proc_macro2::TokenStream> {
     let name = &inp.ident;
     check_uniq(name.span(), field_indices(s.fields.iter())?)?;
@@ -38,7 +38,7 @@ fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct) -> syn::Result<proc_ma
     })
 }
 
-/// Create `Encode` impl for enums.
+/// Create an `Encode` impl for enums.
 fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2::TokenStream> {
     let name = &inp.ident;
     check_uniq(e.enum_token.span(), variant_indices(e.variants.iter())?)?;
@@ -50,7 +50,9 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
         let row = match &var.fields {
             syn::Fields::Unit => quote! {
                 #name::#con => {
+                    __e777.array(2)?;
                     __e777.u32(#idx)?;
+                    __e777.map(0)?;
                     Ok(())
                 }
             },
@@ -59,6 +61,7 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
                 let statements = encode_enum_fields(fields.named.iter())?;
                 quote! {
                     #name::#con{#(#idents,)*} => {
+                        __e777.array(2)?;
                         __e777.u32(#idx)?;
                         #(#statements)*
                     }
@@ -71,6 +74,7 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
                 let statements = encode_enum_fields(fields.unnamed.iter())?;
                 quote! {
                     #name::#con(#(#idents,)*) => {
+                        __e777.array(2)?;
                         __e777.u32(#idx)?;
                         #(#statements)*
                     }
@@ -96,6 +100,10 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
     })
 }
 
+/// The encoding logic of fields.
+///
+/// Each field will produce two CBOR items, first the index number and then
+/// the value. Optional fields which are `None` will not be encoded.
 fn encode_struct_fields<'a, I>(iter: I) -> syn::Result<Vec<proc_macro2::TokenStream>>
 where
     I: Iterator<Item = &'a syn::Field>
@@ -142,6 +150,12 @@ where
     encode_as_map(encode, if has_option { None } else { Some(num_fields) })
 }
 
+/// The encoding logic of enum variant fields.
+///
+/// This is very much like `encode_struct_fields`, except that we do not access
+/// any `self` parameter but use the field names directly, assuming they come
+/// from a pattern match. Tuple structs use synthetic names which concatenate '_'
+/// and the field position, e.g. `_1`.
 fn encode_enum_fields<'a, I>(iter: I) -> syn::Result<Vec<proc_macro2::TokenStream>>
 where
     I: Iterator<Item = &'a syn::Field>
@@ -188,6 +202,8 @@ where
     encode_as_map(encode, if has_option { None } else { Some(num_fields) })
 }
 
+/// This is applied to the field encoding output and surrounds it with a
+/// map (potentially indefinite if no length is given).
 fn encode_as_map<I>(iter: I, len: Option<usize>) -> syn::Result<Vec<proc_macro2::TokenStream>>
 where
     I: IntoIterator<Item = syn::Result<proc_macro2::TokenStream>>
@@ -209,6 +225,7 @@ where
     Ok(statements)
 }
 
+/// Add a `minicbor::Encode` bound to every type parameter.
 fn add_encode_bound<'a, I>(iter: I) -> syn::Result<()>
 where
     I: Iterator<Item = &'a mut syn::TypeParam>

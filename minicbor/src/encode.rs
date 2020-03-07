@@ -1,3 +1,8 @@
+//! Traits and types for encoding CBOR.
+//!
+//! This module defines the trait [`Encode`] and the actual [`Encoder`].
+//! It also defines a [`Write`] trait to store the encoded bytes.
+
 mod encoder;
 mod error;
 mod iter;
@@ -8,7 +13,14 @@ pub use error::Error;
 pub use iter::{Iter, ExactSizeIter};
 pub use write::Write;
 
+/// A type that can be encoded to CBOR.
+///
+/// If this type's CBOR encoding is meant to be decoded by `Decode` impls
+/// derived with [`minicbor_derive`] *it is advisable to only produce a
+/// single CBOR data item*. Tagging, maps or arrays can and should be used
+/// for multiple values.
 pub trait Encode {
+    /// Encode a value of this type using the given `Encoder`.
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>>;
 }
 

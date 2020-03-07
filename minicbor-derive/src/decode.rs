@@ -20,7 +20,7 @@ pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     proc_macro::TokenStream::from(result.unwrap_or_else(|e| e.to_compile_error()))
 }
 
-/// Create `Decode` impl for (tuple) structs.
+/// Create a `Decode` impl for (tuple) structs.
 fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct, lt: syn::LifetimeDef) -> syn::Result<proc_macro2::TokenStream> {
     let name = &inp.ident;
     check_uniq(name.span(), field_indices(s.fields.iter())?)?;
@@ -68,7 +68,7 @@ fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct, lt: syn::LifetimeDef) 
     })
 }
 
-/// Create `Decode` impl for enums.
+/// Create a `Decode` impl for enums.
 fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, lt: syn::LifetimeDef) -> syn::Result<proc_macro2::TokenStream> {
     let name = &inp.ident;
     check_uniq(e.enum_token.span(), variant_indices(e.variants.iter())?)?;
@@ -83,7 +83,10 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, lt: syn::LifetimeDef) -> s
         let idx = index_number(var.ident.span(), &var.attrs)?;
         check_uniq(con.span(), field_indices(var.fields.iter())?)?;
         let row = if let syn::Fields::Unit = &var.fields {
-            quote!(#idx => { Ok(#name::#con) })
+            quote!(#idx => {
+                __d777.skip()?;
+                Ok(#name::#con)
+            })
         } else {
             let (field_names, field_types) = fields(var.fields.iter());
             let field_str = field_names.iter().map(|n| format!("{}::{}::{}", name, con, n));
@@ -125,6 +128,9 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, lt: syn::LifetimeDef) -> s
             where
                 __R777: minicbor::decode::Read<'__b777>
             {
+                if Some(2) != __d777.array()? {
+                    return Err(minicbor::decode::Error::Message("expected enum (2-element array)"))
+                }
                 match __d777.u32()? {
                     #(#rows)*
                     n => Err(minicbor::decode::Error::UnknownVariant(n))
@@ -134,7 +140,27 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, lt: syn::LifetimeDef) -> s
     })
 }
 
-fn gen_statements(names: &Vec<syn::Ident>, types: &Vec<syn::Type>, numbers: &Vec<u32>) -> proc_macro2::TokenStream {
+/// Generate decoding statements for every item.
+//
+// For every name `n`, type `t` and index `i` we declare a local mutable
+// variable `n` with type `Option<t>` and set it to `None` if `t` is not
+// an `Option`, otherwise to `Some(None)`. [1]
+//
+// Then we iterate over all CBOR map elements and if an index `j` equal
+// to `i` is found, we attempt to decode the next CBOR item as a value `v`
+// of type `t`. If successful, we assign the result to `n` as `Some(v)`,
+// otherwise we error, or -- if `t` is an option and the decoding failed
+// because an unknown enum variant was decoded -- we skip the variant
+// value and continue decoding.
+//
+// --------------------------------------------------------------------
+// [1]: These variables will later be deconstructed in `on_enum` and
+// `on_struct` and their inner value will be used to initialise a field.
+// If not present, an error will be produced.
+fn gen_statements(names: &[syn::Ident], types: &[syn::Type], numbers: &[u32]) -> proc_macro2::TokenStream {
+    assert_eq!(names.len(), types.len());
+    assert_eq!(types.len(), numbers.len());
+
     let inits = types.iter().map(|ty| {
         if is_option(ty) {
             quote!(Some(None))
@@ -142,20 +168,36 @@ fn gen_statements(names: &Vec<syn::Ident>, types: &Vec<syn::Type>, numbers: &Vec
             quote!(None)
         }
     });
+
+    let actions = names.iter().zip(types.iter()).map(|(name, ty)| {
+        if is_option(ty) {
+            quote! {
+                match minicbor::Decode::decode(__d777) {
+                    Ok(value) => #name = Some(value),
+                    Err(minicbor::decode::Error::UnknownVariant(_)) => { __d777.skip()? }
+                    Err(e) => return Err(e)
+                }
+            }
+        } else {
+            quote!({ #name = Some(minicbor::Decode::decode(__d777)?) })
+        }
+    })
+    .collect::<Vec<_>>();
+
     quote! {
         #(let mut #names : Option<#types> = #inits;)*
 
         if let Some(__len) = __d777.map()? {
             for _ in 0 .. __len {
                 match __d777.u32()? {
-                    #(#numbers => { #names = Some(minicbor::Decode::decode(__d777)?) })*
+                    #(#numbers => #actions)*
                     _          => __d777.skip()?
                 }
             }
         } else {
             while minicbor::data::Type::Break != __d777.datatype()? {
                 match __d777.u32()? {
-                    #(#numbers => { #names = Some(minicbor::Decode::decode(__d777)?) })*
+                    #(#numbers => #actions)*
                     _          => __d777.skip()?
                 }
             }
@@ -164,6 +206,7 @@ fn gen_statements(names: &Vec<syn::Ident>, types: &Vec<syn::Type>, numbers: &Vec
     }
 }
 
+/// Map fields to a list of field names and field types.
 fn fields<'a, I>(iter: I) -> (Vec<syn::Ident>, Vec<syn::Type>)
 where
     I: Iterator<Item = &'a syn::Field> + Clone
@@ -181,6 +224,7 @@ where
     (names, types)
 }
 
+/// Add a `minicbor::Decode` bound to every type parameter.
 fn add_decode_bound(g: &mut syn::Generics) -> syn::Result<syn::LifetimeDef> {
     let bound: syn::TypeParamBound = syn::parse_str("minicbor::Decode<'__b777>")?;
     let lstatic: syn::Lifetime = syn::parse_str("'static")?;
@@ -197,6 +241,11 @@ fn add_decode_bound(g: &mut syn::Generics) -> syn::Result<syn::LifetimeDef> {
     Ok(lifetime)
 }
 
+/// Return a modified clone of `syn::Generics` with the given lifetime
+/// parameter put before the other type and lifetime parameters.
+///
+/// This will be used later when splitting the parameters so that the
+/// additional lifetime is only present in the `impl` parameter section.
 fn add_lifetime(g: &syn::Generics, l: syn::LifetimeDef) -> syn::Generics {
     let mut g2 = g.clone();
     g2.params = Some(l.into()).into_iter().chain(g2.params).collect();
