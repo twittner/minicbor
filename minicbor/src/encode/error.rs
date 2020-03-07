@@ -4,7 +4,7 @@ use core::fmt;
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum Error<W> {
-    /// Write error.
+    /// Error writing bytes to a `Write` impl.
     Write(W)
 }
 

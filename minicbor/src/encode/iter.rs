@@ -1,5 +1,9 @@
 use super::{Encode, Encoder, Error, Write};
 
+/// Newtype for iterators whose items implement [`Encode`].
+///
+/// `Iter` is itself implementing `Encode` by encoding the inner
+/// iterator items as an indefinite array.
 #[derive(Debug, Clone)]
 pub struct Iter<I>(I);
 
@@ -29,6 +33,10 @@ where
     }
 }
 
+/// Newtype for exact size iterators whose items implement [`Encode`].
+///
+/// `ExactSizeIter` is itself implementing `Encode` by encoding the inner
+/// iterator items as an array of definite length.
 #[derive(Debug, Clone)]
 pub struct ExactSizeIter<I>(I);
 

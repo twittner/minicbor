@@ -20,3 +20,6 @@ derive = ["minicbor-derive"]
 minicbor-derive = { version = "0.1.0", path = "../minicbor-derive", optional = true }
 half            = { version = "1", default-features = false, optional = true }
 smallvec        = { version = "1", default-features = false, optional = true }
+
+[dev-dependencies]
+minicbor = { path = ".", features = ["std"] }
