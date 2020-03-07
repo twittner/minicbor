@@ -1,3 +1,5 @@
+//! Information about CBOR data types and tags.
+
 /// CBOR data types.
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum Type {
@@ -21,12 +23,13 @@ pub enum Type {
     Array,
     Map,
     Tag,
-    Break
+    Break,
+    Unknown(u8)
 }
 
 impl Type {
-    pub(crate) fn read(n: u8) -> Option<Self> {
-        let t = match n {
+    pub(crate) fn read(n: u8) -> Self {
+        match n {
             0x00 ..= 0x18        => Type::U8,
             0x19                 => Type::U16,
             0x1a                 => Type::U32,
@@ -48,9 +51,8 @@ impl Type {
             0xfa                 => Type::F32,
             0xfb                 => Type::F64,
             0xff                 => Type::Break,
-            _                    => return None
-        };
-        Some(t)
+            _                    => Type::Unknown(n)
+        }
     }
 }
 

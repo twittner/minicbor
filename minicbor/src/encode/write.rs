@@ -1,6 +1,13 @@
+//! The [`Write`] trait definition and implementations.
+//!
+//! If the feature `std` is present all `std::io::Write` impls
+//! are made impls of [`Write`] too.
+
+/// A type that accepts byte slices for writing.
 pub trait Write {
     type Error;
 
+    /// Write the whole byte slice.
     fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error>;
 }
 

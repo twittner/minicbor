@@ -1,3 +1,9 @@
+//! Traits and types for decoding CBOR.
+//!
+//! This module defines the trait [`Decode`] and the actual [`Decoder`].
+//! It also defines a [`Read`] trait to access the bytes that should be
+//! decoded.
+
 mod decoder;
 mod error;
 pub mod read;
@@ -7,7 +13,9 @@ pub use decoder::{ArrayIter, BytesIter, MapIter, StrIter};
 pub use error::Error;
 pub use read::Read;
 
+/// A type that can be decoded from CBOR.
 pub trait Decode<'b>: Sized {
+    /// Decode a value using the given `Decoder`.
     fn decode<R: Read<'b>>(d: &mut Decoder<'b, R>) -> Result<Self, Error<R::Error>>;
 }
 
@@ -162,7 +170,7 @@ macro_rules! decode_arrays {
                     for x in iter {
                         if i >= a.len() {
                             let msg = "array lengths do not match";
-                            return Err($crate::decode::Error::Overflow(i as u64, msg))?
+                            return Err($crate::decode::Error::Overflow(i as u64, msg))
                         }
                         a[i] = x?;
                         i += 1;
