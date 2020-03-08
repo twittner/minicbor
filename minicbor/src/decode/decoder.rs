@@ -367,7 +367,7 @@ impl<'b> Decoder<'b> {
                     }
                 MAP ..= 0xbf =>
                     if let Some(n) = self.map()? {
-                        nrounds = nrounds.saturating_add(2 * n)
+                        nrounds = nrounds.saturating_add(n.saturating_mul(2))
                     } else {
                         irounds = irounds.saturating_add(1)
                     }
