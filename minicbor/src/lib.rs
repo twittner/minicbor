@@ -3,9 +3,7 @@
 //! The crate is organised around the following entities:
 //!
 //! - [`Encoder`] and [`Decoder`] for type-directed encoding and decoding
-//! of values. Their encoding sink or decoding source can be any type
-//! that implements the traits [`encode::Write`] or [`decode::Read`]
-//! respectively.
+//! of values.
 //!
 //! - [`Encode`] and [`Decode`] traits which can be implemented for any
 //! type that should be encoded to or decoded from CBOR. They are similar
@@ -67,7 +65,7 @@
 //!     0x33, 0x2d, 0x32, 0x31, 0x54, 0x32, 0x30, 0x3a,
 //!     0x30, 0x34, 0x3a, 0x30, 0x30, 0x5a
 //! ];
-//! let mut decoder = Decoder::from_slice(&input[..]);
+//! let mut decoder = Decoder::new(&input[..]);
 //! assert_eq!(data::Tag::DateTime, decoder.tag()?);
 //! assert_eq!("2013-03-21T20:04:00Z", decoder.str()?);
 //!
@@ -100,21 +98,8 @@ pub use encode::{Encode, Encoder};
 #[cfg(feature = "derive")]
 pub use minicbor_derive::*;
 
-/// An error indicating the end of a slice.
-#[derive(Debug)]
-pub struct EndOfSlice(());
-
-impl core::fmt::Display for EndOfSlice {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        f.write_str("end of slice")
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for EndOfSlice {}
-
 /// Decode a type implementing [`Decode`] from the given byte slice.
-pub fn from_slice<'b, T>(b: &'b [u8]) -> Result<T, decode::Error<EndOfSlice>>
+pub fn from_slice<'b, T>(b: &'b [u8]) -> Result<T, decode::Error>
 where
     T: Decode<'b>
 {
@@ -126,7 +111,7 @@ where
 ///
 /// Returns the subslice that contains the CBOR bytes.
 #[cfg(not(feature = "std"))]
-pub fn to_slice<T>(x: T, b: &mut [u8]) -> Result<&[u8], encode::Error<EndOfSlice>>
+pub fn to_slice<T>(x: T, b: &mut [u8]) -> Result<&[u8], encode::Error<encode::write::EndOfSlice>>
 where
     T: Encode
 {

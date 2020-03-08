@@ -1,4 +1,4 @@
-use minicbor::{data, decode::{self, Read}, Decoder, encode::{self, Write}, Encode, Encoder};
+use minicbor::{data, decode, Decoder, encode::{self, Write}, Encode, Encoder};
 use quickcheck::{Arbitrary, Gen};
 use rand::Rng;
 use serde_cbor::Value;
@@ -18,7 +18,7 @@ fn encode_minicbor_decode_serde() {
 fn encode_serde_decode_minicbor() {
     fn property(input: Cbor) {
         let bytes = serde_cbor::to_vec(&input.0).unwrap();
-        let mut decoder = Decoder::from_slice(&bytes);
+        let mut decoder = Decoder::new(&bytes);
         check(&mut decoder, input).unwrap();
     }
     quickcheck::quickcheck(property as fn(Cbor))
@@ -40,7 +40,7 @@ impl Encode for Cbor {
 }
 
 // Decode using a known `Cbor` value as template.
-fn check<'a, R: Read<'a>>(d: &mut Decoder<'a, R>, c: Cbor) -> Result<(), decode::Error<R::Error>> {
+fn check<'a>(d: &mut Decoder<'a>, c: Cbor) -> Result<(), decode::Error> {
     match c.0 {
         Value::Null => {
             assert_eq!(data::Type::Null, d.datatype()?);

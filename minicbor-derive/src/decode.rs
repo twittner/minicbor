@@ -56,11 +56,7 @@ fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct, lt: syn::LifetimeDef) 
 
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'__b777> for #name #typ_generics #where_clause {
-            fn decode<__R777>(__d777: &mut minicbor::Decoder<'__b777, __R777>)
-                -> Result<#name #typ_generics, minicbor::decode::Error<__R777::Error>>
-            where
-                __R777: minicbor::decode::Read<'__b777>
-            {
+            fn decode(__d777: &mut minicbor::Decoder<'__b777>) -> Result<#name #typ_generics, minicbor::decode::Error> {
                 #statements
                 #result
             }
@@ -123,11 +119,7 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, lt: syn::LifetimeDef) -> s
 
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'__b777> for #name #typ_generics #where_clause {
-            fn decode<__R777>(__d777: &mut minicbor::Decoder<'__b777, __R777>)
-                -> Result<#name #typ_generics, minicbor::decode::Error<__R777::Error>>
-            where
-                __R777: minicbor::decode::Read<'__b777>
-            {
+            fn decode(__d777: &mut minicbor::Decoder<'__b777>) -> Result<#name #typ_generics, minicbor::decode::Error> {
                 if Some(2) != __d777.array()? {
                     return Err(minicbor::decode::Error::Message("expected enum (2-element array)"))
                 }

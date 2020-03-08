@@ -1,8 +1,8 @@
 use crate::{ARRAY, BREAK, BYTES, MAP, SIMPLE, TAGGED, TEXT, SIGNED, UNSIGNED};
 use crate::data::{Tag, Type};
-use crate::decode::{Decode, Error, Read};
+use crate::decode::{Decode, Error};
 use core::{char, f32, i8, i16, i32, i64};
-use core::{convert::TryInto, str, marker};
+use core::{convert::TryInto, marker, str};
 
 // Convert an expression of an unsigned int type to a signed int type.
 //
@@ -37,28 +37,20 @@ macro_rules! u_as_i {
     }}
 }
 
-/// A non-allocating CBOR decoder for bytes of the given [`Read`] source.
+/// A non-allocating CBOR decoder.
 #[derive(Debug, Clone)]
-pub struct Decoder<'b, R: Read<'b>> {
-    reader: R,
-    _mark: marker::PhantomData<&'b ()>
+pub struct Decoder<'b> {
+    buf: &'b [u8]
 }
 
-impl<'b> Decoder<'b, &'b [u8]> {
+impl<'b> Decoder<'b> {
     /// Construct a `Decoder` for the given byte slice.
-    pub fn from_slice(b: &'b [u8]) -> Self {
-        Decoder::new(b)
-    }
-}
-
-impl<'b, R: Read<'b>> Decoder<'b, R> {
-    /// Construct a `Decoder` for the given [`Read`] impl.
-    pub fn new(reader: R) -> Self {
-        Decoder { reader, _mark: marker::PhantomData }
+    pub fn new(bytes: &'b [u8]) -> Self {
+        Decoder { buf: bytes }
     }
 
     /// Decode a `bool` value.
-    pub fn bool(&mut self) -> Result<bool, Error<R::Error>> {
+    pub fn bool(&mut self) -> Result<bool, Error> {
         match self.read()? {
             0xf4 => Ok(false),
             0xf5 => Ok(true),
@@ -67,7 +59,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Decode a `u8` value.
-    pub fn u8(&mut self) -> Result<u8, Error<R::Error>> {
+    pub fn u8(&mut self) -> Result<u8, Error> {
         match self.read()? {
             n @ 0 ..= 0x17 => Ok(n),
             0x18           => self.read(),
@@ -76,7 +68,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Decode a `u16` value.
-    pub fn u16(&mut self) -> Result<u16, Error<R::Error>> {
+    pub fn u16(&mut self) -> Result<u16, Error> {
         match self.read()? {
             n @ 0 ..= 0x17 => Ok(u16::from(n)),
             0x18           => self.read().map(u16::from),
@@ -86,7 +78,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Decode a `u32` value.
-    pub fn u32(&mut self) -> Result<u32, Error<R::Error>> {
+    pub fn u32(&mut self) -> Result<u32, Error> {
         match self.read()? {
             n @ 0 ..= 0x17 => Ok(u32::from(n)),
             0x18           => self.read().map(u32::from),
@@ -97,13 +89,13 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Decode a `u64` value.
-    pub fn u64(&mut self) -> Result<u64, Error<R::Error>> {
+    pub fn u64(&mut self) -> Result<u64, Error> {
         let n = self.read()?;
         self.unsigned(n)
     }
 
     /// Decode an `i8` value.
-    pub fn i8(&mut self) -> Result<i8, Error<R::Error>> {
+    pub fn i8(&mut self) -> Result<i8, Error> {
         match self.read()? {
             n @ 0x00 ..= 0x17 => Ok(n as i8),
             0x18              => u_as_i!(self.read()?, i8, i8::MAX as u8, "u8->i8"),
@@ -114,7 +106,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Decode an `i16` value.
-    pub fn i16(&mut self) -> Result<i16, Error<R::Error>> {
+    pub fn i16(&mut self) -> Result<i16, Error> {
         match self.read()? {
             n @ 0x00 ..= 0x17 => Ok(i16::from(n)),
             0x18              => self.read().map(i16::from),
@@ -127,7 +119,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Decode an `i32` value.
-    pub fn i32(&mut self) -> Result<i32, Error<R::Error>> {
+    pub fn i32(&mut self) -> Result<i32, Error> {
         match self.read()? {
             n @ 0x00 ..= 0x17 => Ok(i32::from(n)),
             0x18              => self.read().map(i32::from),
@@ -142,7 +134,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Decode an `i64` value.
-    pub fn i64(&mut self) -> Result<i64, Error<R::Error>> {
+    pub fn i64(&mut self) -> Result<i64, Error> {
         match self.read()? {
             n @ 0x00 ..= 0x17 => Ok(i64::from(n)),
             0x18              => self.read().map(i64::from),
@@ -162,7 +154,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     ///
     /// Only available when the feature `half` is present.
     #[cfg(feature = "half")]
-    pub fn f16(&mut self) -> Result<f32, Error<R::Error>> {
+    pub fn f16(&mut self) -> Result<f32, Error> {
         let b = self.read()?;
         if 0xf9 != b {
             return Err(Error::TypeMismatch(b, "expected f16"))
@@ -173,7 +165,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Decode an `f32` value.
-    pub fn f32(&mut self) -> Result<f32, Error<R::Error>> {
+    pub fn f32(&mut self) -> Result<f32, Error> {
         match self.peek()? {
             #[cfg(feature = "half")]
             0xf9 => self.f16(),
@@ -188,7 +180,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Decode an `f64` value.
-    pub fn f64(&mut self) -> Result<f64, Error<R::Error>> {
+    pub fn f64(&mut self) -> Result<f64, Error> {
         match self.peek()? {
             #[cfg(feature = "half")]
             0xf9 => self.f16().map(f64::from),
@@ -204,7 +196,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Decode a `char` value.
-    pub fn char(&mut self) -> Result<char, Error<R::Error>> {
+    pub fn char(&mut self) -> Result<char, Error> {
         let n = self.u32()?;
         char::from_u32(n).ok_or(Error::InvalidChar(n))
     }
@@ -213,7 +205,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     ///
     /// This only decodes byte slices of definite lengths.
     /// See [`Decoder::bytes_iter`] for indefinite byte slice support.
-    pub fn bytes(&mut self) -> Result<&'b [u8], Error<R::Error>> {
+    pub fn bytes(&mut self) -> Result<&'b [u8], Error> {
         let b = self.read()?;
         if BYTES != type_of(b) || info_of(b) == 31 {
             return Err(Error::TypeMismatch(b, "expected bytes (definite length)"))
@@ -227,7 +219,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     /// This supports indefinite byte slices by returing a byte slice on each
     /// iterator step. If a single definite slice is decoded the iterator will
     /// only yield one item.
-    pub fn bytes_iter(&mut self) -> Result<BytesIter<'_, 'b, R>, Error<R::Error>> {
+    pub fn bytes_iter(&mut self) -> Result<BytesIter<'_, 'b>, Error> {
         let b = self.read()?;
         if BYTES != type_of(b) {
             return Err(Error::TypeMismatch(b, "expected bytes"))
@@ -245,7 +237,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     ///
     /// This only decodes string slices of definite lengths.
     /// See [`Decoder::str_iter`] for indefinite string slice support.
-    pub fn str(&mut self) -> Result<&'b str, Error<R::Error>> {
+    pub fn str(&mut self) -> Result<&'b str, Error> {
         let b = self.read()?;
         if TEXT != type_of(b) || info_of(b) == 31 {
             return Err(Error::TypeMismatch(b, "expected text (definite length)"))
@@ -260,7 +252,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     /// This supports indefinite string slices by returing a string slice on
     /// each iterator step. If a single definite slice is decoded the iterator
     /// will only yield one item.
-    pub fn str_iter(&mut self) -> Result<StrIter<'_, 'b, R>, Error<R::Error>> {
+    pub fn str_iter(&mut self) -> Result<StrIter<'_, 'b>, Error> {
         let b = self.read()?;
         if TEXT != type_of(b) {
             return Err(Error::TypeMismatch(b, "expected text"))
@@ -279,7 +271,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     /// CBOR arrays are heterogenous collections and may be of indefinite
     /// length. If the length is known it is returned as a `Some`, for
     /// indefinite arrays a `None` is returned.
-    pub fn array(&mut self) -> Result<Option<u64>, Error<R::Error>> {
+    pub fn array(&mut self) -> Result<Option<u64>, Error> {
         let b = self.read()?;
         if ARRAY != type_of(b) {
             return Err(Error::TypeMismatch(b, "expected array"))
@@ -295,7 +287,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     /// This supports indefinite and definite length arrays and uses the
     /// [`Decode`] trait to decode each element. Consequently *only
     /// homogenous arrays are supported by this method*.
-    pub fn array_iter<T>(&mut self) -> Result<ArrayIter<'_, 'b, R, T>, Error<R::Error>>
+    pub fn array_iter<T>(&mut self) -> Result<ArrayIter<'_, 'b, T>, Error>
     where
         T: Decode<'b>
     {
@@ -308,7 +300,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     /// CBOR maps are heterogenous collections (both in keys and in values)
     /// and may be of indefinite length. If the length is known it is returned
     /// as a `Some`, for indefinite maps a `None` is returned.
-    pub fn map(&mut self) -> Result<Option<u64>, Error<R::Error>> {
+    pub fn map(&mut self) -> Result<Option<u64>, Error> {
         let b = self.read()?;
         if MAP != type_of(b) {
             return Err(Error::TypeMismatch(b, "expected map"))
@@ -324,7 +316,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     /// This supports indefinite and definite length maps and uses the
     /// [`Decode`] trait to decode each key and value. Consequently *only
     /// homogenous maps are supported by this method*.
-    pub fn map_iter<K, V>(&mut self) -> Result<MapIter<'_, 'b, R, K, V>, Error<R::Error>>
+    pub fn map_iter<K, V>(&mut self) -> Result<MapIter<'_, 'b, K, V>, Error>
     where
         K: Decode<'b>,
         V: Decode<'b>
@@ -334,7 +326,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Decode a CBOR tag.
-    pub fn tag(&mut self) -> Result<Tag, Error<R::Error>> {
+    pub fn tag(&mut self) -> Result<Tag, Error> {
         let b = self.read()?;
         if TAGGED != type_of(b) {
             return Err(Error::TypeMismatch(b, "expected tag"))
@@ -343,7 +335,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Decode a CBOR simple value.
-    pub fn simple(&mut self) -> Result<u8, Error<R::Error>> {
+    pub fn simple(&mut self) -> Result<u8, Error> {
         match self.read()? {
             n @ SIMPLE ..= 0xf3 => Ok(n - SIMPLE),
             0xf8                => self.read(),
@@ -352,12 +344,12 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Inspect the CBOR type at the current position.
-    pub fn datatype(&self) -> Result<Type, Error<R::Error>> {
+    pub fn datatype(&self) -> Result<Type, Error> {
         self.peek().map(Type::read)
     }
 
     /// Skip over the current CBOR value.
-    pub fn skip(&mut self) -> Result<(), Error<R::Error>> {
+    pub fn skip(&mut self) -> Result<(), Error> {
         let mut nrounds = 1u64; // number of iterations over array and map elements
         let mut irounds = 0u64; // number of indefinite iterations
 
@@ -399,7 +391,7 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
     }
 
     /// Decode a `u64` value beginning with `b`.
-    fn unsigned(&mut self, b: u8) -> Result<u64, Error<R::Error>> {
+    fn unsigned(&mut self, b: u8) -> Result<u64, Error> {
         match b {
             n @ 0 ..= 0x17 => Ok(u64::from(n)),
             0x18           => self.read().map(u64::from),
@@ -410,19 +402,32 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
         }
     }
 
-    /// Like `Read::peek` but maps the error type.
-    fn peek(&self) -> Result<u8, Error<R::Error>> {
-        self.reader.peek().map_err(Error::Read)
+    /// Get the byte at the current position.
+    fn peek(&self) -> Result<u8, Error> {
+        if self.buf.is_empty() {
+            return Err(Error::EndOfInput)
+        }
+        Ok(self.buf[0])
     }
 
-    /// Like `Read::read` but maps the error type.
-    fn read(&mut self) -> Result<u8, Error<R::Error>> {
-        self.reader.read().map_err(Error::Read)
+    /// Consume and return the byte at the current position.
+    fn read(&mut self) -> Result<u8, Error> {
+        if self.buf.is_empty() {
+            return Err(Error::EndOfInput)
+        }
+        let (a, b) = self.buf.split_at(1);
+        self.buf = b;
+        Ok(a[0])
     }
 
-    /// Like `Read::read_slice` but maps the error type.
-    fn read_slice(&mut self, n: usize) -> Result<&'b [u8], Error<R::Error>> {
-        self.reader.read_slice(n).map_err(Error::Read)
+    /// Consume and return *n* bytes starting at the current position.
+    fn read_slice(&mut self, n: usize) -> Result<&'b [u8], Error> {
+        if self.buf.len() < n {
+            return Err(Error::EndOfInput)
+        }
+        let (a, b) = self.buf.split_at(n);
+        self.buf = b;
+        Ok(a)
     }
 }
 
@@ -430,13 +435,13 @@ impl<'b, R: Read<'b>> Decoder<'b, R> {
 ///
 /// Returned from [`Decoder::bytes_iter`].
 #[derive(Debug)]
-pub struct BytesIter<'a, 'b, R: Read<'b>> {
-    decoder: &'a mut Decoder<'b, R>,
+pub struct BytesIter<'a, 'b> {
+    decoder: &'a mut Decoder<'b>,
     len: Option<usize>
 }
 
-impl<'a, 'b, R: Read<'b>> Iterator for BytesIter<'a, 'b, R> {
-    type Item = Result<&'b [u8], Error<R::Error>>;
+impl<'a, 'b> Iterator for BytesIter<'a, 'b> {
+    type Item = Result<&'b [u8], Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.len {
@@ -458,13 +463,13 @@ impl<'a, 'b, R: Read<'b>> Iterator for BytesIter<'a, 'b, R> {
 ///
 /// Returned from [`Decoder::str_iter`].
 #[derive(Debug)]
-pub struct StrIter<'a, 'b, R: Read<'b>> {
-    decoder: &'a mut Decoder<'b, R>,
+pub struct StrIter<'a, 'b> {
+    decoder: &'a mut Decoder<'b>,
     len: Option<usize>
 }
 
-impl<'a, 'b, R: Read<'b>> Iterator for StrIter<'a, 'b, R> {
-    type Item = Result<&'b str, Error<R::Error>>;
+impl<'a, 'b> Iterator for StrIter<'a, 'b> {
+    type Item = Result<&'b str, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.len {
@@ -486,14 +491,14 @@ impl<'a, 'b, R: Read<'b>> Iterator for StrIter<'a, 'b, R> {
 ///
 /// Returned from [`Decoder::array_iter`].
 #[derive(Debug)]
-pub struct ArrayIter<'a, 'b, R: Read<'b>, T> {
-    decoder: &'a mut Decoder<'b, R>,
+pub struct ArrayIter<'a, 'b, T> {
+    decoder: &'a mut Decoder<'b>,
     len: Option<u64>,
     _mark: marker::PhantomData<&'a T>
 }
 
-impl<'a, 'b, R: Read<'b>, T: Decode<'b>> Iterator for ArrayIter<'a, 'b, R, T> {
-    type Item = Result<T, Error<R::Error>>;
+impl<'a, 'b, T: Decode<'b>> Iterator for ArrayIter<'a, 'b, T> {
+    type Item = Result<T, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.len {
@@ -515,26 +520,24 @@ impl<'a, 'b, R: Read<'b>, T: Decode<'b>> Iterator for ArrayIter<'a, 'b, R, T> {
 ///
 /// Returned from [`Decoder::map_iter`].
 #[derive(Debug)]
-pub struct MapIter<'a, 'b, R: Read<'b>, K, V> {
-    decoder: &'a mut Decoder<'b, R>,
+pub struct MapIter<'a, 'b, K, V> {
+    decoder: &'a mut Decoder<'b>,
     len: Option<u64>,
     _mark: marker::PhantomData<&'a (K, V)>
 }
 
-impl<'a, 'b, R, K, V> Iterator for MapIter<'a, 'b, R, K, V>
+impl<'a, 'b, K, V> Iterator for MapIter<'a, 'b, K, V>
 where
     K: Decode<'b>,
-    V: Decode<'b>,
-    R: Read<'b>
+    V: Decode<'b>
 {
-    type Item = Result<(K, V), Error<R::Error>>;
+    type Item = Result<(K, V), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        fn pair<'b, R, K, V>(d: &mut Decoder<'b, R>) -> Result<(K, V), Error<R::Error>>
+        fn pair<'b, K, V>(d: &mut Decoder<'b>) -> Result<(K, V), Error>
         where
             K: Decode<'b>,
-            V: Decode<'b>,
-            R: Read<'b>
+            V: Decode<'b>
         {
             Ok((K::decode(d)?, V::decode(d)?))
         }
@@ -581,7 +584,7 @@ fn info_of(b: u8) -> u8 {
     b & 0b000_11111
 }
 
-fn u64_to_usize<E>(n: u64) -> Result<usize, Error<E>> {
+fn u64_to_usize(n: u64) -> Result<usize, Error> {
     n.try_into().map_err(|_| Error::Overflow(n, "u64->usize"))
 }
 

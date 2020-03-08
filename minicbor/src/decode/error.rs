@@ -3,9 +3,9 @@ use core::{fmt, str};
 /// Decoding errors.
 #[non_exhaustive]
 #[derive(Debug, Clone)]
-pub enum Error<R> {
-    /// Error reading bytes from a [`Read`](crate::decode::Read) impl.
-    Read(R),
+pub enum Error {
+    /// Decoding has (unexpectedly) reached the end of the input slice.
+    EndOfInput,
     /// Data item to decode is not a valid `char`.
     InvalidChar(u32),
     /// Decoding a string failed because it is invalid UTF-8.
@@ -24,10 +24,10 @@ pub enum Error<R> {
     Message(&'static str)
 }
 
-impl<R: fmt::Display> fmt::Display for Error<R> {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::Read(e)            => write!(f, "read error: {}", e),
+            Error::EndOfInput         => f.write_str("end of input bytes"),
             Error::InvalidChar(n)     => write!(f, "invalid char: {:#x?}", n),
             Error::Utf8(e)            => write!(f, "invalid utf-8: {}", e),
             Error::Overflow(n, m)     => write!(f, "{}: {} overflows target type", m, n),
@@ -40,11 +40,11 @@ impl<R: fmt::Display> fmt::Display for Error<R> {
 }
 
 #[cfg(feature = "std")]
-impl<R: std::error::Error + 'static> std::error::Error for Error<R> {
+impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Error::Read(e) => Some(e),
             Error::Utf8(e) => Some(e),
+            | Error::EndOfInput
             | Error::InvalidChar(_)
             | Error::Overflow(..)
             | Error::TypeMismatch(..)
@@ -56,7 +56,7 @@ impl<R: std::error::Error + 'static> std::error::Error for Error<R> {
     }
 }
 
-impl<R> From<str::Utf8Error> for Error<R> {
+impl From<str::Utf8Error> for Error {
     fn from(e: str::Utf8Error) -> Self {
         Error::Utf8(e)
     }

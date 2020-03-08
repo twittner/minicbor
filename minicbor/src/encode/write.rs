@@ -22,17 +22,27 @@ impl<W: std::io::Write> Write for W {
 
 #[cfg(not(feature = "std"))]
 impl Write for &mut [u8] {
-    type Error = crate::EndOfSlice;
+    type Error = EndOfSlice;
 
     fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
         if self.len() < buf.len() {
-            return Err(crate::EndOfSlice(()))
+            return Err(EndOfSlice(()))
         }
         let this = core::mem::replace(self, &mut []);
         let (prefix, suffix) = this.split_at_mut(buf.len());
         prefix.copy_from_slice(buf);
         *self = suffix;
         Ok(())
+    }
+}
+
+/// An error indicating the end of a slice.
+#[derive(Debug)]
+pub struct EndOfSlice(());
+
+impl core::fmt::Display for EndOfSlice {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        f.write_str("end of slice")
     }
 }
 

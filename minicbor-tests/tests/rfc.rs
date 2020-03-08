@@ -10,7 +10,7 @@ use std::{collections::BTreeMap, iter::FromIterator};
 macro_rules! roundtrip {
     ($method:ident, $s:expr, $expected:expr) => {{
         let x = hex::decode($s).unwrap();
-        let mut d = Decoder::from_slice(&x);
+        let mut d = Decoder::new(&x);
         let v = d.$method().unwrap();
         assert_eq!($expected, v);
 
@@ -73,7 +73,7 @@ fn rfc_tv_float() {
 
     for s in &["f97e00", "fa7fc00000", "fb7ff8000000000000"] {
         let x = hex::decode(s).unwrap();
-        let mut d = Decoder::from_slice(&x);
+        let mut d = Decoder::new(&x);
         let v = d.f64().unwrap();
         assert!(v.is_nan())
     }
@@ -88,11 +88,11 @@ fn rfc_tv_small() {
     roundtrip!(simple, "f8ff", 255);
 
     let x = hex::decode("f6").unwrap();
-    let d = Decoder::from_slice(&x);
+    let d = Decoder::new(&x);
     assert_eq!(Type::Null, d.datatype().unwrap());
 
     let x = hex::decode("f7").unwrap();
-    let d = Decoder::from_slice(&x);
+    let d = Decoder::new(&x);
     assert_eq!(Type::Undefined, d.datatype().unwrap())
 }
 
@@ -102,7 +102,7 @@ fn rfc_tv_tagged() {
     {
         let s = "c074323031332d30332d32315432303a30343a30305a";
         let x = hex::decode(s).unwrap();
-        let mut d = Decoder::from_slice(&x);
+        let mut d = Decoder::new(&x);
         assert_eq!(Tag::DateTime, d.tag().unwrap());
         assert_eq!("2013-03-21T20:04:00Z", d.str().unwrap());
 
@@ -117,7 +117,7 @@ fn rfc_tv_tagged() {
     {
         let s = "c11a514b67b0";
         let x = hex::decode(s).unwrap();
-        let mut d = Decoder::from_slice(&x);
+        let mut d = Decoder::new(&x);
         assert_eq!(Tag::Timestamp, d.tag().unwrap());
         assert_eq!(Type::U32, d.datatype().unwrap());
         assert_eq!(1363896240, d.u32().unwrap());
@@ -133,7 +133,7 @@ fn rfc_tv_tagged() {
     {
         let s = "c1fb41d452d9ec200000";
         let x = hex::decode(s).unwrap();
-        let mut d = Decoder::from_slice(&x);
+        let mut d = Decoder::new(&x);
         assert_eq!(Tag::Timestamp, d.tag().unwrap());
         assert_eq!(Type::F64, d.datatype().unwrap());
         assert_eq!(1363896240.5, d.f64().unwrap());
@@ -149,7 +149,7 @@ fn rfc_tv_tagged() {
     {
         let s = "d74401020304";
         let x = hex::decode(s).unwrap();
-        let mut d = Decoder::from_slice(&x);
+        let mut d = Decoder::new(&x);
         assert_eq!(Tag::ToBase16, d.tag().unwrap());
         assert_eq!(Type::Bytes, d.datatype().unwrap());
         assert_eq!([1, 2, 3, 4], d.bytes().unwrap());
@@ -165,10 +165,10 @@ fn rfc_tv_tagged() {
     {
         let s = "d818456449455446";
         let x = hex::decode(s).unwrap();
-        let mut d = Decoder::from_slice(&x);
+        let mut d = Decoder::new(&x);
         assert_eq!(Tag::Cbor, d.tag().unwrap());
         assert_eq!(Type::Bytes, d.datatype().unwrap());
-        let mut g = Decoder::from_slice(d.bytes().unwrap());
+        let mut g = Decoder::new(d.bytes().unwrap());
         assert_eq!(Type::String, g.datatype().unwrap());
         assert_eq!("IETF", g.str().unwrap());
 
@@ -185,7 +185,7 @@ fn rfc_tv_tagged() {
     {
         let s = "d82076687474703a2f2f7777772e6578616d706c652e636f6d";
         let x = hex::decode(s).unwrap();
-        let mut d = Decoder::from_slice(&x);
+        let mut d = Decoder::new(&x);
         assert_eq!(Tag::Uri, d.tag().unwrap());
         assert_eq!(Type::String, d.datatype().unwrap());
         assert_eq!("http://www.example.com", d.str().unwrap());
@@ -218,7 +218,7 @@ fn rfc_tv_string() {
 #[test]
 fn rfc_tv_bytes_indef() {
     let x = hex::decode("5f42010243030405ff").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq! {
         vec![&[1u8, 2][..], &[3, 4, 5][..]],
         d.bytes_iter().unwrap().map(Result::unwrap).collect::<Vec<_>>()
@@ -235,7 +235,7 @@ fn rfc_tv_bytes_indef() {
 #[test]
 fn rfc_tv_string_indef() {
     let x = hex::decode("7f657374726561646d696e67ff").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq! {
         vec!["strea", "ming"],
         d.str_iter().unwrap().map(Result::unwrap).collect::<Vec<_>>()
@@ -252,7 +252,7 @@ fn rfc_tv_string_indef() {
 #[test]
 fn rfc_tv_array() {
     let x = hex::decode("80").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(Some(0), d.array().unwrap());
     let mut e = Encoder::new(Vec::new());
     e.array(0).unwrap();
@@ -260,13 +260,13 @@ fn rfc_tv_array() {
     assert_eq!("80", y);
 
     let x = hex::decode("83010203").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(vec![1, 2, 3], (Decode::decode(&mut d) as Result<Vec<u8>, _>).unwrap());
     let y = hex::encode(minicbor::to_vec([1, 2, 3]).unwrap());
     assert_eq!("83010203", y);
 
     let x = hex::decode("8301820203820405").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(Some(3), d.array().unwrap());
     assert_eq!(1, d.u8().unwrap());
     assert_eq!(Some(2), d.array().unwrap());
@@ -296,7 +296,7 @@ fn rfc_tv_array() {
     assert_eq!("98190102030405060708090a0b0c0d0e0f101112131415161718181819", y);
 
     let x = hex::decode("826161a161626163").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(Some(2), d.array().unwrap());
     assert_eq!("a", d.str().unwrap());
     assert_eq!(Some(1), d.map().unwrap());
@@ -315,7 +315,7 @@ fn rfc_tv_array() {
 #[test]
 fn rfc_tv_array_indef() {
     let x = hex::decode("9fff").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(None, d.array().unwrap());
     assert_eq!(Type::Break, d.datatype().unwrap());
     let mut e = Encoder::new(Vec::new());
@@ -325,7 +325,7 @@ fn rfc_tv_array_indef() {
     assert_eq!("9fff", y);
 
     let x = hex::decode("9f018202039f0405ffff").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(None, d.array().unwrap());
     assert_eq!(1, d.u8().unwrap());
     assert_eq!(Some(2), d.array().unwrap());
@@ -353,7 +353,7 @@ fn rfc_tv_array_indef() {
     assert_eq!("9f018202039f0405ffff", y);
 
     let x = hex::decode("9f01820203820405ff").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(None, d.array().unwrap());
     assert_eq!(1, d.u8().unwrap());
     assert_eq!(Some(2), d.array().unwrap());
@@ -378,7 +378,7 @@ fn rfc_tv_array_indef() {
     assert_eq!("9f01820203820405ff", y);
 
     let x = hex::decode("83018202039f0405ff").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(Some(3), d.array().unwrap());
     assert_eq!(1, d.u8().unwrap());
     assert_eq!(Some(2), d.array().unwrap());
@@ -403,7 +403,7 @@ fn rfc_tv_array_indef() {
     assert_eq!("83018202039f0405ff", y);
 
     let x = hex::decode("83019f0203ff820405").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(Some(3), d.array().unwrap());
     assert_eq!(1, d.u8().unwrap());
     assert_eq!(None, d.array().unwrap());
@@ -436,7 +436,7 @@ fn rfc_tv_array_indef() {
     assert_eq!("9f0102030405060708090a0b0c0d0e0f101112131415161718181819ff", y);
 
     let x = hex::decode("826161bf61626163ff").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(Some(2), d.array().unwrap());
     assert_eq!("a", d.str().unwrap());
     assert_eq!(None, d.map().unwrap());
@@ -459,13 +459,12 @@ fn rfc_tv_array_indef() {
 #[test]
 fn rfc_tv_map() {
     let x = hex::decode("a0").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(Some(0), d.map().unwrap());
     let mut e = Encoder::new(Vec::new());
     e.map(0).unwrap();
     let y = hex::encode(e.into_inner());
     assert_eq!("a0", y);
-
 
     let x = hex::decode("a201020304").unwrap();
     let m = BTreeMap::from_iter(vec![(1u8, 2u8), (3, 4)]);
@@ -474,7 +473,7 @@ fn rfc_tv_map() {
     assert_eq!("a201020304", y);
 
     let x = hex::decode("a26161016162820203").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(Some(2), d.map().unwrap());
     assert_eq!("a", d.str().unwrap());
     assert_eq!(1, d.u8().unwrap());
@@ -493,16 +492,14 @@ fn rfc_tv_map() {
     let y = hex::encode(e.into_inner());
     assert_eq!("a26161016162820203", y);
 
-
     let x = hex::decode("a56161614161626142616361436164614461656145").unwrap();
     let m = BTreeMap::from_iter(vec![("a", "A"), ("b", "B"), ("c", "C"), ("d", "D"), ("e", "E")]);
     assert_eq!(m, minicbor::from_slice(&x).unwrap());
     let y = hex::encode(minicbor::to_vec(&m).unwrap());
     assert_eq!("a56161614161626142616361436164614461656145", y);
 
-
     let x = hex::decode("bf61610161629f0203ffff").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(None, d.map().unwrap());
     assert_eq!("a", d.str().unwrap());
     assert_eq!(1, d.u8().unwrap());
@@ -528,7 +525,7 @@ fn rfc_tv_map() {
     assert_eq!("bf61610161629f0203ffff", y);
 
     let x = hex::decode("bf6346756ef563416d7421ff").unwrap();
-    let mut d = Decoder::from_slice(&x);
+    let mut d = Decoder::new(&x);
     assert_eq!(None, d.map().unwrap());
     assert_eq!("Fun", d.str().unwrap());
     assert_eq!(true, d.bool().unwrap());
