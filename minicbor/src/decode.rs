@@ -15,6 +15,13 @@ pub trait Decode<'b>: Sized {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error>;
 }
 
+#[cfg(feature = "std")]
+impl<'b, T: Decode<'b>> Decode<'b> for Box<T> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        T::decode(d).map(Box::new)
+    }
+}
+
 impl<'a, 'b: 'a> Decode<'b> for &'a [u8] {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
         d.bytes()
@@ -59,12 +66,45 @@ impl<'b, T: Decode<'b>> Decode<'b> for Option<T> {
 }
 
 #[cfg(feature = "std")]
-impl<'b, T: Decode<'b>> Decode<'b> for Vec<T> {
+impl<'b, T> Decode<'b> for std::collections::BinaryHeap<T>
+where
+    T: Decode<'b> + Ord
+{
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        let mut v = Vec::new();
         let iter: ArrayIter<T> = d.array_iter()?;
+        let mut v = std::collections::BinaryHeap::new();
         for x in iter {
             v.push(x?)
+        }
+        Ok(v)
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'b, T> Decode<'b> for std::collections::HashSet<T>
+where
+    T: Decode<'b> + Eq + std::hash::Hash
+{
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        let iter: ArrayIter<T> = d.array_iter()?;
+        let mut v = std::collections::HashSet::new();
+        for x in iter {
+            v.insert(x?);
+        }
+        Ok(v)
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'b, T> Decode<'b> for std::collections::BTreeSet<T>
+where
+    T: Decode<'b> + Ord
+{
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        let iter: ArrayIter<T> = d.array_iter()?;
+        let mut v = std::collections::BTreeSet::new();
+        for x in iter {
+            v.insert(x?);
         }
         Ok(v)
     }
@@ -104,6 +144,12 @@ where
     }
 }
 
+impl<'b, T> Decode<'b> for core::marker::PhantomData<T> {
+    fn decode(_: &mut Decoder<'b>) -> Result<Self, Error> {
+        Ok(core::marker::PhantomData)
+    }
+}
+
 #[cfg(target_pointer_width = "32")]
 impl<'b> Decode<'b> for usize {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
@@ -132,7 +178,7 @@ impl<'b> Decode<'b> for isize {
     }
 }
 
-macro_rules! decode_impls {
+macro_rules! decode_basic {
     ($($t:ident)*) => {
         $(
             impl<'b> $crate::decode::Decode<'b> for $t {
@@ -144,14 +190,65 @@ macro_rules! decode_impls {
     }
 }
 
-decode_impls!(u8 i8 u16 i16 u32 i32 u64 i64 bool f32 f64 char);
+decode_basic!(u8 i8 u16 i16 u32 i32 u64 i64 bool f32 f64 char);
+
+macro_rules! decode_nonzero {
+    ($($t:ty, $msg:expr)*) => {
+        $(
+            impl<'b> $crate::decode::Decode<'b> for $t {
+                fn decode(d: &mut $crate::decode::Decoder<'b>) -> Result<Self, Error> {
+                    Ok(<$t>::new(Decode::decode(d)?).ok_or(Error::Message($msg))?)
+                }
+            }
+        )*
+    }
+}
+
+decode_nonzero! {
+    core::num::NonZeroU8,  "unexpected 0 when decoding a `NonZeroU8`"
+    core::num::NonZeroU16, "unexpected 0 when decoding a `NonZeroU16`"
+    core::num::NonZeroU32, "unexpected 0 when decoding a `NonZeroU32`"
+    core::num::NonZeroU64, "unexpected 0 when decoding a `NonZeroU64`"
+    core::num::NonZeroI8,  "unexpected 0 when decoding a `NonZeroI8`"
+    core::num::NonZeroI16, "unexpected 0 when decoding a `NonZeroI16`"
+    core::num::NonZeroI32, "unexpected 0 when decoding a `NonZeroI32`"
+    core::num::NonZeroI64, "unexpected 0 when decoding a `NonZeroI64`"
+}
+
+#[cfg(feature = "std")]
+macro_rules! decode_sequential {
+    ($($t:ty, $push:ident)*) => {
+        $(
+            impl<'b, T> $crate::decode::Decode<'b> for $t
+            where
+                T: $crate::decode::Decode<'b>
+            {
+                fn decode(d: &mut $crate::decode::Decoder<'b>) -> Result<Self, Error> {
+                    let iter: $crate::decode::ArrayIter<T> = d.array_iter()?;
+                    let mut v = <$t>::new();
+                    for x in iter {
+                        v.$push(x?)
+                    }
+                    Ok(v)
+                }
+            }
+        )*
+    }
+}
+
+#[cfg(feature = "std")]
+decode_sequential! {
+    Vec<T>, push
+    std::collections::VecDeque<T>, push_back
+    std::collections::LinkedList<T>, push_back
+}
 
 macro_rules! decode_arrays {
     ($($n:expr)*) => {
         $(
             impl<'b, T> $crate::decode::Decode<'b> for [T; $n]
             where
-                T: $crate::decode::Decode<'b> + Default,
+                T: $crate::decode::Decode<'b> + Default
             {
                 fn decode(d: &mut $crate::decode::Decoder<'b>) -> Result<Self, Error> {
                     let iter: $crate::decode::ArrayIter<T> = d.array_iter()?;
@@ -198,4 +295,107 @@ macro_rules! decode_smallvecs {
 
 #[cfg(feature = "smallvec")]
 decode_smallvecs!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
+
+macro_rules! decode_fields {
+    ($d:ident | $($n:literal $x:ident => $t:ty ; $msg:literal)*) => {
+        $(let mut $x = None;)*
+
+        match $d.map()? {
+            Some(n) => for _ in 0 .. n {
+                match $d.u32()? {
+                    $($n => $x = Some($crate::decode::Decode::decode($d)?),)*
+                    _    => $d.skip()?
+                }
+            }
+            None => while $d.datatype()? != $crate::data::Type::Break {
+                match $d.u32()? {
+                    $($n => $x = Some($crate::decode::Decode::decode($d)?),)*
+                    _    => $d.skip()?
+                }
+            }
+        }
+
+        $(let $x = if let Some(x) = $x {
+            x
+        } else {
+            return Err(Error::MissingValue($n, $msg))
+        };)*
+    }
+}
+
+impl<'b> Decode<'b> for core::time::Duration {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        decode_fields! { d |
+            0 secs  => u64 ; "Duration::secs"
+            1 nanos => u32 ; "Duration::nanos"
+        }
+        Ok(core::time::Duration::new(secs, nanos))
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'b> Decode<'b> for std::net::IpAddr {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        if Some(2) != d.array()? {
+            return Err(Error::Message("expected enum (2-element array)"))
+        }
+        match d.u32()? {
+            0 => Ok(std::net::Ipv4Addr::decode(d)?.into()),
+            1 => Ok(std::net::Ipv6Addr::decode(d)?.into()),
+            n => Err(Error::UnknownVariant(n))
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'b> Decode<'b> for std::net::Ipv4Addr {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        let octets: [u8; 4] = Decode::decode(d)?;
+        Ok(octets.into())
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'b> Decode<'b> for std::net::Ipv6Addr {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        let octets: [u8; 16] = Decode::decode(d)?;
+        Ok(octets.into())
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'b> Decode<'b> for std::net::SocketAddr {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        if Some(2) != d.array()? {
+            return Err(Error::Message("expected enum (2-element array)"))
+        }
+        match d.u32()? {
+            0 => Ok(std::net::SocketAddrV4::decode(d)?.into()),
+            1 => Ok(std::net::SocketAddrV6::decode(d)?.into()),
+            n => Err(Error::UnknownVariant(n))
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'b> Decode<'b> for std::net::SocketAddrV4 {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        decode_fields! { d |
+            0 ip   => std::net::Ipv4Addr ; "SocketAddrV4::ip"
+            1 port => u16                ; "SocketAddrV4::port"
+        }
+        Ok(std::net::SocketAddrV4::new(ip, port))
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'b> Decode<'b> for std::net::SocketAddrV6 {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        decode_fields! { d |
+            0 ip   => std::net::Ipv6Addr ; "SocketAddrV6::ip"
+            1 port => u16                ; "SocketAddrV6::port"
+        }
+        Ok(std::net::SocketAddrV6::new(ip, port, 0, 0))
+    }
+}
 
