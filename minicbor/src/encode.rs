@@ -45,13 +45,13 @@ impl<T: Encode + ?Sized> Encode for Box<T> {
 
 impl Encode for [u8] {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.bytes(self).map(|_| ())
+        e.bytes(self)?.ok()
     }
 }
 
 impl Encode for str {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.str(self).map(|_| ())
+        e.str(self)?.ok()
     }
 }
 
@@ -69,7 +69,7 @@ impl<T: Encode> Encode for Option<T> {
 #[cfg(feature = "std")]
 impl Encode for String {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.str(self).map(|_| ())
+        e.str(self)?.ok()
     }
 }
 
@@ -125,32 +125,28 @@ impl<T> Encode for core::marker::PhantomData<T> {
 #[cfg(target_pointer_width = "32")]
 impl Encode for usize {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.u32(*self as u32)?;
-        Ok(())
+        e.u32(*self as u32)?.ok()
     }
 }
 
 #[cfg(target_pointer_width = "64")]
 impl Encode for usize {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.u64(*self as u64)?;
-        Ok(())
+        e.u64(*self as u64)?.ok()
     }
 }
 
 #[cfg(target_pointer_width = "32")]
 impl Encode for isize {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.i32(*self as i32)?;
-        Ok(())
+        e.i32(*self as i32)?.ok()
     }
 }
 
 #[cfg(target_pointer_width = "64")]
 impl Encode for isize {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.i64(*self as i64)?;
-        Ok(())
+        e.i64(*self as i64)?.ok()
     }
 }
 
