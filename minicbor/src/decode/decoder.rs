@@ -40,13 +40,41 @@ macro_rules! u_as_i {
 /// A non-allocating CBOR decoder.
 #[derive(Debug, Clone)]
 pub struct Decoder<'b> {
-    buf: &'b [u8]
+    buf: &'b [u8],
+    pos: usize
 }
 
 impl<'b> Decoder<'b> {
     /// Construct a `Decoder` for the given byte slice.
     pub fn new(bytes: &'b [u8]) -> Self {
-        Decoder { buf: bytes }
+        Decoder { buf: bytes, pos: 0 }
+    }
+
+    /// Decode any type that implements [`Decode`].
+    pub fn decode<T: Decode<'b>>(&mut self) -> Result<T, Error> {
+        T::decode(self)
+    }
+
+    /// Get the current decode position.
+    pub fn position(&self) -> usize {
+        self.pos
+    }
+
+    /// Set the current decode position.
+    pub fn set_position(&mut self, pos: usize) {
+        self.pos = pos
+    }
+
+    /// Get a decoding probe to look ahead what is coming next.
+    ///
+    /// This will not affect the decoding state of `self` and after the
+    /// returned `Probe` has been dropped, decoding can continue from
+    /// its current position as if `probe` was never called.
+    pub fn probe<'a>(&'a mut self) -> Probe<'a, 'b> {
+        Probe {
+            decoder: self.clone(),
+            _marker: marker::PhantomData
+        }
     }
 
     /// Decode a `bool` value.
@@ -166,7 +194,7 @@ impl<'b> Decoder<'b> {
 
     /// Decode an `f32` value.
     pub fn f32(&mut self) -> Result<f32, Error> {
-        match self.peek()? {
+        match self.current()? {
             #[cfg(feature = "half")]
             0xf9 => self.f16(),
             0xfa => {
@@ -181,7 +209,7 @@ impl<'b> Decoder<'b> {
 
     /// Decode an `f64` value.
     pub fn f64(&mut self) -> Result<f64, Error> {
-        match self.peek()? {
+        match self.current()? {
             #[cfg(feature = "half")]
             0xf9 => self.f16().map(f64::from),
             0xfa => self.f32().map(f64::from),
@@ -345,7 +373,7 @@ impl<'b> Decoder<'b> {
 
     /// Inspect the CBOR type at the current position.
     pub fn datatype(&self) -> Result<Type, Error> {
-        self.peek().map(Type::read)
+        self.current().map(Type::read)
     }
 
     /// Skip over the current CBOR value.
@@ -354,7 +382,7 @@ impl<'b> Decoder<'b> {
         let mut irounds = 0u64; // number of indefinite iterations
 
         while nrounds > 0 || irounds > 0 {
-            match self.peek()? {
+            match self.current()? {
                 UNSIGNED ..= 0x1b => { self.u64()?; }
                 SIGNED   ..= 0x3b => { self.i64()?; }
                 BYTES    ..= 0x5f => { for _ in self.bytes_iter()? {} }
@@ -403,31 +431,29 @@ impl<'b> Decoder<'b> {
     }
 
     /// Get the byte at the current position.
-    fn peek(&self) -> Result<u8, Error> {
-        if self.buf.is_empty() {
-            return Err(Error::EndOfInput)
+    fn current(&self) -> Result<u8, Error> {
+        if let Some(b) = self.buf.get(self.pos) {
+            return Ok(*b)
         }
-        Ok(self.buf[0])
+        Err(Error::EndOfInput)
     }
 
     /// Consume and return the byte at the current position.
     fn read(&mut self) -> Result<u8, Error> {
-        if self.buf.is_empty() {
-            return Err(Error::EndOfInput)
+        if let Some(b) = self.buf.get(self.pos) {
+            self.pos += 1;
+            return Ok(*b)
         }
-        let (a, b) = self.buf.split_at(1);
-        self.buf = b;
-        Ok(a[0])
+        Err(Error::EndOfInput)
     }
 
     /// Consume and return *n* bytes starting at the current position.
     fn read_slice(&mut self, n: usize) -> Result<&'b [u8], Error> {
-        if self.buf.len() < n {
-            return Err(Error::EndOfInput)
+        if let Some(b) = self.buf.get(self.pos .. self.pos + n) {
+            self.pos += n;
+            return Ok(b)
         }
-        let (a, b) = self.buf.split_at(n);
-        self.buf = b;
-        Ok(a)
+        Err(Error::EndOfInput)
     }
 }
 
@@ -445,7 +471,7 @@ impl<'a, 'b> Iterator for BytesIter<'a, 'b> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.len {
-            None => match self.decoder.peek() {
+            None => match self.decoder.current() {
                 Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
                 Ok(_)     => Some(self.decoder.bytes()),
                 Err(e)    => Some(Err(e))
@@ -473,7 +499,7 @@ impl<'a, 'b> Iterator for StrIter<'a, 'b> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.len {
-            None => match self.decoder.peek() {
+            None => match self.decoder.current() {
                 Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
                 Ok(_)     => Some(self.decoder.str()),
                 Err(e)    => Some(Err(e))
@@ -502,7 +528,7 @@ impl<'a, 'b, T: Decode<'b>> Iterator for ArrayIter<'a, 'b, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.len {
-            None => match self.decoder.peek() {
+            None => match self.decoder.current() {
                 Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
                 Ok(_)     => Some(T::decode(&mut self.decoder)),
                 Err(e)    => Some(Err(e))
@@ -542,7 +568,7 @@ where
             Ok((K::decode(d)?, V::decode(d)?))
         }
         match self.len {
-            None => match self.decoder.peek() {
+            None => match self.decoder.current() {
                 Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
                 Ok(_)  => Some(pair(&mut self.decoder)),
                 Err(e) => Some(Err(e))
@@ -553,6 +579,37 @@ where
                 Some(pair(&mut self.decoder))
             }
         }
+    }
+}
+
+/// A decoding probe to to look ahead what comes next.
+///
+/// A `Probe` derefs to [`Decoder`] and thus can be used like one without
+/// affecting the decoder from which it was created.
+//
+// The current implementation just clones `Decoder` as it is very cheap
+// to do so. `Probe` is nevertheless introduced to discourage use of
+// `Decoder::clone` in client code for this purpose so that it stays
+// independent of the current implementation.
+// With a more heavyweight `Decoder`, `Probe` could only store a reference
+// and the current position which it restores in a `Drop` impl.
+#[derive(Debug)]
+pub struct Probe<'a, 'b> {
+    decoder: Decoder<'b>,
+    _marker: marker::PhantomData<&'a mut ()>
+}
+
+impl<'b> core::ops::Deref for Probe<'_, 'b> {
+    type Target = Decoder<'b>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.decoder
+    }
+}
+
+impl<'b> core::ops::DerefMut for Probe<'_, 'b> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.decoder
     }
 }
 

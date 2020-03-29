@@ -1,6 +1,6 @@
 use crate::{SIGNED, BYTES, TEXT, ARRAY, MAP, TAGGED, SIMPLE};
 use crate::data::Tag;
-use crate::encode::{Error, Write};
+use crate::encode::{Encode, Error, Write};
 
 /// A non-allocating CBOR encoder writing encoded bytes to the given [`Write`] sink.
 #[derive(Debug, Clone)]
@@ -21,6 +21,12 @@ impl<W: Write> Encoder<W> {
     /// Get back the [`Write`] impl.
     pub fn into_inner(self) -> W {
         self.writer
+    }
+
+    /// Encode any type that implements [`Encode`].
+    pub fn encode<T: Encode>(&mut self, x: T) -> Result<&mut Self, Error<W::Error>> {
+        x.encode(self)?;
+        Ok(self)
     }
 
     /// Encode a `u8` value.

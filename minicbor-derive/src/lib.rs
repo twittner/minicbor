@@ -30,7 +30,7 @@
 //! Item **3**. ensures that newer software can stop producing optional values.
 //! Item **4**. ensures that enums can get new variants that older software is
 //! not aware of. By "fields" we mean the elements of structs and tuple
-//! structs well as enum structs and enum tuples. In addition it is a
+//! structs as well as enum structs and enum tuples. In addition it is a
 //! compatible change to turn a unit variant into a struct or tuple variant if
 //! all fields are optional.
 //!
