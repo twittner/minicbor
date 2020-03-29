@@ -599,7 +599,7 @@ pub struct Probe<'a, 'b> {
     _marker: marker::PhantomData<&'a mut ()>
 }
 
-impl<'b> std::ops::Deref for Probe<'_, 'b> {
+impl<'b> core::ops::Deref for Probe<'_, 'b> {
     type Target = Decoder<'b>;
 
     fn deref(&self) -> &Self::Target {
@@ -607,7 +607,7 @@ impl<'b> std::ops::Deref for Probe<'_, 'b> {
     }
 }
 
-impl<'b> std::ops::DerefMut for Probe<'_, 'b> {
+impl<'b> core::ops::DerefMut for Probe<'_, 'b> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.decoder
     }
