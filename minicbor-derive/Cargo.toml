@@ -1,13 +1,14 @@
 [package]
-name        = "minicbor-derive"
-version     = "0.1.0"
-authors     = ["Toralf Wittner <tw@dtex.org>"]
-license     = "BlueOak-1.0.0"
-edition     = "2018"
-description = "Derive minicbor `Decode` and `Encode` traits."
-repository  = "https://gitlab.com/twittner/minicbor"
-keywords    = ["cbor", "encoding", "binary"]
-categories  = ["encoding"]
+name          = "minicbor-derive"
+version       = "0.1.1"
+authors       = ["Toralf Wittner <tw@dtex.org>"]
+license       = "BlueOak-1.0.0"
+edition       = "2018"
+description   = "Derive minicbor `Decode` and `Encode` traits."
+repository    = "https://gitlab.com/twittner/minicbor"
+documentation = "https://twittner.gitlab.io/minicbor/minicbor_derive/"
+keywords      = ["cbor", "encoding", "binary"]
+categories    = ["encoding"]
 
 [lib]
 proc-macro = true

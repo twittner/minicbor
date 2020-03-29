@@ -4,8 +4,8 @@ A small [CBOR][1] codec suitable for `no_std` environments.
 
 Documentation is available at
 
-- <https://docs.rs/minicbor/>
 - <https://twittner.gitlab.io/minicbor/minicbor/>
+- <https://docs.rs/minicbor/>
 
 # License
 
