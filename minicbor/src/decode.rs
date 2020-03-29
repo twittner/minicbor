@@ -5,7 +5,7 @@
 mod decoder;
 mod error;
 
-pub use decoder::Decoder;
+pub use decoder::{Decoder, Probe};
 pub use decoder::{ArrayIter, BytesIter, MapIter, StrIter};
 pub use error::Error;
 
