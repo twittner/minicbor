@@ -3,7 +3,7 @@ use quickcheck::quickcheck;
 
 fn identity<T: Encode + Eq + for<'a> Decode<'a>>(arg: T) -> bool {
     let vec = minicbor::to_vec(&arg).unwrap();
-    let val = minicbor::from_slice(&vec).unwrap();
+    let val = minicbor::decode(&vec).unwrap();
     arg == val
 }
 
@@ -104,7 +104,7 @@ fn binaryheap() {
 
     fn property(arg: BinaryHeap<i32>) -> bool {
         let vec = minicbor::to_vec(&arg).unwrap();
-        let val: BinaryHeap<i32> = minicbor::from_slice(&vec).unwrap();
+        let val: BinaryHeap<i32> = minicbor::decode(&vec).unwrap();
         let a = BTreeSet::from_iter(arg.into_iter());
         let b = BTreeSet::from_iter(val.into_iter());
         a == b
@@ -166,5 +166,57 @@ fn socketaddrv6() {
         identity(x)
     }
     quickcheck(property as fn(std::net::SocketAddrV6) -> bool)
+}
+
+#[test]
+fn bytes_owned() {
+    fn property(x: Vec<u8>) {
+        let bsl = minicbor::Bytes::from(x);
+        assert!(bsl.is_owned());
+        let vec = minicbor::to_vec(&bsl).unwrap();
+        let val = minicbor::decode(&vec).unwrap();
+        assert_eq!(bsl, val);
+        assert!(val.is_borrowed())
+    }
+    quickcheck(property as fn(Vec<u8>))
+}
+
+#[test]
+fn bytes_borrowed() {
+    fn property(x: Vec<u8>) {
+        let bsl = minicbor::Bytes::from(&x);
+        assert!(bsl.is_borrowed());
+        let vec = minicbor::to_vec(&bsl).unwrap();
+        let val = minicbor::decode(&vec).unwrap();
+        assert_eq!(bsl, val);
+        assert!(val.is_borrowed())
+    }
+    quickcheck(property as fn(Vec<u8>))
+}
+
+#[test]
+fn string_owned() {
+    fn property(x: String) {
+        let ssl = minicbor::String::from(x);
+        assert!(ssl.is_owned());
+        let vec = minicbor::to_vec(&ssl).unwrap();
+        let val = minicbor::decode(&vec).unwrap();
+        assert_eq!(ssl, val);
+        assert!(val.is_borrowed())
+    }
+    quickcheck(property as fn(String))
+}
+
+#[test]
+fn string_borrowed() {
+    fn property(x: String) {
+        let ssl = minicbor::String::from(&x);
+        assert!(ssl.is_borrowed());
+        let vec = minicbor::to_vec(&ssl).unwrap();
+        let val = minicbor::decode(&vec).unwrap();
+        assert_eq!(ssl, val);
+        assert!(val.is_borrowed())
+    }
+    quickcheck(property as fn(String))
 }
 

@@ -5,12 +5,10 @@
 
 mod encoder;
 mod error;
-mod iter;
 pub mod write;
 
 pub use encoder::Encoder;
 pub use error::Error;
-pub use iter::{Iter, ExactSizeIter};
 pub use write::Write;
 
 /// A type that can be encoded to CBOR.
@@ -43,15 +41,23 @@ impl<T: Encode + ?Sized> Encode for Box<T> {
     }
 }
 
-impl Encode for [u8] {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.bytes(self)?.ok()
-    }
-}
-
 impl Encode for str {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
         e.str(self)?.ok()
+    }
+}
+
+#[cfg(feature = "std")]
+impl Encode for crate::Bytes<'_> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.bytes(self.as_ref())?.ok()
+    }
+}
+
+#[cfg(feature = "std")]
+impl Encode for crate::String<'_> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.str(self.as_ref())?.ok()
     }
 }
 
@@ -76,7 +82,7 @@ impl Encode for String {
 #[cfg(feature = "std")]
 impl<T> Encode for std::borrow::Cow<'_, T>
 where
-    T: Encode + Clone
+    T: Encode + std::borrow::ToOwned + ?Sized
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
         self.as_ref().encode(e)
@@ -117,6 +123,12 @@ where
 }
 
 impl<T> Encode for core::marker::PhantomData<T> {
+    fn encode<W: Write>(&self, _: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        Ok(())
+    }
+}
+
+impl Encode for () {
     fn encode<W: Write>(&self, _: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
         Ok(())
     }
@@ -194,7 +206,6 @@ encode_nonzero! {
     core::num::NonZeroI64
 }
 
-#[cfg(feature = "std")]
 macro_rules! encode_sequential {
     ($($t:ty)*) => {
         $(
@@ -216,6 +227,8 @@ macro_rules! encode_sequential {
         )*
     }
 }
+
+encode_sequential!([T]);
 
 #[cfg(feature = "std")]
 encode_sequential! {
@@ -250,32 +263,6 @@ macro_rules! encode_arrays {
 }
 
 encode_arrays!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
-
-#[cfg(feature = "smallvec")]
-macro_rules! encode_smallvecs {
-    ($($n:expr)*) => {
-        $(
-            impl<T> $crate::encode::Encode for smallvec::SmallVec::<[T; $n]>
-            where
-                T: $crate::encode::Encode
-            {
-                fn encode<W>(&self, e: &mut $crate::encode::Encoder<W>) -> Result<(), Error<W::Error>>
-                where
-                    W: $crate::encode::Write
-                {
-                    e.array(self.len())?;
-                    for x in self {
-                        x.encode(e)?
-                    }
-                    Ok(())
-                }
-            }
-        )*
-    }
-}
-
-#[cfg(feature = "smallvec")]
-encode_smallvecs!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
 
 impl Encode for core::time::Duration {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {

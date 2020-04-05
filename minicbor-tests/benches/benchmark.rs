@@ -2,7 +2,6 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use minicbor::{Encode, Decode};
 use rand::{distributions::Alphanumeric, prelude::*};
 use serde::{Serialize, Deserialize};
-use smallvec::SmallVec;
 use std::borrow::Cow;
 
 criterion_group!(benches, benchmark);
@@ -11,7 +10,7 @@ criterion_main!(benches);
 #[derive(Debug, Encode, Decode, Serialize, Deserialize)]
 struct AddressBook<'a> {
     #[n(1)] timestamp: u64,
-    #[n(2)] entries: SmallVec<[Entry<'a>; 8]>,
+    #[n(2)] entries: Vec<Entry<'a>>,
     #[n(3)] style: Option<Style<'a>>,
     #[n(4)] rating: Option<f64>
 }
@@ -21,7 +20,7 @@ struct Entry<'a> {
     #[n(1)] firstname: Cow<'a, str>,
     #[n(2)] lastname: Cow<'a, str>,
     #[n(3)] birthday: u32,
-    #[n(4)] addresses: SmallVec<[Address<'a>; 8]>
+    #[n(4)] addresses: Vec<Address<'a>>
 }
 
 #[derive(Debug, Encode, Decode, Serialize, Deserialize)]
@@ -64,7 +63,7 @@ fn benchmark(c: &mut Criterion) {
 
     }));
     group.bench_function("minicbor", |b| b.iter(|| {
-        let _: AddressBook = minicbor::from_slice(&book_bytes_minicbor).unwrap();
+        let _: AddressBook = minicbor::decode(&book_bytes_minicbor).unwrap();
     }));
     group.finish();
 }
@@ -102,7 +101,7 @@ fn gen_addressbook(n: usize) -> AddressBook<'static> {
             lastname: gen_string(g),
             birthday: g.gen(),
             addresses: {
-                let mut v = SmallVec::new();
+                let mut v = Vec::with_capacity(n);
                 for _ in 0 .. n {
                     v.push(gen_address(g))
                 }
@@ -116,7 +115,7 @@ fn gen_addressbook(n: usize) -> AddressBook<'static> {
     AddressBook {
         timestamp: g.gen(),
         entries: {
-            let mut v = SmallVec::new();
+            let mut v = Vec::with_capacity(n);
             for _ in 0 .. n {
                 v.push(gen_entry(&mut g, n))
             }

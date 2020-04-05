@@ -82,42 +82,42 @@ fn compatibility() {
     // Any given version can be decoded as any of the 6 versions.
     // Common fields are equal and enum constructors match.
     fn property(m: Message) {
-        match minicbor::from_slice::<Version1>(&m.1) {
+        match minicbor::decode::<Version1>(&m.1) {
             Ok(v1) => {
                 let v = SomeVersion::V1(v1);
                 assert!(m.0.overlaps(&v), "{:?} != {:?}", m.0, v)
             }
             Err(e) => panic!("failed decoding v{} as v1: {}", m.0.version(), e)
         }
-        match minicbor::from_slice::<Version2>(&m.1) {
+        match minicbor::decode::<Version2>(&m.1) {
             Ok(v2) => {
                 let v = SomeVersion::V2(v2);
                 assert!(m.0.overlaps(&v), "{:?} != {:?}", m.0, v)
             }
             Err(e) => panic!("failed decoding v{} as v2: {}", m.0.version(), e)
         }
-        match minicbor::from_slice::<Version3>(&m.1) {
+        match minicbor::decode::<Version3>(&m.1) {
             Ok(v3) => {
                 let v = SomeVersion::V3(v3);
                 assert!(m.0.overlaps(&v), "{:?} != {:?}", m.0, v)
             }
             Err(e) => panic!("failed decoding v{} as v3: {}", m.0.version(), e)
         }
-        match minicbor::from_slice::<Version4>(&m.1) {
+        match minicbor::decode::<Version4>(&m.1) {
             Ok(v4) => {
                 let v = SomeVersion::V4(v4);
                 assert!(m.0.overlaps(&v), "{:?} != {:?}", m.0, v)
             }
             Err(e) => panic!("failed decoding v{} as v4: {}", m.0.version(), e)
         }
-        match minicbor::from_slice::<Version5>(&m.1) {
+        match minicbor::decode::<Version5>(&m.1) {
             Ok(v5) => {
                 let v = SomeVersion::V5(v5);
                 assert!(m.0.overlaps(&v), "{:?} != {:?}", m.0, v)
             }
             Err(e) => panic!("failed decoding v{} as v5: {}", m.0.version(), e)
         }
-        match minicbor::from_slice::<Version6>(&m.1) {
+        match minicbor::decode::<Version6>(&m.1) {
             Ok(v6) => {
                 let v = SomeVersion::V6(v6);
                 assert!(m.0.overlaps(&v), "{:?} != {:?}", m.0, v)

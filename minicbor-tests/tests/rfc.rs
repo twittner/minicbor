@@ -1,4 +1,4 @@
-use minicbor::{Decode, Decoder, Encoder, data::{Tag, Type}, encode::{ExactSizeIter, Iter}};
+use minicbor::{Decode, Decoder, Encoder, data::{Tag, Type}};
 use std::{collections::BTreeMap, iter::FromIterator};
 
 // Test vectors of RFC 7049
@@ -46,7 +46,7 @@ fn rfc_tv_int() {
 fn rfc_tv_float() {
     fn decode(s: &str, expected: f64) {
         let x = hex::decode(s).unwrap();
-        let v = minicbor::from_slice(&x).unwrap();
+        let v = minicbor::decode(&x).unwrap();
         assert_eq!(expected, v)
     }
 
@@ -290,9 +290,9 @@ fn rfc_tv_array() {
     let x = hex::decode("98190102030405060708090a0b0c0d0e0f101112131415161718181819").unwrap();
     assert_eq! {
         (1 ..= 25).collect::<Vec<_>>(),
-        minicbor::from_slice::<Vec<u8>>(&x).unwrap()
+        minicbor::decode::<Vec<u8>>(&x).unwrap()
     }
-    let y = hex::encode(minicbor::to_vec(ExactSizeIter::from(1u8 ..= 25)).unwrap());
+    let y = hex::encode(minicbor::to_vec((1u8 ..= 25).collect::<Vec<_>>()).unwrap());
     assert_eq!("98190102030405060708090a0b0c0d0e0f101112131415161718181819", y);
 
     let x = hex::decode("826161a161626163").unwrap();
@@ -430,9 +430,17 @@ fn rfc_tv_array_indef() {
     let x = hex::decode("9f0102030405060708090a0b0c0d0e0f101112131415161718181819ff").unwrap();
     assert_eq! {
         (1 ..= 25).collect::<Vec<_>>(),
-        minicbor::from_slice::<Vec<u8>>(&x).unwrap()
+        minicbor::decode::<Vec<u8>>(&x).unwrap()
     }
-    let y = hex::encode(minicbor::to_vec(Iter::from(1u8 ..= 25)).unwrap());
+    let y = hex::encode({
+        let mut e = Encoder::new(Vec::new());
+        e.begin_array().unwrap();
+        for i in 1 ..= 25 {
+            e.u8(i).unwrap();
+        }
+        e.end().unwrap();
+        e.into_inner()
+    });
     assert_eq!("9f0102030405060708090a0b0c0d0e0f101112131415161718181819ff", y);
 
     let x = hex::decode("826161bf61626163ff").unwrap();
@@ -468,7 +476,7 @@ fn rfc_tv_map() {
 
     let x = hex::decode("a201020304").unwrap();
     let m = BTreeMap::from_iter(vec![(1u8, 2u8), (3, 4)]);
-    assert_eq!(m, minicbor::from_slice(&x).unwrap());
+    assert_eq!(m, minicbor::decode(&x).unwrap());
     let y = hex::encode(minicbor::to_vec(&m).unwrap());
     assert_eq!("a201020304", y);
 
@@ -494,7 +502,7 @@ fn rfc_tv_map() {
 
     let x = hex::decode("a56161614161626142616361436164614461656145").unwrap();
     let m = BTreeMap::from_iter(vec![("a", "A"), ("b", "B"), ("c", "C"), ("d", "D"), ("e", "E")]);
-    assert_eq!(m, minicbor::from_slice(&x).unwrap());
+    assert_eq!(m, minicbor::decode(&x).unwrap());
     let y = hex::encode(minicbor::to_vec(&m).unwrap());
     assert_eq!("a56161614161626142616361436164614461656145", y);
 
