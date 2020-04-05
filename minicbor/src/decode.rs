@@ -35,9 +35,27 @@ impl<'a, 'b: 'a> Decode<'b> for &'a str {
 }
 
 #[cfg(feature = "std")]
-impl<'a, 'b: 'a> Decode<'b> for std::borrow::Cow<'a, [u8]> {
+impl<'a, 'b: 'a> Decode<'b> for crate::Bytes<'a> {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        d.bytes().map(std::borrow::Cow::Borrowed)
+        d.bytes().map(crate::Bytes::Borrowed)
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'a, 'b: 'a> Decode<'b> for crate::String<'a> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        d.str().map(crate::String::Borrowed)
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'b, T> Decode<'b> for std::borrow::Cow<'_, T>
+where
+    T: std::borrow::ToOwned + ?Sized,
+    T::Owned: Decode<'b>
+{
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        d.decode().map(std::borrow::Cow::Owned)
     }
 }
 
@@ -45,13 +63,6 @@ impl<'a, 'b: 'a> Decode<'b> for std::borrow::Cow<'a, [u8]> {
 impl<'b> Decode<'b> for String {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
         d.str().map(String::from)
-    }
-}
-
-#[cfg(feature = "std")]
-impl<'a, 'b: 'a> Decode<'b> for std::borrow::Cow<'a, str> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        d.str().map(std::borrow::Cow::Borrowed)
     }
 }
 
@@ -147,6 +158,12 @@ where
 impl<'b, T> Decode<'b> for core::marker::PhantomData<T> {
     fn decode(_: &mut Decoder<'b>) -> Result<Self, Error> {
         Ok(core::marker::PhantomData)
+    }
+}
+
+impl<'b> Decode<'b> for () {
+    fn decode(_: &mut Decoder<'b>) -> Result<Self, Error> {
+        Ok(())
     }
 }
 
@@ -271,30 +288,6 @@ macro_rules! decode_arrays {
 }
 
 decode_arrays!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
-
-#[cfg(feature = "smallvec")]
-macro_rules! decode_smallvecs {
-    ($($n:expr)*) => {
-        $(
-            impl<'b, T> $crate::decode::Decode<'b> for smallvec::SmallVec::<[T; $n]>
-            where
-                T: $crate::decode::Decode<'b>
-            {
-                fn decode(d: &mut $crate::decode::Decoder<'b>) -> Result<Self, Error> {
-                    let iter: $crate::decode::ArrayIter<T> = d.array_iter()?;
-                    let mut v = smallvec::SmallVec::<[T; $n]>::new();
-                    for x in iter {
-                        v.push(x?)
-                    }
-                    Ok(v)
-                }
-            }
-        )*
-    }
-}
-
-#[cfg(feature = "smallvec")]
-decode_smallvecs!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
 
 macro_rules! decode_fields {
     ($d:ident | $($n:literal $x:ident => $t:ty ; $msg:literal)*) => {

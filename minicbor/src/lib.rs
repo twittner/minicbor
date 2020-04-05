@@ -28,8 +28,8 @@
 //! let input = ["hello", "world"];
 //! let mut buffer = [0u8; 128];
 //!
-//! let bytes = minicbor::to_slice(&input, &mut buffer[..])?;
-//! let output: [&str; 2] = minicbor::from_slice(bytes)?;
+//! minicbor::encode(&input, buffer.as_mut())?;
+//! let output: [&str; 2] = minicbor::decode(buffer.as_ref())?;
 //! assert_eq!(input, output);
 //!
 //! # Ok::<_, Box<dyn std::error::Error>>(())
@@ -78,6 +78,12 @@
 #![forbid(unsafe_code, unused_imports, unused_variables)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(feature = "std")]
+mod bytes;
+
+#[cfg(feature = "std")]
+mod string;
+
 pub mod data;
 pub mod decode;
 pub mod encode;
@@ -95,42 +101,30 @@ const BREAK: u8    = 0xff;
 pub use decode::{Decode, Decoder};
 pub use encode::{Encode, Encoder};
 
+#[cfg(feature = "std")]
+pub use bytes::Bytes;
+
+#[cfg(feature = "std")]
+pub use string::String;
+
 #[cfg(feature = "derive")]
 pub use minicbor_derive::*;
 
 /// Decode a type implementing [`Decode`] from the given byte slice.
-pub fn from_slice<'b, T>(b: &'b [u8]) -> Result<T, decode::Error>
+pub fn decode<'b, T>(b: &'b [u8]) -> Result<T, decode::Error>
 where
     T: Decode<'b>
 {
-    let mut d = Decoder::new(b);
-    T::decode(&mut d)
+    Decoder::new(b).decode()
 }
 
-/// Encode a type implementing [`Encode`] to the given byte slice.
-///
-/// Returns the subslice that contains the CBOR bytes.
-#[cfg(not(feature = "std"))]
-pub fn to_slice<T>(x: T, b: &mut [u8]) -> Result<&[u8], encode::Error<encode::write::EndOfSlice>>
+/// Encode a type implementing [`Encode`] to the given [`encode::Write`] impl.
+pub fn encode<T, W>(x: T, w: W) -> Result<(), encode::Error<W::Error>>
 where
-    T: Encode
+    T: Encode,
+    W: encode::Write
 {
-    let mut e = Encoder::new(b);
-    x.encode(&mut e)?;
-    Ok(e.into_inner())
-}
-
-/// Encode a type implementing [`Encode`] to the given byte slice.
-///
-/// Returns the subslice that contains the CBOR bytes.
-#[cfg(feature = "std")]
-pub fn to_slice<T>(x: T, b: &mut [u8]) -> Result<&[u8], encode::Error<std::io::Error>>
-where
-    T: Encode
-{
-    let mut e = Encoder::new(&mut *b);
-    x.encode(&mut e)?;
-    Ok(b)
+    Encoder::new(w).encode(x)?.ok()
 }
 
 /// Encode a type implementing [`Encode`] and return the encoded byte vector.

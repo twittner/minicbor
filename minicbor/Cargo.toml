@@ -1,6 +1,6 @@
 [package]
 name          = "minicbor"
-version       = "0.1.1"
+version       = "0.2.0"
 authors       = ["Toralf Wittner <tw@dtex.org>"]
 license       = "BlueOak-1.0.0"
 edition       = "2018"
@@ -20,7 +20,6 @@ derive = ["minicbor-derive"]
 [dependencies]
 minicbor-derive = { version = "0.1.0", path = "../minicbor-derive", optional = true }
 half            = { version = "1", default-features = false, optional = true }
-smallvec        = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
 minicbor = { path = ".", features = ["std"] }
