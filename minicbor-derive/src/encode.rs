@@ -86,15 +86,25 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
 
     let (impl_generics, typ_generics, where_clause) = inp.generics.split_for_impl();
 
+    let body = if rows.is_empty() {
+        quote! {
+            unreachable!("empty type")
+        }
+    } else {
+        quote! {
+            match self {
+                #(#rows)*
+            }
+        }
+    };
+
     Ok(quote! {
         impl #impl_generics minicbor::Encode for #name #typ_generics #where_clause {
             fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>) -> Result<(), minicbor::encode::Error<__W777::Error>>
             where
                 __W777: minicbor::encode::Write
             {
-                match self {
-                    #(#rows)*
-                }
+                #body
             }
         }
     })
@@ -114,7 +124,7 @@ where
     let encode = iter.enumerate().map(|(i, f)| -> syn::Result<_> {
         num_fields += 1;
         let num = index_number(f.span(), &f.attrs)?;
-        let needs_if = is_option(&f.ty);
+        let needs_if = is_option(&f.ty, |_| true);
         has_option |= needs_if;
         Ok(match &f.ident {
             Some(name) if needs_if => quote! {
@@ -166,7 +176,7 @@ where
     let encode = iter.enumerate().map(|(i, f)| -> syn::Result<_> {
         num_fields += 1;
         let num = index_number(f.span(), &f.attrs)?;
-        let needs_if = is_option(&f.ty);
+        let needs_if = is_option(&f.ty, |_| true);
         has_option |= needs_if;
         Ok(match &f.ident {
             Some(name) if needs_if => quote! {
