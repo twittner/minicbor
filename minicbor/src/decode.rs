@@ -35,20 +35,6 @@ impl<'a, 'b: 'a> Decode<'b> for &'a str {
 }
 
 #[cfg(feature = "std")]
-impl<'a, 'b: 'a> Decode<'b> for crate::Bytes<'a> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        d.bytes().map(crate::Bytes::Borrowed)
-    }
-}
-
-#[cfg(feature = "std")]
-impl<'a, 'b: 'a> Decode<'b> for crate::String<'a> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        d.str().map(crate::String::Borrowed)
-    }
-}
-
-#[cfg(feature = "std")]
 impl<'b, T> Decode<'b> for std::borrow::Cow<'_, T>
 where
     T: std::borrow::ToOwned + ?Sized,
@@ -198,8 +184,8 @@ impl<'b> Decode<'b> for isize {
 macro_rules! decode_basic {
     ($($t:ident)*) => {
         $(
-            impl<'b> $crate::decode::Decode<'b> for $t {
-                fn decode(d: &mut $crate::decode::Decoder<'b>) -> Result<Self, Error> {
+            impl<'b> Decode<'b> for $t {
+                fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
                     d.$t()
                 }
             }
@@ -212,8 +198,8 @@ decode_basic!(u8 i8 u16 i16 u32 i32 u64 i64 bool f32 f64 char);
 macro_rules! decode_nonzero {
     ($($t:ty, $msg:expr)*) => {
         $(
-            impl<'b> $crate::decode::Decode<'b> for $t {
-                fn decode(d: &mut $crate::decode::Decoder<'b>) -> Result<Self, Error> {
+            impl<'b> Decode<'b> for $t {
+                fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
                     Ok(<$t>::new(Decode::decode(d)?).ok_or(Error::Message($msg))?)
                 }
             }
@@ -236,12 +222,9 @@ decode_nonzero! {
 macro_rules! decode_sequential {
     ($($t:ty, $push:ident)*) => {
         $(
-            impl<'b, T> $crate::decode::Decode<'b> for $t
-            where
-                T: $crate::decode::Decode<'b>
-            {
-                fn decode(d: &mut $crate::decode::Decoder<'b>) -> Result<Self, Error> {
-                    let iter: $crate::decode::ArrayIter<T> = d.array_iter()?;
+            impl<'b, T: Decode<'b>> Decode<'b> for $t {
+                fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+                    let iter: ArrayIter<T> = d.array_iter()?;
                     let mut v = <$t>::new();
                     for x in iter {
                         v.$push(x?)
@@ -263,18 +246,15 @@ decode_sequential! {
 macro_rules! decode_arrays {
     ($($n:expr)*) => {
         $(
-            impl<'b, T> $crate::decode::Decode<'b> for [T; $n]
-            where
-                T: $crate::decode::Decode<'b> + Default
-            {
-                fn decode(d: &mut $crate::decode::Decoder<'b>) -> Result<Self, Error> {
-                    let iter: $crate::decode::ArrayIter<T> = d.array_iter()?;
-                    let mut a: [T; $n] = ::core::default::Default::default();
+            impl<'b, T: Decode<'b> + Default> Decode<'b> for [T; $n] {
+                fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+                    let iter: ArrayIter<T> = d.array_iter()?;
+                    let mut a: [T; $n] = Default::default();
                     let mut i = 0;
                     for x in iter {
                         if i >= a.len() {
                             let msg = "array lengths do not match";
-                            return Err($crate::decode::Error::Overflow(i as u64, msg))
+                            return Err(Error::Overflow(i as u64, msg))
                         }
                         a[i] = x?;
                         i += 1;
@@ -296,13 +276,13 @@ macro_rules! decode_fields {
         match $d.map()? {
             Some(n) => for _ in 0 .. n {
                 match $d.u32()? {
-                    $($n => $x = Some($crate::decode::Decode::decode($d)?),)*
+                    $($n => $x = Some(Decode::decode($d)?),)*
                     _    => $d.skip()?
                 }
             }
-            None => while $d.datatype()? != $crate::data::Type::Break {
+            None => while $d.datatype()? != crate::data::Type::Break {
                 match $d.u32()? {
-                    $($n => $x = Some($crate::decode::Decode::decode($d)?),)*
+                    $($n => $x = Some(Decode::decode($d)?),)*
                     _    => $d.skip()?
                 }
             }

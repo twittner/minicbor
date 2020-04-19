@@ -83,28 +83,63 @@
 //! error for those new variants.
 //!
 //! [1]: https://developers.google.com/protocol-buffers/
+//!
+//! # Attributes and borrowing
+//!
+//! Each value needs to be annotated with an index number using either `n` or
+//! `b` as attribute names. For the encoding it makes no difference which one
+//! to choose. For decoding, `b` indicates that the value borrows from the
+//! decoding input, whereas `n` produces non-borrowed values (except for
+//! implicit borrows).
+//!
+//! ## Implicit borrowing
+//!
+//! By default the following types implicitly borrow from the decoding input,
+//! which means their lifetimes are constrained by the input lifetime:
+//!
+//! - `&'_ str`
+//! - `&'_ [u8]`
+//! - `Option<&'_ str>`
+//! - `Option<&'_ [u8]>`
+//!
+//! ## Explicit borrowing
+//!
+//! If a type is annotated with `#[b(...)]`, all its lifetimes will be bound to
+//! the input lifetime. If the type is a `std::borrow::Cow` type the generated
+//! code will decode the inner type and construct a `Cow::Borrowed` variant
+//! contrary to the `Cow` impl of `Decode` which produces owned values.
+//!
+//! # CBOR encoding
+//!
+//! The CBOR values which are produced by a derived `Encode` implementation are
+//! of the following format.
+//!
+//! ## Structs
+//!
+//! Each struct is encoded as a CBOR map with numeric keys:
+//!
+//! ```text
+//! <<struct encoding>> =
+//!     | `map(0)`           ; unit struct => empty map
+//!     | `begin_map`        ; indefinite map otherwise
+//!           `0` item_0
+//!           `1` item_1
+//!           ...
+//!           `n` item_n
+//!       `end`
+//! ```
+//!
+//! Optional fields whose value is `None` are not encoded.
+//!
+//! ## Enums
+//!
+//! Each enum variant is encoded as a two-element array. The first element
+//! denotes the variant index and the second the actual variant value:
+//!
+//! ```text
+//! <<enum encoding>> = `array(2)` n <<struct encoding>>
+//! ```
 
-// Structs are encoded as:
-//
-//      struct_encoding =
-//          begin_map
-//              n_0 item_0
-//              n_1 item_1
-//              ...
-//              n_k item_k
-//          end
-//
-// `n_0`, `n_1` etc. denote the field indices. `begin_map` means the start of
-// an indefinite map which terminates at `end`. Optional fields whose value is
-// `None` are not encoded. Enums are encoded as:
-//
-//      enum_encoding =
-//          array(2) n_var map(0) // unit constructor
-//          | array(2) n_var <<struct_encoding>>
-//
-// `n_var` denotes the variant index. `array(2)` means a 2-element array and
-// `map(0)` an empty map.
-//
 // While the enum encoding costs as much as 2 bytes extra for unit constructors,
 // those are import for compatibility. The array is required so that enums in
 // unknown fields can be skipped over. The empty map is required so we can skip
@@ -116,13 +151,15 @@ extern crate proc_macro;
 mod decode;
 mod encode;
 
+use quote::{ToTokens, TokenStreamExt};
 use proc_macro2::Span;
 use syn::spanned::Spanned;
+use std::collections::HashSet;
 
 /// Derive the `minicbor::Decode` trait for a struct or enum.
 ///
 /// See the [crate] documentation for details.
-#[proc_macro_derive(Decode, attributes(n))]
+#[proc_macro_derive(Decode, attributes(n, b))]
 pub fn derive_decode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     decode::derive_from(input)
 }
@@ -130,54 +167,235 @@ pub fn derive_decode(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 /// Derive the `minicbor::Encode` trait for a struct or enum.
 ///
 /// See the [crate] documentation for details.
-#[proc_macro_derive(Encode, attributes(n))]
+#[proc_macro_derive(Encode, attributes(n, b))]
 pub fn derive_encode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     encode::derive_from(input)
 }
 
-/// Check if the given type is an `Option`.
-fn is_option(ty: &syn::Type) -> bool {
-    let options = &[
-        &["Option"][..],
-        &["option", "Option"][..],
-        &["std", "option", "Option"][..],
-        &["core", "option", "Option"][..]
-    ];
-    if let syn::Type::Path(tp) = ty {
-        for o in options {
-            if tp.path.segments.iter().zip(o.iter()).all(|(a, b)| a.ident == b) {
-                return true
+// Helpers ////////////////////////////////////////////////////////////////////
+
+/// Check if the given type is an `Option` whose inner type matches the predicate.
+fn is_option(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> bool {
+    if let syn::Type::Path(t) = ty {
+        if let Some(s) = t.path.segments.last() {
+            if s.ident == "Option" {
+                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
+                    if b.args.len() == 1 {
+                        if let syn::GenericArgument::Type(ty) = &b.args[0] {
+                            return pred(ty)
+                        }
+                    }
+                }
             }
         }
     }
     false
 }
 
+/// Check if the given type is a `Cow` whose inner type matches the predicate.
+fn is_cow(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> bool {
+    if let syn::Type::Path(t) = ty {
+        if let Some(s) = t.path.segments.last() {
+            if s.ident == "Cow" {
+                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
+                    if b.args.len() == 2 {
+                        if let syn::GenericArgument::Lifetime(_) = &b.args[0] {
+                            if let syn::GenericArgument::Type(ty) = &b.args[1] {
+                                return pred(ty)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Check if the given type is a `&str`.
+fn is_str(ty: &syn::Type) -> bool {
+    if let syn::Type::Path(t) = ty {
+        t.qself.is_none() && t.path.segments.len() == 1 && t.path.segments[0].ident == "str"
+    } else {
+        false
+    }
+}
+
+/// Check if the given type is a `&[u8]`.
+fn is_byte_slice(ty: &syn::Type) -> bool {
+    if let syn::Type::Slice(t) = ty {
+        if let syn::Type::Path(t) = &*t.elem {
+            t.qself.is_none() && t.path.segments.len() == 1 && t.path.segments[0].ident == "u8"
+        } else {
+            false
+        }
+    } else {
+        false
+    }
+}
+
+/// Get the lifetime of the given type if it is an `Option` whose inner type matches the predicate.
+fn option_lifetime(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> Option<syn::Lifetime> {
+    if let syn::Type::Path(t) = ty {
+        if let Some(s) = t.path.segments.last() {
+            if s.ident == "Option" {
+                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
+                    if b.args.len() == 1 {
+                        if let syn::GenericArgument::Type(syn::Type::Reference(ty)) = &b.args[0] {
+                            if pred(&*ty.elem) {
+                                return ty.lifetime.clone()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Get all lifetimes of a type.
+fn get_lifetimes(ty: &syn::Type, set: &mut HashSet<syn::Lifetime>) {
+    match ty {
+        syn::Type::Array(t) => get_lifetimes(&t.elem, set),
+        syn::Type::Slice(t) => get_lifetimes(&t.elem, set),
+        syn::Type::Paren(t) => get_lifetimes(&t.elem, set),
+        syn::Type::Group(t) => get_lifetimes(&t.elem, set),
+        syn::Type::Ptr(t)   => get_lifetimes(&t.elem, set),
+        syn::Type::Reference(t) => {
+            if let Some(l) = &t.lifetime {
+                set.insert(l.clone());
+            }
+            get_lifetimes(&t.elem, set)
+        }
+        syn::Type::Tuple(t) => {
+            for t in &t.elems {
+                get_lifetimes(t, set)
+            }
+        }
+        syn::Type::Path(t) => {
+            for s in &t.path.segments {
+                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
+                    for a in &b.args {
+                        match a {
+                            syn::GenericArgument::Type(t)     => get_lifetimes(t, set),
+                            syn::GenericArgument::Binding(b)  => get_lifetimes(&b.ty, set),
+                            syn::GenericArgument::Lifetime(l) => { set.insert(l.clone()); }
+                            _                                 => {}
+                        }
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Get the lifetime of a reference if its type matches the predicate.
+fn tyref_lifetime(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> Option<syn::Lifetime> {
+    if let syn::Type::Reference(p) = ty {
+        if pred(&*p.elem) {
+            return p.lifetime.clone()
+        }
+    }
+    None
+}
+
+/// Get the set of lifetimes which need to be constrained to the decoding input lifetime.
+fn lifetimes_to_constrain<'a, I>(types: I) -> HashSet<syn::Lifetime>
+where
+    I: Iterator<Item = (&'a Idx, &'a syn::Type)>
+{
+    let mut set = HashSet::new();
+    for (i, t) in types {
+        if let Some(l) = tyref_lifetime(t, is_str) {
+            set.insert(l);
+            continue
+        }
+        if let Some(l) = tyref_lifetime(t, is_byte_slice) {
+            set.insert(l);
+            continue
+        }
+        if let Some(l) = option_lifetime(t, is_str) {
+            set.insert(l);
+            continue
+        }
+        if let Some(l) = option_lifetime(t, is_byte_slice) {
+            set.insert(l);
+            continue
+        }
+        if i.is_b() {
+            get_lifetimes(t, &mut set)
+        }
+    }
+    set
+}
+
+/// The index attribute.
+#[derive(Debug, Clone, Copy)]
+enum Idx {
+    /// A regular, non-borrowing index.
+    N(u32),
+    /// An index which indicates that the value borrows from the decoding input.
+    B(u32)
+}
+
+impl ToTokens for Idx {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        tokens.append(proc_macro2::Literal::u32_suffixed(self.val()))
+    }
+}
+
+impl Idx {
+    /// Test if `Idx` is the `B` variant.
+    fn is_b(self) -> bool {
+        if let Idx::B(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get the numeric index value.
+    fn val(self) -> u32 {
+        match self {
+            Idx::N(i) => i,
+            Idx::B(i) => i
+        }
+    }
+}
+
 /// Get the index number from the list of attributes.
 ///
 /// The first attribute `n` will be used and its argument must be an
 /// unsigned integer literal that fits into a `u32`.
-fn index_number(s: Span, attrs: &[syn::Attribute]) -> syn::Result<u32> {
+fn index_number(s: Span, attrs: &[syn::Attribute]) -> syn::Result<Idx> {
     for a in attrs {
         if a.path.is_ident("n") {
             let lit: syn::LitInt = a.parse_args()?;
-            return lit.base10_digits().parse().map_err(|_| {
-                syn::Error::new(a.tokens.span(), "expected `u32` value")
-            })
+            return lit.base10_digits().parse()
+                .map_err(|_| syn::Error::new(a.tokens.span(), "expected `u32` value"))
+                .map(Idx::N)
+        }
+        if a.path.is_ident("b") {
+            let lit: syn::LitInt = a.parse_args()?;
+            return lit.base10_digits().parse()
+                .map_err(|_| syn::Error::new(a.tokens.span(), "expected `u32` value"))
+                .map(Idx::B)
         }
     }
-    Err(syn::Error::new(s, "missing `#[n(...)]` attribute"))
+    Err(syn::Error::new(s, "missing `#[n(...)]` or `#[b(...)]` attribute"))
 }
 
 /// Check that there are no duplicate elements in `iter`.
 fn check_uniq<I>(s: Span, iter: I) -> syn::Result<()>
 where
-    I: IntoIterator<Item = u32>
+    I: IntoIterator<Item = Idx>
 {
-    let mut set = std::collections::HashSet::new();
+    let mut set = HashSet::new();
     let mut ctr = 0;
     for u in iter {
-        set.insert(u);
+        set.insert(u.val());
         ctr += 1;
     }
     if ctr != set.len() {
@@ -187,7 +405,7 @@ where
 }
 
 /// Get the index number of every field.
-fn field_indices<'a, I>(iter: I) -> syn::Result<Vec<u32>>
+fn field_indices<'a, I>(iter: I) -> syn::Result<Vec<Idx>>
 where
     I: Iterator<Item = &'a syn::Field>
 {
@@ -195,7 +413,7 @@ where
 }
 
 /// Get the index number of every variant.
-fn variant_indices<'a, I>(iter: I) -> syn::Result<Vec<u32>>
+fn variant_indices<'a, I>(iter: I) -> syn::Result<Vec<Idx>>
 where
     I: Iterator<Item = &'a syn::Variant>
 {

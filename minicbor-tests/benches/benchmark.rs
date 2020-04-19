@@ -10,26 +10,26 @@ criterion_main!(benches);
 #[derive(Debug, Encode, Decode, Serialize, Deserialize)]
 struct AddressBook<'a> {
     #[n(1)] timestamp: u64,
-    #[n(2)] entries: Vec<Entry<'a>>,
-    #[n(3)] style: Option<Style<'a>>,
+    #[b(2)] #[serde(borrow)] entries: Vec<Entry<'a>>,
+    #[b(3)] #[serde(borrow)] style: Option<Style<'a>>,
     #[n(4)] rating: Option<f64>
 }
 
 #[derive(Debug, Encode, Decode, Serialize, Deserialize)]
 struct Entry<'a> {
-    #[n(1)] firstname: Cow<'a, str>,
-    #[n(2)] lastname: Cow<'a, str>,
+    #[b(1)] #[serde(borrow)] firstname: Cow<'a, str>,
+    #[b(2)] #[serde(borrow)] lastname: Cow<'a, str>,
     #[n(3)] birthday: u32,
-    #[n(4)] addresses: Vec<Address<'a>>
+    #[b(4)] #[serde(borrow)] addresses: Vec<Address<'a>>
 }
 
 #[derive(Debug, Encode, Decode, Serialize, Deserialize)]
 struct Address<'a> {
-    #[n(1)] street: Cow<'a, str>,
-    #[n(2)] houseno: Cow<'a, str>,
+    #[b(1)] #[serde(borrow)] street: Cow<'a, str>,
+    #[b(2)] #[serde(borrow)] houseno: Cow<'a, str>,
     #[n(3)] postcode: u32,
-    #[n(4)] city: Cow<'a, str>,
-    #[n(5)] country: Cow<'a, str>
+    #[b(4)] #[serde(borrow)] city: Cow<'a, str>,
+    #[b(5)] #[serde(borrow)] country: Cow<'a, str>
 }
 
 #[derive(Debug, Encode, Decode, Serialize, Deserialize)]
@@ -37,8 +37,8 @@ enum Style<'a> {
     #[n(1)] Version1,
     #[n(2)] Version2,
     #[n(3)] Version3(#[n(1)] bool, #[n(2)] u64),
-    #[n(4)] Version4 {
-        #[n(1)] path: Cow<'a, str>,
+    #[b(4)] Version4 {
+        #[b(1)] #[serde(borrow)] path: Cow<'a, str>,
         #[n(2)] timestamp: u64
     }
 }

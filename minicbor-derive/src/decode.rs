@@ -1,4 +1,5 @@
-use crate::{check_uniq, field_indices, index_number, is_option, variant_indices};
+use crate::{check_uniq, field_indices, index_number, is_cow, is_option, variant_indices};
+use crate::{Idx, lifetimes_to_constrain};
 use quote::quote;
 use syn::spanned::Spanned;
 
@@ -21,18 +22,22 @@ pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 /// Create a `Decode` impl for (tuple) structs.
-fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct, lt: syn::LifetimeDef) -> syn::Result<proc_macro2::TokenStream> {
+fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct, mut lt: syn::LifetimeDef) -> syn::Result<proc_macro2::TokenStream> {
     let name = &inp.ident;
-    check_uniq(name.span(), field_indices(s.fields.iter())?)?;
+    let indices = field_indices(s.fields.iter())?;
+    check_uniq(name.span(), indices.iter().cloned())?;
+
+    let (field_names, field_types) = fields(s.fields.iter());
+    for l in lifetimes_to_constrain(indices.iter().zip(field_types.iter())) {
+        lt.bounds.push(l.clone())
+    }
+    let field_str = field_names.iter().map(|n| format!("{}::{}", name, n));
+    let numbers = field_indices(s.fields.iter())?;
+    let statements = gen_statements(&field_names, &field_types, &numbers);
 
     let g = add_lifetime(&inp.generics, lt);
     let (impl_generics , ..) = g.split_for_impl();
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
-
-    let (field_names, field_types) = fields(s.fields.iter());
-    let field_str = field_names.iter().map(|n| format!("{}::{}", name, n));
-    let numbers = field_indices(s.fields.iter())?;
-    let statements = gen_statements(&field_names, &field_types, &numbers);
 
     let result = if let syn::Fields::Named(_) = s.fields {
         quote! {
@@ -44,6 +49,8 @@ fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct, lt: syn::LifetimeDef) 
                 }),*
             })
         }
+    } else if let syn::Fields::Unit = &s.fields {
+        quote!(Ok(#name))
     } else {
         quote! {
             Ok(#name(#(if let Some(x) = #field_names {
@@ -65,19 +72,16 @@ fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct, lt: syn::LifetimeDef) 
 }
 
 /// Create a `Decode` impl for enums.
-fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, lt: syn::LifetimeDef) -> syn::Result<proc_macro2::TokenStream> {
+fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, mut lt: syn::LifetimeDef) -> syn::Result<proc_macro2::TokenStream> {
     let name = &inp.ident;
     check_uniq(e.enum_token.span(), variant_indices(e.variants.iter())?)?;
-
-    let g = add_lifetime(&inp.generics, lt);
-    let (impl_generics , ..) = g.split_for_impl();
-    let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     let mut rows = Vec::new();
     for var in e.variants.iter() {
         let con = &var.ident;
         let idx = index_number(var.ident.span(), &var.attrs)?;
-        check_uniq(con.span(), field_indices(var.fields.iter())?)?;
+        let indices = field_indices(var.fields.iter())?;
+        check_uniq(con.span(), indices.iter().cloned())?;
         let row = if let syn::Fields::Unit = &var.fields {
             quote!(#idx => {
                 __d777.skip()?;
@@ -85,6 +89,9 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, lt: syn::LifetimeDef) -> s
             })
         } else {
             let (field_names, field_types) = fields(var.fields.iter());
+            for l in lifetimes_to_constrain(indices.iter().zip(field_types.iter())) {
+                lt.bounds.push(l.clone())
+            }
             let field_str = field_names.iter().map(|n| format!("{}::{}::{}", name, con, n));
             let numbers = field_indices(var.fields.iter())?;
             let statements = gen_statements(&field_names, &field_types, &numbers);
@@ -116,6 +123,10 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, lt: syn::LifetimeDef) -> s
         };
         rows.push(row)
     }
+
+    let g = add_lifetime(&inp.generics, lt);
+    let (impl_generics , ..) = g.split_for_impl();
+    let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'__b777> for #name #typ_generics #where_clause {
@@ -149,30 +160,40 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, lt: syn::LifetimeDef) -> s
 // [1]: These variables will later be deconstructed in `on_enum` and
 // `on_struct` and their inner value will be used to initialise a field.
 // If not present, an error will be produced.
-fn gen_statements(names: &[syn::Ident], types: &[syn::Type], numbers: &[u32]) -> proc_macro2::TokenStream {
+fn gen_statements(names: &[syn::Ident], types: &[syn::Type], numbers: &[Idx]) -> proc_macro2::TokenStream {
     assert_eq!(names.len(), types.len());
     assert_eq!(types.len(), numbers.len());
 
     let inits = types.iter().map(|ty| {
-        if is_option(ty) {
+        if is_option(ty, |_| true) {
             quote!(Some(None))
         } else {
             quote!(None)
         }
     });
 
-    let actions = names.iter().zip(types.iter()).map(|(name, ty)| {
-        if is_option(ty) {
-            quote! {
+    let actions = numbers.iter().zip(names.iter().zip(types.iter())).map(|(ix, (name, ty))| {
+        if is_option(ty, |_| true) {
+            return quote! {
                 match minicbor::Decode::decode(__d777) {
                     Ok(value) => #name = Some(value),
                     Err(minicbor::decode::Error::UnknownVariant(_)) => { __d777.skip()? }
                     Err(e) => return Err(e)
                 }
             }
-        } else {
-            quote!({ #name = Some(minicbor::Decode::decode(__d777)?) })
         }
+
+        if ix.is_b() && is_cow(ty, |_| true) {
+            return quote! {
+                match minicbor::Decode::decode(__d777) {
+                    Ok(value) => #name = Some(std::borrow::Cow::Borrowed(value)),
+                    Err(minicbor::decode::Error::UnknownVariant(_)) => { __d777.skip()? }
+                    Err(e) => return Err(e)
+                }
+            }
+        }
+
+        quote!({ #name = Some(minicbor::Decode::decode(__d777)?) })
     })
     .collect::<Vec<_>>();
 
@@ -219,18 +240,10 @@ where
 /// Add a `minicbor::Decode` bound to every type parameter.
 fn add_decode_bound(g: &mut syn::Generics) -> syn::Result<syn::LifetimeDef> {
     let bound: syn::TypeParamBound = syn::parse_str("minicbor::Decode<'__b777>")?;
-    let lstatic: syn::Lifetime = syn::parse_str("'static")?;
-    let mut lifetime: syn::LifetimeDef = syn::parse_str("'__b777")?;
-    for l in g.lifetimes() {
-        if l.lifetime == lstatic {
-            continue
-        }
-        lifetime.bounds.push(l.lifetime.clone())
-    }
     for t in g.type_params_mut() {
         t.bounds.push(bound.clone())
     }
-    Ok(lifetime)
+    syn::parse_str("'__b777")
 }
 
 /// Return a modified clone of `syn::Generics` with the given lifetime

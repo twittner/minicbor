@@ -47,20 +47,6 @@ impl Encode for str {
     }
 }
 
-#[cfg(feature = "std")]
-impl Encode for crate::Bytes<'_> {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.bytes(self.as_ref())?.ok()
-    }
-}
-
-#[cfg(feature = "std")]
-impl Encode for crate::String<'_> {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.str(self.as_ref())?.ok()
-    }
-}
-
 impl<T: Encode> Encode for Option<T> {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
         if let Some(x) = self {
@@ -165,11 +151,8 @@ impl Encode for isize {
 macro_rules! encode_basic {
     ($($t:ident)*) => {
         $(
-            impl $crate::encode::Encode for $t {
-                fn encode<W>(&self, e: &mut $crate::encode::Encoder<W>) -> Result<(), Error<W::Error>>
-                where
-                    W: $crate::encode::Write
-                {
+            impl Encode for $t {
+                fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
                     e.$t(*self)?;
                     Ok(())
                 }
@@ -183,11 +166,8 @@ encode_basic!(u8 i8 u16 i16 u32 i32 u64 i64 bool f32 f64 char);
 macro_rules! encode_nonzero {
     ($($t:ty)*) => {
         $(
-            impl $crate::encode::Encode for $t {
-                fn encode<W>(&self, e: &mut $crate::encode::Encoder<W>) -> Result<(), Error<W::Error>>
-                where
-                    W: $crate::encode::Write
-                {
+            impl Encode for $t {
+                fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
                     self.get().encode(e)
                 }
             }
@@ -209,14 +189,8 @@ encode_nonzero! {
 macro_rules! encode_sequential {
     ($($t:ty)*) => {
         $(
-            impl<T> $crate::encode::Encode for $t
-            where
-                T: $crate::encode::Encode
-            {
-                fn encode<W>(&self, e: &mut $crate::encode::Encoder<W>) -> Result<(), Error<W::Error>>
-                where
-                    W: $crate::encode::Write
-                {
+            impl<T: Encode> Encode for $t {
+                fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
                     e.array(self.len())?;
                     for x in self {
                         x.encode(e)?
@@ -243,14 +217,8 @@ encode_sequential! {
 macro_rules! encode_arrays {
     ($($n:expr)*) => {
         $(
-            impl<T> $crate::encode::Encode for [T; $n]
-            where
-                T: $crate::encode::Encode
-            {
-                fn encode<W>(&self, e: &mut $crate::encode::Encoder<W>) -> Result<(), Error<W::Error>>
-                where
-                    W: $crate::encode::Write
-                {
+            impl<T: Encode> Encode for [T; $n] {
+                fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
                     e.array($n)?;
                     for x in self {
                         x.encode(e)?
