@@ -78,12 +78,6 @@
 #![forbid(unsafe_code, unused_imports, unused_variables)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[cfg(feature = "std")]
-mod bytes;
-
-#[cfg(feature = "std")]
-mod string;
-
 pub mod data;
 pub mod decode;
 pub mod encode;
@@ -100,12 +94,6 @@ const BREAK: u8    = 0xff;
 
 pub use decode::{Decode, Decoder};
 pub use encode::{Encode, Encoder};
-
-#[cfg(feature = "std")]
-pub use bytes::Bytes;
-
-#[cfg(feature = "std")]
-pub use string::String;
 
 #[cfg(feature = "derive")]
 pub use minicbor_derive::*;
