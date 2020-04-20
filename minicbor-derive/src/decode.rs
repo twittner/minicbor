@@ -1,5 +1,5 @@
 use crate::{check_uniq, field_indices, index_number, is_cow, is_option, variant_indices};
-use crate::{Idx, lifetimes_to_constrain};
+use crate::{Idx, lifetimes_to_constrain, is_str, is_byte_slice};
 use quote::quote;
 use syn::spanned::Spanned;
 
@@ -183,7 +183,7 @@ fn gen_statements(names: &[syn::Ident], types: &[syn::Type], numbers: &[Idx]) ->
             }
         }
 
-        if ix.is_b() && is_cow(ty, |_| true) {
+        if ix.is_b() && is_cow(ty, |t| is_str(t) || is_byte_slice(t)) {
             return quote! {
                 match minicbor::Decode::decode(__d777) {
                     Ok(value) => #name = Some(std::borrow::Cow::Borrowed(value)),
