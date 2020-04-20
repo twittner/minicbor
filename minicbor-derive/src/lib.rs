@@ -6,15 +6,14 @@
 //!
 //! The goal is that ideally a change to a type still allows older software,
 //! which is unaware of the changes, to decode values of the changed type
-//! (forward compatibility) and newer software, which knows about the changes,
-//! to decode values of types which have been encoded by older software and
-//! which therefore do not include the changes made to the type (backward
-//! compatibility).
+//! (forward compatibility) and newer software, to decode values of types
+//! encoded by older software, which do not include the changes made to the
+//! type (backward compatibility).
 //!
-//! In order to reach this goal the encoding has the following characteristics:
+//! In order to reach this goal, the encoding has the following characteristics:
 //!
 //! 1. The encoding does not contain any names, i.e. no field names, type names
-//! or variant names. Instead every field and every constructor needs to be
+//! or variant names. Instead, every field and every constructor needs to be
 //! annotated with an (unsigned) index number, e.g. `#[n(1)]`.
 //!
 //! 2. Unknown fields are ignored during decoding.
@@ -25,14 +24,14 @@
 //! 4. Optional enums default to `None` if an unknown variant is encountered
 //! during decoding.
 //!
-//! Item **1**. ensures that names can be changed freely without compatibility
-//! concerns. Item **2**. ensures that new fields do not affect older software.
-//! Item **3**. ensures that newer software can stop producing optional values.
-//! Item **4**. ensures that enums can get new variants that older software is
-//! not aware of. By "fields" we mean the elements of structs and tuple
-//! structs as well as enum structs and enum tuples. In addition it is a
-//! compatible change to turn a unit variant into a struct or tuple variant if
-//! all fields are optional.
+//! Item **1** ensures that names can be changed freely without compatibility
+//! concerns. Item **2** ensures that new fields do not affect older software.
+//! Item **3** ensures that newer software can stop producing optional values.
+//! Item **4** ensures that enums can get new variants that older software is
+//! not aware of. By "fields" we mean the elements of structs and tuple structs
+//! as well as enum structs and enum tuples. In addition, it is a compatible
+//! change to turn a unit variant into a struct or tuple variant if all fields
+//! are optional.
 //!
 //! From the above it should be obvious that *non-optional fields need to be
 //! present forever*, so they should only be part of a type after careful
@@ -86,16 +85,16 @@
 //!
 //! # Attributes and borrowing
 //!
-//! Each value needs to be annotated with an index number using either `n` or
-//! `b` as attribute names. For the encoding it makes no difference which one
-//! to choose. For decoding, `b` indicates that the value borrows from the
-//! decoding input, whereas `n` produces non-borrowed values (except for
-//! implicit borrows).
+//! Each field and variant needs to be annotated with an index number, which is
+//! used instead of the name, using either `n` or `b` as attribute names. For
+//! the encoding it makes no difference which one to choose. For decoding, `b`
+//! indicates that the value borrows from the decoding input, whereas `n`
+//! produces non-borrowed values (except for implicit borrows).
 //!
 //! ## Implicit borrowing
 //!
-//! By default the following types implicitly borrow from the decoding input,
-//! which means their lifetimes are constrained by the input lifetime:
+//! The following types implicitly borrow from the decoding input, which means
+//! their lifetimes are constrained by the input lifetime:
 //!
 //! - `&'_ str`
 //! - `&'_ [u8]`
@@ -104,15 +103,18 @@
 //!
 //! ## Explicit borrowing
 //!
-//! If a type is annotated with `#[b(...)]`, all its lifetimes will be bound to
-//! the input lifetime. If the type is a `std::borrow::Cow` type the generated
-//! code will decode the inner type and construct a `Cow::Borrowed` variant
-//! contrary to the `Cow` impl of `Decode` which produces owned values.
+//! If a type is annotated with `#[b(...)]`, all its lifetimes will be
+//! constrained to the input lifetime.
+//!
+//! If the type is a `std::borrow::Cow<'_, str>` or `std::borrow::Cow<'_, [u8]>`
+//! type, the generated code will decode the inner type and construct a
+//! `Cow::Borrowed` variant, contrary to the `Cow` impl of `Decode` which
+//! produces owned values.
 //!
 //! # CBOR encoding
 //!
-//! The CBOR values which are produced by a derived `Encode` implementation are
-//! of the following format.
+//! The CBOR values produced by a derived `Encode` implementation are of the
+//! following format.
 //!
 //! ## Structs
 //!
@@ -120,12 +122,12 @@
 //!
 //! ```text
 //! <<struct encoding>> =
-//!     | `map(0)`           ; unit struct => empty map
-//!     | `begin_map`        ; indefinite map otherwise
+//!     | `map(0)`         ; unit struct => empty map
+//!     | `begin_map`      ; indefinite map otherwise
 //!           `0` item_0
 //!           `1` item_1
 //!           ...
-//!           `n` item_n
+//!            n  item_n
 //!       `end`
 //! ```
 //!
@@ -134,7 +136,7 @@
 //! ## Enums
 //!
 //! Each enum variant is encoded as a two-element array. The first element
-//! denotes the variant index and the second the actual variant value:
+//! is the variant index and the second the actual variant value:
 //!
 //! ```text
 //! <<enum encoding>> = `array(2)` n <<struct encoding>>
