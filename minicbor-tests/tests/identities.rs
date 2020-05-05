@@ -168,3 +168,43 @@ fn socketaddrv6() {
     quickcheck(property as fn(std::net::SocketAddrV6) -> bool)
 }
 
+#[test]
+fn tuple1() {
+    quickcheck(identity as fn((bool,)) -> bool)
+}
+
+#[test]
+fn tuple2() {
+    quickcheck(identity as fn((bool, u8)) -> bool)
+}
+
+#[test]
+fn tuple3() {
+    quickcheck(identity as fn((bool, u8, char)) -> bool)
+}
+
+#[test]
+fn tuple4() {
+    quickcheck(identity as fn((bool, u8, char, String)) -> bool)
+}
+
+#[test]
+fn tuple5() {
+    quickcheck(identity as fn((bool, u8, char, String, Option<i16>)) -> bool)
+}
+
+#[test]
+fn tuple6() {
+    quickcheck(identity as fn((bool, u8, char, String, Option<i16>, Vec<u32>)) -> bool)
+}
+
+#[test]
+fn tuple7() {
+    quickcheck(identity as fn((bool, u8, char, String, Option<i16>, Vec<u32>, u8)) -> bool)
+}
+
+#[test]
+fn tuple8() {
+    quickcheck(identity as fn((bool, u8, char, String, Option<i16>, Vec<u32>, u8, i64)) -> bool)
+}
+
