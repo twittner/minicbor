@@ -269,6 +269,45 @@ macro_rules! decode_arrays {
 
 decode_arrays!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
 
+macro_rules! decode_tuples {
+    (
+        $(
+            $len:expr => { $($T:ident)+ }
+        )+
+    ) => {
+        $(
+            impl<'b, $($T:Decode<'b>),+> Decode<'b> for ($($T,)+) {
+                fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+                    let array_len = d.array()?;
+                    debug_assert_eq!(array_len, Some($len));
+                    Ok(
+                        ( $(d.decode::<$T>()?,)+ )
+                    )
+                }
+            }
+        )+
+    }
+}
+
+decode_tuples!(
+    1  => { A }
+    2  => { A B }
+    3  => { A B C }
+    4  => { A B C D }
+    5  => { A B C D E }
+    6  => { A B C D E F }
+    7  => { A B C D E F G }
+    8  => { A B C D E F G H }
+    9  => { A B C D E F G H I }
+    10 => { A B C D E F G H I J }
+    11 => { A B C D E F G H I J K }
+    12 => { A B C D E F G H I J K L }
+    13 => { A B C D E F G H I J K L M }
+    14 => { A B C D E F G H I J K L M N }
+    15 => { A B C D E F G H I J K L M N O }
+    16 => { A B C D E F G H I J K L M N O P }
+);
+
 macro_rules! decode_fields {
     ($d:ident | $($n:literal $x:ident => $t:ty ; $msg:literal)*) => {
         $(let mut $x = None;)*
