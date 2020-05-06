@@ -233,13 +233,9 @@ macro_rules! encode_arrays {
 encode_arrays!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
 
 macro_rules! encode_tuples {
-    (
+    ($( $len:expr => { $($T:ident ($idx:tt))+ } )+) => {
         $(
-            $len:expr => { $($T:ident ($idx:tt))+ }
-        )+
-    ) => {
-        $(
-            impl<$($T:Encode),+> Encode for ($($T,)+) {
+            impl<$($T: Encode),+> Encode for ($($T,)+) {
                 fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
                     e.array($len)?
                         $(.encode(&self.$idx)?)+
@@ -250,7 +246,7 @@ macro_rules! encode_tuples {
     }
 }
 
-encode_tuples!(
+encode_tuples! {
     1  => { A(0) }
     2  => { A(0) B(1) }
     3  => { A(0) B(1) C(2) }
@@ -267,7 +263,7 @@ encode_tuples!(
     14 => { A(0) B(1) C(2) D(3) E(4) F(5) G(6) H(7) I(8) J(9) K(10) L(11) M(12) N(13) }
     15 => { A(0) B(1) C(2) D(3) E(4) F(5) G(6) H(7) I(8) J(9) K(10) L(11) M(12) N(13) O(14) }
     16 => { A(0) B(1) C(2) D(3) E(4) F(5) G(6) H(7) I(8) J(9) K(10) L(11) M(12) N(13) O(14) P(15) }
-);
+}
 
 impl Encode for core::time::Duration {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {

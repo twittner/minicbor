@@ -253,13 +253,16 @@ macro_rules! decode_arrays {
                     let mut i = 0;
                     for x in iter {
                         if i >= a.len() {
-                            let msg = "array lengths do not match";
-                            return Err(Error::Overflow(i as u64, msg))
+                            let msg = concat!("array has more than ", $n, " elements");
+                            return Err(Error::Message(msg))
                         }
                         a[i] = x?;
                         i += 1;
                     }
-                    debug_assert_eq!(i, a.len());
+                    if i < a.len() {
+                        let msg = concat!("array has less than ", $n, " elements");
+                        return Err(Error::Message(msg))
+                    }
                     Ok(a)
                 }
             }
@@ -270,26 +273,22 @@ macro_rules! decode_arrays {
 decode_arrays!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
 
 macro_rules! decode_tuples {
-    (
+    ($( $len:expr => { $($T:ident)+ } )+) => {
         $(
-            $len:expr => { $($T:ident)+ }
-        )+
-    ) => {
-        $(
-            impl<'b, $($T:Decode<'b>),+> Decode<'b> for ($($T,)+) {
+            impl<'b, $($T: Decode<'b>),+> Decode<'b> for ($($T,)+) {
                 fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-                    let array_len = d.array()?;
-                    debug_assert_eq!(array_len, Some($len));
-                    Ok(
-                        ( $(d.decode::<$T>()?,)+ )
-                    )
+                    let n = d.array()?;
+                    if n != Some($len) {
+                        return Err(Error::Message(concat!("invalid ", $len, "-tuple length")))
+                    }
+                    Ok(($($T::decode(d)?,)+))
                 }
             }
         )+
     }
 }
 
-decode_tuples!(
+decode_tuples! {
     1  => { A }
     2  => { A B }
     3  => { A B C }
@@ -306,7 +305,7 @@ decode_tuples!(
     14 => { A B C D E F G H I J K L M N }
     15 => { A B C D E F G H I J K L M N O }
     16 => { A B C D E F G H I J K L M N O P }
-);
+}
 
 macro_rules! decode_fields {
     ($d:ident | $($n:literal $x:ident => $t:ty ; $msg:literal)*) => {

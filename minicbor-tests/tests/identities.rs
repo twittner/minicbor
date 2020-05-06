@@ -208,3 +208,35 @@ fn tuple8() {
     quickcheck(identity as fn((bool, u8, char, String, Option<i16>, Vec<u32>, u8, i64)) -> bool)
 }
 
+#[test]
+fn array1() {
+    fn property(a: bool) -> bool {
+        identity([a])
+    }
+    quickcheck(property as fn(bool) -> bool)
+}
+
+#[test]
+fn array2() {
+    fn property(a: bool, b: bool) -> bool {
+        identity([a, b])
+    }
+    quickcheck(property as fn(bool, bool) -> bool)
+}
+
+#[test]
+fn array3() {
+    fn property(a: bool, b: bool, c: bool) -> bool {
+        identity([a, b, c])
+    }
+    quickcheck(property as fn(bool, bool, bool) -> bool)
+}
+
+#[test]
+fn array4() {
+    fn property(a: bool, b: bool, c: bool, d: bool) -> bool {
+        identity([a, b, c, d])
+    }
+    quickcheck(property as fn(bool, bool, bool, bool) -> bool)
+}
+
