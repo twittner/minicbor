@@ -1,4 +1,4 @@
-use crate::{check_uniq, field_indices, index_number, is_option, variant_indices};
+use crate::{check_uniq, field_indices, Idx, index_number, is_option, variant_indices};
 use quote::quote;
 use syn::spanned::Spanned;
 
@@ -22,8 +22,16 @@ pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// Create an `Encode` impl for (tuple) structs.
 fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct) -> syn::Result<proc_macro2::TokenStream> {
     let name = &inp.ident;
+
     check_uniq(name.span(), field_indices(s.fields.iter())?)?;
-    let statements = encode_struct_fields(s.fields.iter())?;
+
+    let mut fields = s.fields.iter()
+        .enumerate()
+        .map(|(i, f)| index_number(f.span(), &f.attrs).map(move |n| (i, n, f)))
+        .collect::<Result<Vec<_>, _>>()?;
+    fields.sort_unstable_by_key(|(_, n, _)| n.val());
+
+    let statements = encode_as_array(&fields, true);
     let (impl_generics, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     Ok(quote! {
@@ -32,7 +40,7 @@ fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct) -> syn::Result<proc_ma
             where
                 __W777: minicbor::encode::Write
             {
-                #(#statements)*
+                #statements
             }
         }
     })
@@ -51,19 +59,24 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
             syn::Fields::Unit => quote! {
                 #name::#con => {
                     __e777.array(2)?;
-                    __e777.u32(#idx)?;
-                    __e777.map(0)?;
+                    __e777.u64(#idx)?;
+                    __e777.array(0)?;
                     Ok(())
                 }
             },
             syn::Fields::Named(fields) => {
                 let idents = fields.named.iter().map(|f| f.ident.clone().unwrap());
-                let statements = encode_enum_fields(fields.named.iter())?;
+                let mut fields = fields.named.iter()
+                    .enumerate()
+                    .map(|(i, f)| index_number(f.span(), &f.attrs).map(move |n| (i, n, f)))
+                    .collect::<Result<Vec<_>, _>>()?;
+                fields.sort_unstable_by_key(|(_, n, _)| n.val());
+                let statements = encode_as_array(&fields, false);
                 quote! {
                     #name::#con{#(#idents,)*} => {
                         __e777.array(2)?;
-                        __e777.u32(#idx)?;
-                        #(#statements)*
+                        __e777.u64(#idx)?;
+                        #statements
                     }
                 }
             }
@@ -71,12 +84,17 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
                 let idents = fields.unnamed.iter().enumerate().map(|(i, _)| {
                     quote::format_ident!("_{}", i)
                 });
-                let statements = encode_enum_fields(fields.unnamed.iter())?;
+                let mut fields = fields.unnamed.iter()
+                    .enumerate()
+                    .map(|(i, f)| index_number(f.span(), &f.attrs).map(move |n| (i, n, f)))
+                    .collect::<Result<Vec<_>, _>>()?;
+                fields.sort_unstable_by_key(|(_, n, _)| n.val());
+                let statements = encode_as_array(&fields, false);
                 quote! {
                     #name::#con(#(#idents,)*) => {
                         __e777.array(2)?;
-                        __e777.u32(#idx)?;
-                        #(#statements)*
+                        __e777.u64(#idx)?;
+                        #statements
                     }
                 }
             }
@@ -110,129 +128,166 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
     })
 }
 
-/// The encoding logic of fields.
-///
-/// Each field will produce two CBOR items, first the index number and then
-/// the value. Optional fields which are `None` will not be encoded.
-fn encode_struct_fields<'a, I>(iter: I) -> syn::Result<Vec<proc_macro2::TokenStream>>
-where
-    I: Iterator<Item = &'a syn::Field>
-{
-    let mut num_fields = 0usize;
-    let mut has_option = false;
+fn encode_as_array(fields: &[(usize, Idx, &syn::Field)], has_self: bool) -> proc_macro2::TokenStream {
+    let mut max_index = 0;
+    let mut tests = Vec::new();
 
-    let encode = iter.enumerate().map(|(i, f)| -> syn::Result<_> {
-        num_fields += 1;
-        let num = index_number(f.span(), &f.attrs)?;
-        let needs_if = is_option(&f.ty, |_| true);
-        has_option |= needs_if;
-        Ok(match &f.ident {
-            Some(name) if needs_if => quote! {
-                if let Some(x) = &self.#name {
-                    __e777.u32(#num)?;
-                    x.encode(__e777)?
+    for j in (0 .. fields.len()).rev() {
+        let (i, n, f) = fields[j];
+        let n = n.val();
+        if !is_option(&f.ty, |_| true) {
+            max_index = n;
+            break
+        }
+        tests.push(match &f.ident {
+            Some(name) if has_self => quote! {
+                if self.#name.is_some() {
+                    __max_index777 = #n
                 }
             },
             Some(name) => quote! {
-                __e777.u32(#num)?;
-                self.#name.encode(__e777)?;
+                if #name.is_some() {
+                    __max_index777 = #n
+                }
             },
-            None if needs_if => {
+            None if has_self => {
                 let i = syn::Index::from(i);
                 quote! {
-                    if let Some(x) = &self.#i {
-                        __e777.u32(#num)?;
-                        x.encode(__e777)?
+                    if self.#i.is_some() {
+                        __max_index777 = #n
                     }
                 }
             }
             None => {
-                let i = syn::Index::from(i);
+                let i = quote::format_ident!("_{}", i);
                 quote! {
-                    __e777.u32(#num)?;
+                    if #i.is_some() {
+                        __max_index777 = #n
+                    }
+                }
+            }
+        })
+    }
+
+    tests.reverse();
+
+    let mut statements = Vec::new();
+
+    let mut first = true;
+    let mut k = 0;
+    for (i, n, f) in fields {
+        let is_opt = is_option(&f.ty, |_| true);
+        let gaps = if first {
+            first = false;
+            n.val() - k
+        } else {
+            n.val() - k - 1
+        };
+        let statement = match &f.ident {
+            Some(name) if has_self && is_opt && gaps > 0 => quote! {
+                if #n <= __max_index777 {
+                    for _ in 0 .. #gaps {
+                        __e777.null()?;
+                    }
+                    self.#name.encode(__e777)?
+                }
+            },
+            Some(name) if has_self && gaps > 0 => quote! {
+                for _ in 0 .. #gaps {
+                    __e777.null()?;
+                }
+                self.#name.encode(__e777)?;
+            },
+            Some(name) if has_self => quote! {
+                self.#name.encode(__e777)?;
+            },
+            Some(name) if is_opt && gaps > 0 => quote! {
+                if #n <= __max_index777 {
+                    for _ in 0 .. #gaps {
+                        __e777.null()?;
+                    }
+                    #name.encode(__e777)?
+                }
+            },
+            Some(name) if gaps > 0 => quote! {
+                for _ in 0 .. #gaps {
+                    __e777.null()?;
+                }
+                #name.encode(__e777)?;
+            },
+            Some(name) => quote! {
+                #name.encode(__e777)?;
+            },
+
+            None if has_self && is_opt && gaps > 0 => {
+                let i = syn::Index::from(*i);
+                quote! {
+                    if #n <= __max_index777 {
+                        for _ in 0 .. #gaps {
+                            __e777.null()?;
+                        }
+                        self.#i.encode(__e777)?
+                    }
+                }
+            }
+            None if has_self && gaps > 0 => {
+                let i = syn::Index::from(*i);
+                quote! {
+                    for _ in 0 .. #gaps {
+                        __e777.null()?;
+                    }
                     self.#i.encode(__e777)?;
                 }
             }
-        })
-    })
-    .collect::<Vec<_>>();
-
-    encode_as_map(encode, if has_option { None } else { Some(num_fields) })
-}
-
-/// The encoding logic of enum variant fields.
-///
-/// This is very much like `encode_struct_fields`, except that we do not access
-/// any `self` parameter but use the field names directly, assuming they come
-/// from a pattern match. Tuple structs use synthetic names which concatenate '_'
-/// and the field position, e.g. `_1`.
-fn encode_enum_fields<'a, I>(iter: I) -> syn::Result<Vec<proc_macro2::TokenStream>>
-where
-    I: Iterator<Item = &'a syn::Field>
-{
-    let mut num_fields = 0usize;
-    let mut has_option = false;
-
-    let encode = iter.enumerate().map(|(i, f)| -> syn::Result<_> {
-        num_fields += 1;
-        let num = index_number(f.span(), &f.attrs)?;
-        let needs_if = is_option(&f.ty, |_| true);
-        has_option |= needs_if;
-        Ok(match &f.ident {
-            Some(name) if needs_if => quote! {
-                if let Some(x) = #name {
-                    __e777.u32(#num)?;
-                    x.encode(__e777)?
+            None if has_self => {
+                let i = syn::Index::from(*i);
+                quote! {
+                    self.#i.encode(__e777)?;
                 }
-            },
-            Some(name) => quote! {
-                __e777.u32(#num)?;
-                #name.encode(__e777)?;
-            },
-            None if needs_if => {
+            }
+
+            None if is_opt && gaps > 0 => {
                 let i = quote::format_ident!("_{}", i);
                 quote! {
-                    if let Some(x) = #i {
-                        __e777.u32(#num)?;
-                        x.encode(__e777)?
+                    if #n <= __max_index777 {
+                        for _ in 0 .. #gaps {
+                            __e777.null()?;
+                        }
+                        #i.encode(__e777)?
                     }
+                }
+            }
+            None if gaps > 0 => {
+                let i = quote::format_ident!("_{}", i);
+                quote! {
+                    for _ in 0 .. #gaps {
+                        __e777.null()?;
+                    }
+                    #i.encode(__e777)?;
                 }
             }
             None => {
                 let i = quote::format_ident!("_{}", i);
                 quote! {
-                    __e777.u32(#num)?;
                     #i.encode(__e777)?;
                 }
             }
-        })
-    })
-    .collect::<Vec<_>>();
-
-    encode_as_map(encode, if has_option { None } else { Some(num_fields) })
-}
-
-/// This is applied to the field encoding output and surrounds it with a
-/// map (potentially indefinite if no length is given).
-fn encode_as_map<I>(iter: I, len: Option<usize>) -> syn::Result<Vec<proc_macro2::TokenStream>>
-where
-    I: IntoIterator<Item = syn::Result<proc_macro2::TokenStream>>
-{
-    let mut statements = Vec::new();
-    if let Some(n) = len {
-        statements.push(quote!(__e777.map(#n)?;))
-    } else {
-        statements.push(quote!(__e777.begin_map()?;))
+        };
+        statements.push(statement);
+        k = n.val()
     }
-    for e in iter.into_iter() {
-        statements.push(e?)
-    }
-    if len.is_none() {
-        statements.push(quote!(__e777.end()?;))
-    }
-    statements.push(quote!(Ok(())));
 
-    Ok(statements)
+    quote! {
+        let mut __max_index777 = #max_index;
+
+        #(#tests)*
+
+        __e777.array(__max_index777 + 1)?;
+
+        #(#statements)*
+
+        Ok(())
+    }
 }
 
 /// Add a `minicbor::Encode` bound to every type parameter.

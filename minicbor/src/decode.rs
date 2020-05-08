@@ -311,18 +311,23 @@ macro_rules! decode_fields {
     ($d:ident | $($n:literal $x:ident => $t:ty ; $msg:literal)*) => {
         $(let mut $x = None;)*
 
-        match $d.map()? {
-            Some(n) => for _ in 0 .. n {
-                match $d.u32()? {
+        match $d.array()? {
+            Some(n) => for i in 0 .. n {
+                match i {
                     $($n => $x = Some(Decode::decode($d)?),)*
                     _    => $d.skip()?
                 }
             }
-            None => while $d.datatype()? != crate::data::Type::Break {
-                match $d.u32()? {
-                    $($n => $x = Some(Decode::decode($d)?),)*
-                    _    => $d.skip()?
+            None => {
+                let mut i = 0;
+                while $d.datatype()? != crate::data::Type::Break {
+                    match i {
+                        $($n => $x = Some(Decode::decode($d)?),)*
+                        _    => $d.skip()?
+                    }
+                    i += 1
                 }
+                $d.skip()?
             }
         }
 
@@ -350,7 +355,7 @@ impl<'b> Decode<'b> for std::net::IpAddr {
         if Some(2) != d.array()? {
             return Err(Error::Message("expected enum (2-element array)"))
         }
-        match d.u32()? {
+        match d.u64()? {
             0 => Ok(std::net::Ipv4Addr::decode(d)?.into()),
             1 => Ok(std::net::Ipv6Addr::decode(d)?.into()),
             n => Err(Error::UnknownVariant(n))
@@ -380,7 +385,7 @@ impl<'b> Decode<'b> for std::net::SocketAddr {
         if Some(2) != d.array()? {
             return Err(Error::Message("expected enum (2-element array)"))
         }
-        match d.u32()? {
+        match d.u64()? {
             0 => Ok(std::net::SocketAddrV4::decode(d)?.into()),
             1 => Ok(std::net::SocketAddrV6::decode(d)?.into()),
             n => Err(Error::UnknownVariant(n))

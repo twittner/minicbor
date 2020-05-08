@@ -134,7 +134,7 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, mut lt: syn::LifetimeDef) 
                 if Some(2) != __d777.array()? {
                     return Err(minicbor::decode::Error::Message("expected enum (2-element array)"))
                 }
-                match __d777.u32()? {
+                match __d777.u64()? {
                     #(#rows)*
                     n => Err(minicbor::decode::Error::UnknownVariant(n))
                 }
@@ -200,19 +200,21 @@ fn gen_statements(names: &[syn::Ident], types: &[syn::Type], numbers: &[Idx]) ->
     quote! {
         #(let mut #names : Option<#types> = #inits;)*
 
-        if let Some(__len) = __d777.map()? {
-            for _ in 0 .. __len {
-                match __d777.u32()? {
+        if let Some(__len) = __d777.array()? {
+            for i in 0 .. __len {
+                match i {
                     #(#numbers => #actions)*
                     _          => __d777.skip()?
                 }
             }
         } else {
+            let mut i = 0;
             while minicbor::data::Type::Break != __d777.datatype()? {
-                match __d777.u32()? {
+                match i {
                     #(#numbers => #actions)*
                     _          => __d777.skip()?
                 }
+                i += 1
             }
             __d777.skip()?
         }

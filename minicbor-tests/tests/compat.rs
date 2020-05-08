@@ -87,7 +87,7 @@ fn compatibility() {
                 let v = SomeVersion::V1(v1);
                 assert!(m.0.overlaps(&v), "{:?} != {:?}", m.0, v)
             }
-            Err(e) => panic!("failed decoding v{} as v1: {}", m.0.version(), e)
+            Err(e) => panic!("failed decoding v{} as v1: {}: {:02x?}", m.0.version(), e, m.1)
         }
         match minicbor::decode::<Version2>(&m.1) {
             Ok(v2) => {

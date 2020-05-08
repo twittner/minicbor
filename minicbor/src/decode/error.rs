@@ -15,9 +15,9 @@ pub enum Error {
     /// An unexpected type was encountered.
     TypeMismatch(u8, &'static str),
     /// An unknown enum variant was encountered.
-    UnknownVariant(u32),
+    UnknownVariant(u64),
     /// A value was missing at the specified index.
-    MissingValue(u32, &'static str),
+    MissingValue(u64, &'static str),
     /// Generic error message.
     Message(&'static str)
 }
