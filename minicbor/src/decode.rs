@@ -311,18 +311,23 @@ macro_rules! decode_fields {
     ($d:ident | $($n:literal $x:ident => $t:ty ; $msg:literal)*) => {
         $(let mut $x = None;)*
 
-        match $d.map()? {
-            Some(n) => for _ in 0 .. n {
-                match $d.u32()? {
+        match $d.array()? {
+            Some(n) => for i in 0 .. n {
+                match i {
                     $($n => $x = Some(Decode::decode($d)?),)*
                     _    => $d.skip()?
                 }
             }
-            None => while $d.datatype()? != crate::data::Type::Break {
-                match $d.u32()? {
-                    $($n => $x = Some(Decode::decode($d)?),)*
-                    _    => $d.skip()?
+            None => {
+                let mut i = 0;
+                while $d.datatype()? != crate::data::Type::Break {
+                    match i {
+                        $($n => $x = Some(Decode::decode($d)?),)*
+                        _    => $d.skip()?
+                    }
+                    i += 1
                 }
+                $d.skip()?
             }
         }
 
