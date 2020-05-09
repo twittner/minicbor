@@ -1,5 +1,5 @@
 use crate::{check_uniq, field_indices, index_number, is_cow, is_option, variant_indices};
-use crate::{Idx, lifetimes_to_constrain, is_str, is_byte_slice};
+use crate::{Idx, lifetimes_to_constrain, is_str, is_byte_slice, encoding, Encoding};
 use quote::quote;
 use syn::spanned::Spanned;
 
@@ -33,7 +33,8 @@ fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct, mut lt: syn::LifetimeD
     }
     let field_str = field_names.iter().map(|n| format!("{}::{}", name, n));
     let numbers = field_indices(s.fields.iter())?;
-    let statements = gen_statements(&field_names, &field_types, &numbers);
+    let encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
+    let statements = gen_statements(&field_names, &field_types, &numbers, encoding);
 
     let g = add_lifetime(&inp.generics, lt);
     let (impl_generics , ..) = g.split_for_impl();
@@ -94,7 +95,8 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, mut lt: syn::LifetimeDef) 
             }
             let field_str = field_names.iter().map(|n| format!("{}::{}::{}", name, con, n));
             let numbers = field_indices(var.fields.iter())?;
-            let statements = gen_statements(&field_names, &field_types, &numbers);
+            let encoding = var.attrs.iter().filter_map(encoding).next().unwrap_or_default();
+            let statements = gen_statements(&field_names, &field_types, &numbers, encoding);
             if let syn::Fields::Named(_) = var.fields {
                 quote! {
                     #idx => {
@@ -160,7 +162,7 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, mut lt: syn::LifetimeDef) 
 // [1]: These variables will later be deconstructed in `on_enum` and
 // `on_struct` and their inner value will be used to initialise a field.
 // If not present, an error will be produced.
-fn gen_statements(names: &[syn::Ident], types: &[syn::Type], numbers: &[Idx]) -> proc_macro2::TokenStream {
+fn gen_statements(names: &[syn::Ident], types: &[syn::Type], numbers: &[Idx], encoding: Encoding) -> proc_macro2::TokenStream {
     assert_eq!(names.len(), types.len());
     assert_eq!(types.len(), numbers.len());
 
@@ -197,26 +199,48 @@ fn gen_statements(names: &[syn::Ident], types: &[syn::Type], numbers: &[Idx]) ->
     })
     .collect::<Vec<_>>();
 
-    quote! {
-        #(let mut #names : Option<#types> = #inits;)*
+    match encoding {
+        Encoding::Array => quote! {
+            #(let mut #names : Option<#types> = #inits;)*
 
-        if let Some(__len) = __d777.array()? {
-            for i in 0 .. __len {
-                match i {
-                    #(#numbers => #actions)*
-                    _          => __d777.skip()?
+            if let Some(__len) = __d777.array()? {
+                for i in 0 .. __len {
+                    match i {
+                        #(#numbers => #actions)*
+                        _          => __d777.skip()?
+                    }
                 }
-            }
-        } else {
-            let mut i = 0;
-            while minicbor::data::Type::Break != __d777.datatype()? {
-                match i {
-                    #(#numbers => #actions)*
-                    _          => __d777.skip()?
+            } else {
+                let mut i = 0;
+                while minicbor::data::Type::Break != __d777.datatype()? {
+                    match i {
+                        #(#numbers => #actions)*
+                        _          => __d777.skip()?
+                    }
+                    i += 1
                 }
-                i += 1
+                __d777.skip()?
             }
-            __d777.skip()?
+        },
+        Encoding::Map => quote! {
+            #(let mut #names : Option<#types> = #inits;)*
+
+            if let Some(__len) = __d777.map()? {
+                for _ in 0 .. __len {
+                    match __d777.u32()? {
+                        #(#numbers => #actions)*
+                        _          => __d777.skip()?
+                    }
+                }
+            } else {
+                while minicbor::data::Type::Break != __d777.datatype()? {
+                    match __d777.u32()? {
+                        #(#numbers => #actions)*
+                        _          => __d777.skip()?
+                    }
+                }
+                __d777.skip()?
+            }
         }
     }
 }

@@ -1,4 +1,5 @@
 use crate::{check_uniq, field_indices, Idx, index_number, is_option, variant_indices};
+use crate::{encoding, Encoding};
 use quote::quote;
 use syn::spanned::Spanned;
 
@@ -25,13 +26,9 @@ fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct) -> syn::Result<proc_ma
 
     check_uniq(name.span(), field_indices(s.fields.iter())?)?;
 
-    let mut fields = s.fields.iter()
-        .enumerate()
-        .map(|(i, f)| index_number(f.span(), &f.attrs).map(move |n| (i, n, f)))
-        .collect::<Result<Vec<_>, _>>()?;
-    fields.sort_unstable_by_key(|(_, n, _)| n.val());
-
-    let statements = encode_as_array(&fields, true);
+    let fields = sorted_fields(s.fields.iter())?;
+    let encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
+    let statements = encode_fields(&fields, true, encoding);
     let (impl_generics, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     Ok(quote! {
@@ -50,28 +47,36 @@ fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct) -> syn::Result<proc_ma
 fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2::TokenStream> {
     let name = &inp.ident;
     check_uniq(e.enum_token.span(), variant_indices(e.variants.iter())?)?;
+    let enum_encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
     let mut rows = Vec::new();
     for var in e.variants.iter() {
         let con = &var.ident;
         let idx = index_number(var.ident.span(), &var.attrs)?;
         check_uniq(con.span(), field_indices(var.fields.iter())?)?;
+        let encoding = var.attrs.iter().filter_map(encoding).next().unwrap_or(enum_encoding);
         let row = match &var.fields {
-            syn::Fields::Unit => quote! {
-                #name::#con => {
-                    __e777.array(2)?;
-                    __e777.u32(#idx)?;
-                    __e777.array(0)?;
-                    Ok(())
+            syn::Fields::Unit => match encoding {
+                Encoding::Array => quote! {
+                    #name::#con => {
+                        __e777.array(2)?;
+                        __e777.u32(#idx)?;
+                        __e777.array(0)?;
+                        Ok(())
+                    }
+                },
+                Encoding::Map => quote! {
+                    #name::#con => {
+                        __e777.array(2)?;
+                        __e777.u32(#idx)?;
+                        __e777.map(0)?;
+                        Ok(())
+                    }
                 }
-            },
+            }
             syn::Fields::Named(fields) => {
                 let idents = fields.named.iter().map(|f| f.ident.clone().unwrap());
-                let mut fields = fields.named.iter()
-                    .enumerate()
-                    .map(|(i, f)| index_number(f.span(), &f.attrs).map(move |n| (i, n, f)))
-                    .collect::<Result<Vec<_>, _>>()?;
-                fields.sort_unstable_by_key(|(_, n, _)| n.val());
-                let statements = encode_as_array(&fields, false);
+                let fields = sorted_fields(fields.named.iter())?;
+                let statements = encode_fields(&fields, false, encoding);
                 quote! {
                     #name::#con{#(#idents,)*} => {
                         __e777.array(2)?;
@@ -84,12 +89,8 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
                 let idents = fields.unnamed.iter().enumerate().map(|(i, _)| {
                     quote::format_ident!("_{}", i)
                 });
-                let mut fields = fields.unnamed.iter()
-                    .enumerate()
-                    .map(|(i, f)| index_number(f.span(), &f.attrs).map(move |n| (i, n, f)))
-                    .collect::<Result<Vec<_>, _>>()?;
-                fields.sort_unstable_by_key(|(_, n, _)| n.val());
-                let statements = encode_as_array(&fields, false);
+                let fields = sorted_fields(fields.unnamed.iter())?;
+                let statements = encode_fields(&fields, false, encoding);
                 quote! {
                     #name::#con(#(#idents,)*) => {
                         __e777.array(2)?;
@@ -128,165 +129,329 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
     })
 }
 
-fn encode_as_array(fields: &[(usize, Idx, &syn::Field)], has_self: bool) -> proc_macro2::TokenStream {
-    let mut max_index = 0;
+fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding: Encoding) -> proc_macro2::TokenStream {
+    let mut max_index;
     let mut tests = Vec::new();
 
-    for j in (0 .. fields.len()).rev() {
-        let (i, n, f) = fields[j];
-        let n = n.val();
-        if !is_option(&f.ty, |_| true) {
-            max_index = n;
-            break
+    match encoding {
+        Encoding::Array => {
+            max_index = 0;
+            for j in (0 .. fields.len()).rev() {
+                let (i, n, f) = fields[j];
+                let n = n.val();
+                if !is_option(&f.ty, |_| true) {
+                    max_index = n;
+                    break
+                }
+                tests.push(match &f.ident {
+                    Some(name) if has_self => quote! {
+                        if self.#name.is_some() {
+                            __max_index777 = #n
+                        }
+                    },
+                    Some(name) => quote! {
+                        if #name.is_some() {
+                            __max_index777 = #n
+                        }
+                    },
+                    None if has_self => {
+                        let i = syn::Index::from(i);
+                        quote! {
+                            if self.#i.is_some() {
+                                __max_index777 = #n
+                            }
+                        }
+                    }
+                    None => {
+                        let i = quote::format_ident!("_{}", i);
+                        quote! {
+                            if #i.is_some() {
+                                __max_index777 = #n
+                            }
+                        }
+                    }
+                })
+            }
+            tests.reverse()
         }
-        tests.push(match &f.ident {
-            Some(name) if has_self => quote! {
-                if self.#name.is_some() {
-                    __max_index777 = #n
+        Encoding::Map => {
+            max_index = fields.len() as u32;
+            for j in 0 .. fields.len() {
+                let (i, _, f) = fields[j];
+                if !is_option(&f.ty, |_| true) {
+                    continue
                 }
-            },
-            Some(name) => quote! {
-                if #name.is_some() {
-                    __max_index777 = #n
-                }
-            },
-            None if has_self => {
-                let i = syn::Index::from(i);
-                quote! {
-                    if self.#i.is_some() {
-                        __max_index777 = #n
+                tests.push(match &f.ident {
+                    Some(name) if has_self => quote! {
+                        if self.#name.is_none() {
+                            __max_fields777 -= 1
+                        }
+                    },
+                    Some(name) => quote! {
+                        if #name.is_none() {
+                            __max_fields777 -= 1
+                        }
+                    },
+                    None if has_self => {
+                        let i = syn::Index::from(i);
+                        quote! {
+                            if self.#i.is_none() {
+                                __max_fields777 -= 1
+                            }
+                        }
                     }
-                }
-            }
-            None => {
-                let i = quote::format_ident!("_{}", i);
-                quote! {
-                    if #i.is_some() {
-                        __max_index777 = #n
+                    None => {
+                        let i = quote::format_ident!("_{}", i);
+                        quote! {
+                            if #i.is_none() {
+                                __max_fields777 -= 1
+                            }
+                        }
                     }
-                }
+                })
             }
-        })
+        }
     }
-
-    tests.reverse();
 
     let mut statements = Vec::new();
 
-    let mut first = true;
-    let mut k = 0;
-    for (i, n, f) in fields {
-        let is_opt = is_option(&f.ty, |_| true);
-        let gaps = if first {
-            first = false;
-            n.val() - k
-        } else {
-            n.val() - k - 1
-        };
-        let statement = match &f.ident {
-            Some(name) if has_self && is_opt && gaps > 0 => quote! {
-                if #n <= __max_index777 {
-                    for _ in 0 .. #gaps {
-                        __e777.null()?;
-                    }
-                    self.#name.encode(__e777)?
-                }
-            },
-            Some(name) if has_self && gaps > 0 => quote! {
-                for _ in 0 .. #gaps {
-                    __e777.null()?;
-                }
-                self.#name.encode(__e777)?;
-            },
-            Some(name) if has_self => quote! {
-                self.#name.encode(__e777)?;
-            },
-            Some(name) if is_opt && gaps > 0 => quote! {
-                if #n <= __max_index777 {
-                    for _ in 0 .. #gaps {
-                        __e777.null()?;
-                    }
-                    #name.encode(__e777)?
-                }
-            },
-            Some(name) if gaps > 0 => quote! {
-                for _ in 0 .. #gaps {
-                    __e777.null()?;
-                }
-                #name.encode(__e777)?;
-            },
-            Some(name) => quote! {
-                #name.encode(__e777)?;
-            },
+    match encoding {
+        Encoding::Map => for (i, n, f) in fields {
+            let is_opt = is_option(&f.ty, |_| true);
+            let statement = match &f.ident {
 
-            None if has_self && is_opt && gaps > 0 => {
-                let i = syn::Index::from(*i);
-                quote! {
-                    if #n <= __max_index777 {
+                // struct
+
+                Some(name) if has_self && is_opt => quote! {
+                    if let Some(x) = &self.#name {
+                        __e777.u32(#n)?;
+                        x.encode(__e777)?
+                    }
+                },
+                Some(name) if has_self => quote! {
+                    __e777.u32(#n)?;
+                    self.#name.encode(__e777)?;
+                },
+
+                // tuple struct
+
+                Some(name) if is_opt => quote! {
+                    if let Some(x) = #name {
+                        __e777.u32(#n)?;
+                        x.encode(__e777)?
+                    }
+                },
+                Some(name) => quote! {
+                    __e777.u32(#n)?;
+                    #name.encode(__e777)?;
+                },
+
+                // enum struct
+
+                None if has_self && is_opt => {
+                    let i = syn::Index::from(*i);
+                    quote! {
+                        if let Some(x) = &self.#i {
+                            __e777.u32(#n)?;
+                            x.encode(__e777)?
+                        }
+                    }
+                }
+                None if has_self => {
+                    let i = syn::Index::from(*i);
+                    quote! {
+                        __e777.u32(#n)?;
+                        self.#i.encode(__e777)?;
+                    }
+                }
+
+                // enum tuple
+
+                None if is_opt => {
+                    let i = quote::format_ident!("_{}", i);
+                    quote! {
+                        if let Some(x) = #i {
+                            __e777.u32(#n)?;
+                            x.encode(__e777)?
+                        }
+                    }
+                }
+                None => {
+                    let i = quote::format_ident!("_{}", i);
+                    quote! {
+                        __e777.u32(#n)?;
+                        #i.encode(__e777)?;
+                    }
+                }
+            };
+            statements.push(statement)
+        }
+        Encoding::Array => {
+            let mut first = true;
+            let mut k = 0;
+            for (i, n, f) in fields {
+                let is_opt = is_option(&f.ty, |_| true);
+                let gaps = if first {
+                    first = false;
+                    n.val() - k
+                } else {
+                    n.val() - k - 1
+                };
+                let statement = match &f.ident {
+
+                    // struct
+
+                    Some(name) if has_self && is_opt && gaps > 0 => quote! {
+                        if #n <= __max_index777 {
+                            for _ in 0 .. #gaps {
+                                __e777.null()?;
+                            }
+                            self.#name.encode(__e777)?
+                        }
+                    },
+                    Some(name) if has_self && is_opt && gaps == 0 => quote! {
+                        if #n <= __max_index777 {
+                            self.#name.encode(__e777)?
+                        }
+                    },
+                    Some(name) if has_self && gaps > 0 => quote! {
                         for _ in 0 .. #gaps {
                             __e777.null()?;
                         }
-                        self.#i.encode(__e777)?
-                    }
-                }
-            }
-            None if has_self && gaps > 0 => {
-                let i = syn::Index::from(*i);
-                quote! {
-                    for _ in 0 .. #gaps {
-                        __e777.null()?;
-                    }
-                    self.#i.encode(__e777)?;
-                }
-            }
-            None if has_self => {
-                let i = syn::Index::from(*i);
-                quote! {
-                    self.#i.encode(__e777)?;
-                }
-            }
+                        self.#name.encode(__e777)?;
+                    },
+                    Some(name) if has_self => quote! {
+                        self.#name.encode(__e777)?;
+                    },
 
-            None if is_opt && gaps > 0 => {
-                let i = quote::format_ident!("_{}", i);
-                quote! {
-                    if #n <= __max_index777 {
+                    // enum struct
+
+                    Some(name) if is_opt && gaps > 0 => quote! {
+                        if #n <= __max_index777 {
+                            for _ in 0 .. #gaps {
+                                __e777.null()?;
+                            }
+                            #name.encode(__e777)?
+                        }
+                    },
+                    Some(name) if is_opt && gaps == 0 => quote! {
+                        if #n <= __max_index777 {
+                            #name.encode(__e777)?
+                        }
+                    },
+                    Some(name) if gaps > 0 => quote! {
                         for _ in 0 .. #gaps {
                             __e777.null()?;
                         }
-                        #i.encode(__e777)?
+                        #name.encode(__e777)?;
+                    },
+                    Some(name) => quote! {
+                        #name.encode(__e777)?;
+                    },
+
+                    // tuple struct
+
+                    None if has_self && is_opt && gaps > 0 => {
+                        let i = syn::Index::from(*i);
+                        quote! {
+                            if #n <= __max_index777 {
+                                for _ in 0 .. #gaps {
+                                    __e777.null()?;
+                                }
+                                self.#i.encode(__e777)?
+                            }
+                        }
                     }
-                }
-            }
-            None if gaps > 0 => {
-                let i = quote::format_ident!("_{}", i);
-                quote! {
-                    for _ in 0 .. #gaps {
-                        __e777.null()?;
+                    None if has_self && is_opt && gaps == 0 => {
+                        let i = syn::Index::from(*i);
+                        quote! {
+                            if #n <= __max_index777 {
+                                self.#i.encode(__e777)?
+                            }
+                        }
                     }
-                    #i.encode(__e777)?;
-                }
+                    None if has_self && gaps > 0 => {
+                        let i = syn::Index::from(*i);
+                        quote! {
+                            for _ in 0 .. #gaps {
+                                __e777.null()?;
+                            }
+                            self.#i.encode(__e777)?;
+                        }
+                    }
+                    None if has_self => {
+                        let i = syn::Index::from(*i);
+                        quote! {
+                            self.#i.encode(__e777)?;
+                        }
+                    }
+
+                    // enum tuple
+
+                    None if is_opt && gaps > 0 => {
+                        let i = quote::format_ident!("_{}", i);
+                        quote! {
+                            if #n <= __max_index777 {
+                                for _ in 0 .. #gaps {
+                                    __e777.null()?;
+                                }
+                                #i.encode(__e777)?
+                            }
+                        }
+                    }
+                    None if is_opt && gaps == 0 => {
+                        let i = quote::format_ident!("_{}", i);
+                        quote! {
+                            if #n <= __max_index777 {
+                                #i.encode(__e777)?
+                            }
+                        }
+                    }
+                    None if gaps > 0 => {
+                        let i = quote::format_ident!("_{}", i);
+                        quote! {
+                            for _ in 0 .. #gaps {
+                                __e777.null()?;
+                            }
+                            #i.encode(__e777)?;
+                        }
+                    }
+                    None => {
+                        let i = quote::format_ident!("_{}", i);
+                        quote! {
+                            #i.encode(__e777)?;
+                        }
+                    }
+                };
+                statements.push(statement);
+                k = n.val()
             }
-            None => {
-                let i = quote::format_ident!("_{}", i);
-                quote! {
-                    #i.encode(__e777)?;
-                }
-            }
-        };
-        statements.push(statement);
-        k = n.val()
+        }
     }
 
-    quote! {
-        let mut __max_index777 = #max_index;
+    match encoding {
+        Encoding::Array => quote! {
+            let mut __max_index777 = #max_index;
 
-        #(#tests)*
+            #(#tests)*
 
-        __e777.array(__max_index777 as u64 + 1)?;
+            __e777.array(__max_index777 as u64 + 1)?;
 
-        #(#statements)*
+            #(#statements)*
 
-        Ok(())
+            Ok(())
+        },
+        Encoding::Map => quote! {
+            let mut __max_fields777 = #max_index;
+
+            #(#tests)*
+
+            __e777.map(__max_fields777 as u64)?;
+
+            #(#statements)*
+
+            Ok(())
+        }
     }
 }
 
@@ -302,3 +467,13 @@ where
     Ok(())
 }
 
+fn sorted_fields<'a, I>(iter: I) -> syn::Result<Vec<(usize, Idx, &'a syn::Field)>>
+where
+    I: Iterator<Item = &'a syn::Field>
+{
+    let mut fields = iter.enumerate()
+        .map(|(i, f)| index_number(f.span(), &f.attrs).map(move |n| (i, n, f)))
+        .collect::<Result<Vec<_>, _>>()?;
+    fields.sort_unstable_by_key(|(_, n, _)| n.val());
+    Ok(fields)
+}

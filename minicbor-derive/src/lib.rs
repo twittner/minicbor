@@ -161,7 +161,7 @@ use std::collections::HashSet;
 /// Derive the `minicbor::Decode` trait for a struct or enum.
 ///
 /// See the [crate] documentation for details.
-#[proc_macro_derive(Decode, attributes(n, b))]
+#[proc_macro_derive(Decode, attributes(n, b, cbor))]
 pub fn derive_decode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     decode::derive_from(input)
 }
@@ -169,7 +169,7 @@ pub fn derive_decode(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 /// Derive the `minicbor::Encode` trait for a struct or enum.
 ///
 /// See the [crate] documentation for details.
-#[proc_macro_derive(Encode, attributes(n, b))]
+#[proc_macro_derive(Encode, attributes(n, b, cbor))]
 pub fn derive_encode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     encode::derive_from(input)
 }
@@ -422,3 +422,31 @@ where
     iter.map(|v| index_number(v.span(), &v.attrs)).collect()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Encoding {
+    Array,
+    Map
+}
+
+impl Default for Encoding {
+    fn default() -> Self {
+        Encoding::Array
+    }
+}
+
+fn encoding(a: &syn::Attribute) -> Option<Encoding> {
+    match a.parse_meta().ok()? {
+        syn::Meta::List(ml) if ml.path.is_ident("cbor") => {
+            if let Some(syn::NestedMeta::Meta(syn::Meta::Path(arg))) = ml.nested.first() {
+                if arg.is_ident("map") {
+                    return Some(Encoding::Map)
+                }
+                if arg.is_ident("array") {
+                    return Some(Encoding::Array)
+                }
+            }
+        }
+        _ => {}
+    }
+    None
+}
