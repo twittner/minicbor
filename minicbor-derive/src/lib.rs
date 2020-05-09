@@ -337,14 +337,14 @@ where
 #[derive(Debug, Clone, Copy)]
 enum Idx {
     /// A regular, non-borrowing index.
-    N(u64),
+    N(u32),
     /// An index which indicates that the value borrows from the decoding input.
-    B(u64)
+    B(u32)
 }
 
 impl ToTokens for Idx {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        tokens.append(proc_macro2::Literal::u64_suffixed(self.val()))
+        tokens.append(proc_macro2::Literal::u32_unsuffixed(self.val()))
     }
 }
 
@@ -359,7 +359,7 @@ impl Idx {
     }
 
     /// Get the numeric index value.
-    fn val(self) -> u64 {
+    fn val(self) -> u32 {
         match self {
             Idx::N(i) => i,
             Idx::B(i) => i

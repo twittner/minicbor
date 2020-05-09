@@ -59,7 +59,7 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
             syn::Fields::Unit => quote! {
                 #name::#con => {
                     __e777.array(2)?;
-                    __e777.u64(#idx)?;
+                    __e777.u32(#idx)?;
                     __e777.array(0)?;
                     Ok(())
                 }
@@ -75,7 +75,7 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
                 quote! {
                     #name::#con{#(#idents,)*} => {
                         __e777.array(2)?;
-                        __e777.u64(#idx)?;
+                        __e777.u32(#idx)?;
                         #statements
                     }
                 }
@@ -93,7 +93,7 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
                 quote! {
                     #name::#con(#(#idents,)*) => {
                         __e777.array(2)?;
-                        __e777.u64(#idx)?;
+                        __e777.u32(#idx)?;
                         #statements
                     }
                 }
@@ -282,7 +282,7 @@ fn encode_as_array(fields: &[(usize, Idx, &syn::Field)], has_self: bool) -> proc
 
         #(#tests)*
 
-        __e777.array(__max_index777 + 1)?;
+        __e777.array(__max_index777 as u64 + 1)?;
 
         #(#statements)*
 

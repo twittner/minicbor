@@ -355,7 +355,7 @@ impl<'b> Decode<'b> for std::net::IpAddr {
         if Some(2) != d.array()? {
             return Err(Error::Message("expected enum (2-element array)"))
         }
-        match d.u64()? {
+        match d.u32()? {
             0 => Ok(std::net::Ipv4Addr::decode(d)?.into()),
             1 => Ok(std::net::Ipv6Addr::decode(d)?.into()),
             n => Err(Error::UnknownVariant(n))
@@ -385,7 +385,7 @@ impl<'b> Decode<'b> for std::net::SocketAddr {
         if Some(2) != d.array()? {
             return Err(Error::Message("expected enum (2-element array)"))
         }
-        match d.u64()? {
+        match d.u32()? {
             0 => Ok(std::net::SocketAddrV4::decode(d)?.into()),
             1 => Ok(std::net::SocketAddrV6::decode(d)?.into()),
             n => Err(Error::UnknownVariant(n))

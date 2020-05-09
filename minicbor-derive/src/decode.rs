@@ -134,7 +134,7 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, mut lt: syn::LifetimeDef) 
                 if Some(2) != __d777.array()? {
                     return Err(minicbor::decode::Error::Message("expected enum (2-element array)"))
                 }
-                match __d777.u64()? {
+                match __d777.u32()? {
                     #(#rows)*
                     n => Err(minicbor::decode::Error::UnknownVariant(n))
                 }

@@ -118,4 +118,3 @@ enum E4<'a> {
 fn e4_is_bound<'a, 'b: 'a>(d: &mut Decoder<'b>) -> E4<'a> {
     d.decode().unwrap()
 }
-
