@@ -130,35 +130,34 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
 }
 
 fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding: Encoding) -> proc_macro2::TokenStream {
-    let mut max_index;
+    let mut max_index = None;
     let mut tests = Vec::new();
 
     match encoding {
         Encoding::Array => {
-            max_index = 0;
             for j in (0 .. fields.len()).rev() {
                 let (i, n, f) = fields[j];
                 let n = n.val();
                 if !is_option(&f.ty, |_| true) {
-                    max_index = n;
+                    max_index = Some(n);
                     break
                 }
                 tests.push(match &f.ident {
                     Some(name) if has_self => quote! {
                         if self.#name.is_some() {
-                            __max_index777 = #n
+                            __max_index777 = Some(#n)
                         }
                     },
                     Some(name) => quote! {
                         if #name.is_some() {
-                            __max_index777 = #n
+                            __max_index777 = Some(#n)
                         }
                     },
                     None if has_self => {
                         let i = syn::Index::from(i);
                         quote! {
                             if self.#i.is_some() {
-                                __max_index777 = #n
+                                __max_index777 = Some(#n)
                             }
                         }
                     }
@@ -166,7 +165,7 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
                         let i = quote::format_ident!("_{}", i);
                         quote! {
                             if #i.is_some() {
-                                __max_index777 = #n
+                                __max_index777 = Some(#n)
                             }
                         }
                     }
@@ -175,7 +174,6 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
             tests.reverse()
         }
         Encoding::Map => {
-            max_index = fields.len() as u32;
             for j in 0 .. fields.len() {
                 let (i, _, f) = fields[j];
                 if !is_option(&f.ty, |_| true) {
@@ -302,7 +300,7 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
                     // struct
 
                     Some(name) if has_self && is_opt && gaps > 0 => quote! {
-                        if #n <= __max_index777 {
+                        if Some(#n) <= __max_index777 {
                             for _ in 0 .. #gaps {
                                 __e777.null()?;
                             }
@@ -310,7 +308,7 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
                         }
                     },
                     Some(name) if has_self && is_opt && gaps == 0 => quote! {
-                        if #n <= __max_index777 {
+                        if Some(#n) <= __max_index777 {
                             self.#name.encode(__e777)?
                         }
                     },
@@ -327,7 +325,7 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
                     // enum struct
 
                     Some(name) if is_opt && gaps > 0 => quote! {
-                        if #n <= __max_index777 {
+                        if Some(#n) <= __max_index777 {
                             for _ in 0 .. #gaps {
                                 __e777.null()?;
                             }
@@ -335,7 +333,7 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
                         }
                     },
                     Some(name) if is_opt && gaps == 0 => quote! {
-                        if #n <= __max_index777 {
+                        if Some(#n) <= __max_index777 {
                             #name.encode(__e777)?
                         }
                     },
@@ -354,7 +352,7 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
                     None if has_self && is_opt && gaps > 0 => {
                         let i = syn::Index::from(*i);
                         quote! {
-                            if #n <= __max_index777 {
+                            if Some(#n) <= __max_index777 {
                                 for _ in 0 .. #gaps {
                                     __e777.null()?;
                                 }
@@ -365,7 +363,7 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
                     None if has_self && is_opt && gaps == 0 => {
                         let i = syn::Index::from(*i);
                         quote! {
-                            if #n <= __max_index777 {
+                            if Some(#n) <= __max_index777 {
                                 self.#i.encode(__e777)?
                             }
                         }
@@ -391,7 +389,7 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
                     None if is_opt && gaps > 0 => {
                         let i = quote::format_ident!("_{}", i);
                         quote! {
-                            if #n <= __max_index777 {
+                            if Some(#n) <= __max_index777 {
                                 for _ in 0 .. #gaps {
                                     __e777.null()?;
                                 }
@@ -402,7 +400,7 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
                     None if is_opt && gaps == 0 => {
                         let i = quote::format_ident!("_{}", i);
                         quote! {
-                            if #n <= __max_index777 {
+                            if Some(#n) <= __max_index777 {
                                 #i.encode(__e777)?
                             }
                         }
@@ -429,20 +427,32 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
         }
     }
 
+    let max_fields = fields.len() as u32;
+
+    let max_index =
+        if let Some(i) = max_index {
+            quote!(Some(#i))
+        } else {
+            quote!(None)
+        };
+
     match encoding {
         Encoding::Array => quote! {
-            let mut __max_index777 = #max_index;
+            let mut __max_index777: Option<u32> = #max_index;
 
             #(#tests)*
 
-            __e777.array(__max_index777 as u64 + 1)?;
-
-            #(#statements)*
+            if let Some(__i777) = __max_index777 {
+                __e777.array(__i777 as u64 + 1)?;
+                #(#statements)*
+            } else {
+                __e777.array(0)?;
+            }
 
             Ok(())
         },
         Encoding::Map => quote! {
-            let mut __max_fields777 = #max_index;
+            let mut __max_fields777 = #max_fields;
 
             #(#tests)*
 

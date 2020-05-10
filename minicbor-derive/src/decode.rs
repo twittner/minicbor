@@ -76,6 +76,7 @@ fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct, mut lt: syn::LifetimeD
 fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, mut lt: syn::LifetimeDef) -> syn::Result<proc_macro2::TokenStream> {
     let name = &inp.ident;
     check_uniq(e.enum_token.span(), variant_indices(e.variants.iter())?)?;
+    let enum_encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
 
     let mut rows = Vec::new();
     for var in e.variants.iter() {
@@ -95,7 +96,7 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, mut lt: syn::LifetimeDef) 
             }
             let field_str = field_names.iter().map(|n| format!("{}::{}::{}", name, con, n));
             let numbers = field_indices(var.fields.iter())?;
-            let encoding = var.attrs.iter().filter_map(encoding).next().unwrap_or_default();
+            let encoding = var.attrs.iter().filter_map(encoding).next().unwrap_or(enum_encoding);
             let statements = gen_statements(&field_names, &field_types, &numbers, encoding);
             if let syn::Fields::Named(_) = var.fields {
                 quote! {
