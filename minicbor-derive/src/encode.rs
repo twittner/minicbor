@@ -129,11 +129,29 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
     })
 }
 
+/// The encoding logic of fields.
+///
+/// We first generate code to determine at runtime the number of fields to
+/// encode so that we can use regular map or array containers instead of
+/// indefinite ones. Since this value depends on optional values being `Some`
+/// we can not calculate this number statically but have the generate code
+/// with runtime tests.
+///
+/// Then the actual field encoding happens which is slightly different
+/// depending on the encoding.
+///
+/// NB: The `fields` parameter is assumed to be sorted by index.
 fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding: Encoding) -> proc_macro2::TokenStream {
     let mut max_index = None;
     let mut tests = Vec::new();
 
     match encoding {
+        // Under array encoding the number of elements is the highest
+        // index + 1. To determine the highest index we start from the
+        // highest field whose type is not an `Option`, because it is
+        // certain that all fields up to this point need to be encoded.
+        // For each `Option` that follows the highest index is updated
+        // if the value is a `Some`.
         Encoding::Array => {
             for j in (0 .. fields.len()).rev() {
                 let (i, n, f) = fields[j];
@@ -173,6 +191,11 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
             }
             tests.reverse()
         }
+        // Under map encoding the number of map entries is the number
+        // of fields minus those which are an `Option` whose value is
+        // `None`. We (later) set the number to the total number of fields
+        // and for each `Option` we check if it is `None` and if so
+        // substract 1 from the total.
         Encoding::Map => {
             for j in 0 .. fields.len() {
                 let (i, _, f) = fields[j];
@@ -214,6 +237,9 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
     let mut statements = Vec::new();
 
     match encoding {
+        // Under map encoding each field is encoded with its index.
+        // If the field type is an `Option` and `None`, neither the
+        // index nor the field value are encoded.
         Encoding::Map => for (i, n, f) in fields {
             let is_opt = is_option(&f.ty, |_| true);
             let statement = match &f.ident {
@@ -284,6 +310,12 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
             };
             statements.push(statement)
         }
+        // Under array encoding only field values are encoded and their
+        // index is represented as the array position. Gaps between indexes
+        // need to be filled with null.
+        // We do not encode the suffix of `Option` fields which are `None`
+        // so we check for each field if it is still below the max. index,
+        // otherwise we do not encode it.
         Encoding::Array => {
             let mut first = true;
             let mut k = 0;
@@ -307,7 +339,7 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
                             self.#name.encode(__e777)?
                         }
                     },
-                    Some(name) if has_self && is_opt && gaps == 0 => quote! {
+                    Some(name) if has_self && is_opt => quote! {
                         if Some(#n) <= __max_index777 {
                             self.#name.encode(__e777)?
                         }
@@ -332,7 +364,7 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
                             #name.encode(__e777)?
                         }
                     },
-                    Some(name) if is_opt && gaps == 0 => quote! {
+                    Some(name) if is_opt => quote! {
                         if Some(#n) <= __max_index777 {
                             #name.encode(__e777)?
                         }
@@ -360,7 +392,7 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
                             }
                         }
                     }
-                    None if has_self && is_opt && gaps == 0 => {
+                    None if has_self && is_opt => {
                         let i = syn::Index::from(*i);
                         quote! {
                             if Some(#n) <= __max_index777 {
@@ -397,7 +429,7 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
                             }
                         }
                     }
-                    None if is_opt && gaps == 0 => {
+                    None if is_opt => {
                         let i = quote::format_ident!("_{}", i);
                         quote! {
                             if Some(#n) <= __max_index777 {
@@ -477,6 +509,7 @@ where
     Ok(())
 }
 
+/// Collect the field indexes and sort the fields by index number.
 fn sorted_fields<'a, I>(iter: I) -> syn::Result<Vec<(usize, Idx, &'a syn::Field)>>
 where
     I: Iterator<Item = &'a syn::Field>

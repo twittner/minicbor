@@ -152,12 +152,13 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum, mut lt: syn::LifetimeDef) 
 // variable `n` with type `Option<t>` and set it to `None` if `t` is not
 // an `Option`, otherwise to `Some(None)`. [1]
 //
-// Then we iterate over all CBOR map elements and if an index `j` equal
-// to `i` is found, we attempt to decode the next CBOR item as a value `v`
-// of type `t`. If successful, we assign the result to `n` as `Some(v)`,
-// otherwise we error, or -- if `t` is an option and the decoding failed
-// because an unknown enum variant was decoded -- we skip the variant
-// value and continue decoding.
+// Then -- depending on the selected encoding -- we iterate over all CBOR
+// map or array elements and if an index `j` equal to `i` is found, we
+// attempt to decode the next CBOR item as a value `v` of type `t`. If
+// successful, we assign the result to `n` as `Some(v)`, otherwise we
+// error, or -- if `t` is an option and the decoding failed because an
+// unknown enum variant was decoded -- we skip the variant value and
+// continue decoding.
 //
 // --------------------------------------------------------------------
 // [1]: These variables will later be deconstructed in `on_enum` and
