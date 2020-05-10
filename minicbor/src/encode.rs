@@ -83,7 +83,7 @@ where
     V: Encode
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.map(self.len())?;
+        e.map(self.len() as u64)?;
         for (k, v) in self {
             k.encode(e)?;
             v.encode(e)?;
@@ -99,7 +99,7 @@ where
     V: Encode
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.map(self.len())?;
+        e.map(self.len() as u64)?;
         for (k, v) in self {
             k.encode(e)?;
             v.encode(e)?;
@@ -191,7 +191,7 @@ macro_rules! encode_sequential {
         $(
             impl<T: Encode> Encode for $t {
                 fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-                    e.array(self.len())?;
+                    e.array(self.len() as u64)?;
                     for x in self {
                         x.encode(e)?
                     }
@@ -267,9 +267,9 @@ encode_tuples! {
 
 impl Encode for core::time::Duration {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.map(2)?
-            .u8(0)?.encode(self.as_secs())?
-            .u8(1)?.encode(self.subsec_nanos())?
+        e.array(2)?
+            .encode(self.as_secs())?
+            .encode(self.subsec_nanos())?
             .ok()
     }
 }
@@ -313,9 +313,9 @@ impl Encode for std::net::SocketAddr {
 #[cfg(feature = "std")]
 impl Encode for std::net::SocketAddrV4 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.map(2)?
-            .u32(0)?.encode(self.ip())?
-            .u32(1)?.encode(self.port())?
+        e.array(2)?
+            .encode(self.ip())?
+            .encode(self.port())?
             .ok()
     }
 }
@@ -323,9 +323,9 @@ impl Encode for std::net::SocketAddrV4 {
 #[cfg(feature = "std")]
 impl Encode for std::net::SocketAddrV6 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.map(2)?
-            .u32(0)?.encode(self.ip())?
-            .u32(1)?.encode(self.port())?
+        e.array(2)?
+            .encode(self.ip())?
+            .encode(self.port())?
             .ok()
     }
 }

@@ -173,13 +173,13 @@ impl<W: Write> Encoder<W> {
     }
 
     /// Begin encoding an array with `len` elements.
-    pub fn array(&mut self, len: usize) -> Result<&mut Self, Error<W::Error>> {
-        self.type_len(ARRAY, len as u64)
+    pub fn array(&mut self, len: u64) -> Result<&mut Self, Error<W::Error>> {
+        self.type_len(ARRAY, len)
     }
 
     /// Begin encoding a map with `len` entries.
-    pub fn map(&mut self, len: usize) -> Result<&mut Self, Error<W::Error>> {
-        self.type_len(MAP, len as u64)
+    pub fn map(&mut self, len: u64) -> Result<&mut Self, Error<W::Error>> {
+        self.type_len(MAP, len)
     }
 
     /// Begin encoding an array of unknown size.

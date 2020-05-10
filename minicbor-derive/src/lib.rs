@@ -91,6 +91,14 @@
 //! indicates that the value borrows from the decoding input, whereas `n`
 //! produces non-borrowed values (except for implicit borrows).
 //!
+//! ## Encoding format
+//!
+//! The actual CBOR encoding to use can be selected by attaching either the
+//! `#[cbor(array)]` or `#[cbor(map)]` attribute to structs, enums or
+//! enum variants. By default `#[cbor(array)]` is assumed. The attribute
+//! attached to an enum applies to all its variants but can be overriden per
+//! variant with another such attribute.
+//!
 //! ## Implicit borrowing
 //!
 //! The following types implicitly borrow from the decoding input, which means
@@ -114,24 +122,42 @@
 //! # CBOR encoding
 //!
 //! The CBOR values produced by a derived `Encode` implementation are of the
-//! following format.
+//! following formats.
 //!
 //! ## Structs
 //!
-//! Each struct is encoded as a CBOR map with numeric keys:
+//! ### Array encoding
+//!
+//! By default or if a struct has the `#[cbor(array)]` attribute, it will be
+//! represented as a CBOR array. Its index numbers are represened by the
+//! position of the field value in this array. Any gaps between index numbers
+//! are filled with CBOR NULL values and `Option`s which are `None` likewise
+//! end up as NULLs in this array.
 //!
 //! ```text
-//! <<struct encoding>> =
-//!     | `map(0)`         ; unit struct => empty map
-//!     | `begin_map`      ; indefinite map otherwise
-//!           `0` item_0
-//!           `1` item_1
-//!           ...
-//!            n  item_n
-//!       `end`
+//! <<struct-as-array encoding>> =
+//!     `array(n)`
+//!         item_0
+//!         item_1
+//!         ...
+//!         item_n
 //! ```
 //!
-//! Optional fields whose value is `None` are not encoded.
+//! ### Map encoding
+//!
+//! If a struct has the `#[cbor(map)]` attribute, then it will be represented
+//! as a CBOR map with keys corresponding to the numeric index value:
+//!
+//! ```text
+//! <<struct-as-map encoding>> =
+//!     `map(n)`
+//!         `0` item_0
+//!         `1` item_1
+//!         ...
+//!          n  item_n
+//! ```
+//!
+//! Optional fields whose value is `None` are not represented at all.
 //!
 //! ## Enums
 //!
@@ -141,12 +167,29 @@
 //! ```text
 //! <<enum encoding>> = `array(2)` n <<struct encoding>>
 //! ```
-
-// While the enum encoding costs as much as 2 bytes extra for unit constructors,
-// those are import for compatibility. The array is required so that enums in
-// unknown fields can be skipped over. The empty map is required so we can skip
-// over unknown variants as we can not know when to expect a unit constructor
-// if we do not even know the variant.
+//!
+//! Which struct encoding is used for the variant value depends again on the
+//! `#[cbor(...)]` attribute and again, the array encoding is used by default.
+//!
+//!
+//! ## Which encoding to use?
+//!
+//! The map encoding needs to represent the indexes explicitly in the encoding
+//! which costs at least one extra byte per field value, whereas the array
+//! encoding does not need to encode the indexes. On the other hand, absent
+//! values, i.e. `None`s and gaps between indexes are not encoded with maps but
+//! need to be encoded explicitly with arrays as nulls which need one byte each.
+//! Which encoding to choose depends therefore on the kind of type that should
+//! be encoded:
+//!
+//! - *Dense types* are types which contain only few `Option`s or their `Option`s
+//! are assumed to be `Some`s usually. They are best encoded as arrays.
+//!
+//! - *Sparse types* are types with many `Option`s and their `Option`s are usually
+//! `None`. They are best encoded as maps.
+//!
+//! When selecting the encoding, future changes to the type should be considered
+//! as they may turn a dense type into a sparse one over time.
 
 extern crate proc_macro;
 
@@ -161,7 +204,7 @@ use std::collections::HashSet;
 /// Derive the `minicbor::Decode` trait for a struct or enum.
 ///
 /// See the [crate] documentation for details.
-#[proc_macro_derive(Decode, attributes(n, b))]
+#[proc_macro_derive(Decode, attributes(n, b, cbor))]
 pub fn derive_decode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     decode::derive_from(input)
 }
@@ -169,7 +212,7 @@ pub fn derive_decode(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 /// Derive the `minicbor::Encode` trait for a struct or enum.
 ///
 /// See the [crate] documentation for details.
-#[proc_macro_derive(Encode, attributes(n, b))]
+#[proc_macro_derive(Encode, attributes(n, b, cbor))]
 pub fn derive_encode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     encode::derive_from(input)
 }
@@ -344,7 +387,7 @@ enum Idx {
 
 impl ToTokens for Idx {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        tokens.append(proc_macro2::Literal::u32_suffixed(self.val()))
+        tokens.append(proc_macro2::Literal::u32_unsuffixed(self.val()))
     }
 }
 
@@ -422,3 +465,33 @@ where
     iter.map(|v| index_number(v.span(), &v.attrs)).collect()
 }
 
+/// The encoding to use for structs and enum variants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Encoding {
+    Array,
+    Map
+}
+
+impl Default for Encoding {
+    fn default() -> Self {
+        Encoding::Array
+    }
+}
+
+/// Determine attribute value of the `#[cbor(...)]` encoding.
+fn encoding(a: &syn::Attribute) -> Option<Encoding> {
+    match a.parse_meta().ok()? {
+        syn::Meta::List(ml) if ml.path.is_ident("cbor") => {
+            if let Some(syn::NestedMeta::Meta(syn::Meta::Path(arg))) = ml.nested.first() {
+                if arg.is_ident("map") {
+                    return Some(Encoding::Map)
+                }
+                if arg.is_ident("array") {
+                    return Some(Encoding::Array)
+                }
+            }
+        }
+        _ => {}
+    }
+    None
+}
