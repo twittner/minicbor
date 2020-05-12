@@ -114,13 +114,13 @@ where
         Value::Bytes(b)   => { e.bytes(b)?; }
         Value::Text(s)    => { e.str(s)?; }
         Value::Array(a)   => {
-            e.array(a.len())?;
+            e.array(a.len() as u64)?;
             for x in a {
                 encode_value(x, e)?
             }
         }
         Value::Map(m) => {
-            e.map(m.len())?;
+            e.map(m.len() as u64)?;
             for (k, v) in m {
                 encode_value(k, e)?;
                 encode_value(v, e)?
