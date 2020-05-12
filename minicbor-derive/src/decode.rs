@@ -205,21 +205,21 @@ fn gen_statements(names: &[syn::Ident], types: &[syn::Type], numbers: &[Idx], en
         Encoding::Array => quote! {
             #(let mut #names : Option<#types> = #inits;)*
 
-            if let Some(__len) = __d777.array()? {
-                for i in 0 .. __len {
-                    match i {
+            if let Some(__len777) = __d777.array()? {
+                for __i777 in 0 .. __len777 {
+                    match __i777 {
                         #(#numbers => #actions)*
                         _          => __d777.skip()?
                     }
                 }
             } else {
-                let mut i = 0;
+                let mut __i777 = 0;
                 while minicbor::data::Type::Break != __d777.datatype()? {
-                    match i {
+                    match __i777 {
                         #(#numbers => #actions)*
                         _          => __d777.skip()?
                     }
-                    i += 1
+                    __i777 += 1
                 }
                 __d777.skip()?
             }
@@ -227,8 +227,8 @@ fn gen_statements(names: &[syn::Ident], types: &[syn::Type], numbers: &[Idx], en
         Encoding::Map => quote! {
             #(let mut #names : Option<#types> = #inits;)*
 
-            if let Some(__len) = __d777.map()? {
-                for _ in 0 .. __len {
+            if let Some(__len777) = __d777.map()? {
+                for _ in 0 .. __len777 {
                     match __d777.u32()? {
                         #(#numbers => #actions)*
                         _          => __d777.skip()?
