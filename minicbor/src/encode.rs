@@ -83,7 +83,7 @@ where
     V: Encode
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.map(self.len() as u64)?;
+        e.map(as_u64(self.len()))?;
         for (k, v) in self {
             k.encode(e)?;
             v.encode(e)?;
@@ -99,7 +99,7 @@ where
     V: Encode
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        e.map(self.len() as u64)?;
+        e.map(as_u64(self.len()))?;
         for (k, v) in self {
             k.encode(e)?;
             v.encode(e)?;
@@ -191,7 +191,7 @@ macro_rules! encode_sequential {
         $(
             impl<T: Encode> Encode for $t {
                 fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-                    e.array(self.len() as u64)?;
+                    e.array(as_u64(self.len()))?;
                     for x in self {
                         x.encode(e)?
                     }
@@ -328,5 +328,10 @@ impl Encode for std::net::SocketAddrV6 {
             .encode(self.port())?
             .ok()
     }
+}
+
+#[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
+fn as_u64(n: usize) -> u64 {
+    n as u64
 }
 

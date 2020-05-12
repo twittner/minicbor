@@ -95,7 +95,7 @@
 //!
 //! The actual CBOR encoding to use can be selected by attaching either the
 //! `#[cbor(array)]` or `#[cbor(map)]` attribute to structs, enums or
-//! enum variants. By default `#[cbor(array)]` is assumed. The attribute
+//! enum variants. By default `#[cbor(array)]` is used. The attribute
 //! attached to an enum applies to all its variants but can be overriden per
 //! variant with another such attribute.
 //!
@@ -157,7 +157,7 @@
 //!          n  item_n
 //! ```
 //!
-//! Optional fields whose value is `None` are not represented at all.
+//! Optional fields whose value is `None` are not encoded.
 //!
 //! ## Enums
 //!
@@ -165,12 +165,10 @@
 //! is the variant index and the second the actual variant value:
 //!
 //! ```text
-//! <<enum encoding>> = `array(2)` n <<struct encoding>>
+//! <<enum encoding>> =
+//!     | `array(2)` n <<struct-as-array encoding>> ; if #[cbor(array)]
+//!     | `array(2)` n <<struct-as-map encoding>>   ; if #[cbor(map)]
 //! ```
-//!
-//! Which struct encoding is used for the variant value depends again on the
-//! `#[cbor(...)]` attribute and again, the array encoding is used by default.
-//!
 //!
 //! ## Which encoding to use?
 //!
@@ -178,15 +176,15 @@
 //! which costs at least one extra byte per field value, whereas the array
 //! encoding does not need to encode the indexes. On the other hand, absent
 //! values, i.e. `None`s and gaps between indexes are not encoded with maps but
-//! need to be encoded explicitly with arrays as nulls which need one byte each.
-//! Which encoding to choose depends therefore on the kind of type that should
-//! be encoded:
+//! need to be encoded explicitly with arrays as NULLs which need one byte each.
+//! Which encoding to choose depends therefore on the nature of the type that
+//! should be encoded:
 //!
 //! - *Dense types* are types which contain only few `Option`s or their `Option`s
 //! are assumed to be `Some`s usually. They are best encoded as arrays.
 //!
 //! - *Sparse types* are types with many `Option`s and their `Option`s are usually
-//! `None`. They are best encoded as maps.
+//! `None`s. They are best encoded as maps.
 //!
 //! When selecting the encoding, future changes to the type should be considered
 //! as they may turn a dense type into a sparse one over time.
@@ -478,7 +476,7 @@ impl Default for Encoding {
     }
 }
 
-/// Determine attribute value of the `#[cbor(...)]` encoding.
+/// Determine attribute value of the `#[cbor(...)]` attribute.
 fn encoding(a: &syn::Attribute) -> Option<Encoding> {
     match a.parse_meta().ok()? {
         syn::Meta::List(ml) if ml.path.is_ident("cbor") => {

@@ -1,6 +1,7 @@
 use crate::{check_uniq, field_indices, Idx, index_number, is_option, variant_indices};
 use crate::{encoding, Encoding};
 use quote::quote;
+use std::convert::TryInto;
 use syn::spanned::Spanned;
 
 /// Entry point to derive `minicbor::Encode` on structs and enums.
@@ -28,7 +29,7 @@ fn on_struct(inp: &syn::DeriveInput, s: &syn::DataStruct) -> syn::Result<proc_ma
 
     let fields = sorted_fields(s.fields.iter())?;
     let encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
-    let statements = encode_fields(&fields, true, encoding);
+    let statements = encode_fields(&fields, true, encoding)?;
     let (impl_generics, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     Ok(quote! {
@@ -76,7 +77,7 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
             syn::Fields::Named(fields) => {
                 let idents = fields.named.iter().map(|f| f.ident.clone().unwrap());
                 let fields = sorted_fields(fields.named.iter())?;
-                let statements = encode_fields(&fields, false, encoding);
+                let statements = encode_fields(&fields, false, encoding)?;
                 quote! {
                     #name::#con{#(#idents,)*} => {
                         __e777.array(2)?;
@@ -90,7 +91,7 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
                     quote::format_ident!("_{}", i)
                 });
                 let fields = sorted_fields(fields.unnamed.iter())?;
-                let statements = encode_fields(&fields, false, encoding);
+                let statements = encode_fields(&fields, false, encoding)?;
                 quote! {
                     #name::#con(#(#idents,)*) => {
                         __e777.array(2)?;
@@ -141,7 +142,12 @@ fn on_enum(inp: &syn::DeriveInput, e: &syn::DataEnum) -> syn::Result<proc_macro2
 /// depending on the encoding.
 ///
 /// NB: The `fields` parameter is assumed to be sorted by index.
-fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding: Encoding) -> proc_macro2::TokenStream {
+fn encode_fields
+    ( fields: &[(usize, Idx, &syn::Field)]
+    , has_self: bool
+    , encoding: Encoding
+    ) -> syn::Result<proc_macro2::TokenStream>
+{
     let mut max_index = None;
     let mut tests = Vec::new();
 
@@ -193,9 +199,9 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
         }
         // Under map encoding the number of map entries is the number
         // of fields minus those which are an `Option` whose value is
-        // `None`. We (later) set the number to the total number of fields
-        // and for each `Option` we check if it is `None` and if so
-        // substract 1 from the total.
+        // `None`. Further down we define the total number of fields
+        // and here for each `Option` we check if it is `None` and if
+        // so substract 1 from the total.
         Encoding::Map => {
             for j in 0 .. fields.len() {
                 let (i, _, f) = fields[j];
@@ -459,7 +465,11 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
         }
     }
 
-    let max_fields = fields.len() as u32;
+    let max_fields: u32 = fields.len().try_into()
+        .map_err(|_| {
+            let msg = "more than 2^32 fields are not supported";
+            syn::Error::new(proc_macro2::Span::call_site(), msg)
+        })?;
 
     let max_index =
         if let Some(i) = max_index {
@@ -469,31 +479,31 @@ fn encode_fields(fields: &[(usize, Idx, &syn::Field)], has_self: bool, encoding:
         };
 
     match encoding {
-        Encoding::Array => quote! {
+        Encoding::Array => Ok(quote! {
             let mut __max_index777: Option<u32> = #max_index;
 
             #(#tests)*
 
             if let Some(__i777) = __max_index777 {
-                __e777.array(__i777 as u64 + 1)?;
+                __e777.array(u64::from(__i777) + 1)?;
                 #(#statements)*
             } else {
                 __e777.array(0)?;
             }
 
             Ok(())
-        },
-        Encoding::Map => quote! {
+        }),
+        Encoding::Map => Ok(quote! {
             let mut __max_fields777 = #max_fields;
 
             #(#tests)*
 
-            __e777.map(__max_fields777 as u64)?;
+            __e777.map(u64::from(__max_fields777))?;
 
             #(#statements)*
 
             Ok(())
-        }
+        })
     }
 }
 
