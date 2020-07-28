@@ -476,7 +476,7 @@ impl Default for Encoding {
     }
 }
 
-/// Determine attribute value of the `#[cbor(...)]` attribute.
+/// Determine attribute value of the `#[cbor(map|array)]` attribute.
 fn encoding(a: &syn::Attribute) -> Option<Encoding> {
     match a.parse_meta().ok()? {
         syn::Meta::List(ml) if ml.path.is_ident("cbor") => {
@@ -492,4 +492,135 @@ fn encoding(a: &syn::Attribute) -> Option<Encoding> {
         _ => {}
     }
     None
+}
+
+/// Custom encode/decode functions.
+enum CustomCodec {
+    /// Custom encode function.
+    ///
+    /// Assumed to be of a type equivalent to:
+    ///
+    ///   `fn<T, W: Write>(&T, &mut Encoder<W>) -> Result<(), Error<W::Error>>`
+    ///
+    /// Declared with `#[cbor(encode_with = "...")]`.
+    Encode(syn::ExprPath),
+    /// Custom decode function.
+    ///
+    /// Assumed to be of a type equivalent to:
+    ///
+    ///   `fn<T>(&mut Decoder<'_>) -> Result<T, Error>`
+    ///
+    /// Declared with `#[cbor(decode_with = "...")]`.
+    Decode(syn::ExprPath),
+    /// A module which contains custom encode/decode functions.
+    ///
+    /// The module is assumed to contain two functions named `encode` and
+    /// `decode` whose types match those declared with
+    /// `#[cbor(encode_with = "...")]` or `#[cbor(decode_with = "...")]`
+    /// respectively. Declared with `#[cbor(with = "...")]`.
+    Both(syn::ExprPath)
+}
+
+impl CustomCodec {
+    /// Extract the encode function unless this `CustomCodec` does not declare one.
+    fn to_encode_path(&self) -> Option<syn::ExprPath> {
+        match self {
+            CustomCodec::Encode(p) => Some(p.clone()),
+            CustomCodec::Decode(_) => None,
+            CustomCodec::Both(p) => {
+                let mut p = p.clone();
+                let ident = syn::Ident::new("encode", proc_macro2::Span::call_site());
+                p.path.segments.push(ident.into());
+                Some(p)
+            }
+        }
+    }
+
+    /// Extract the decode function unless this `CustomCodec` does not declare one.
+    fn to_decode_path(&self) -> Option<syn::ExprPath> {
+        match self {
+            CustomCodec::Encode(_) => None,
+            CustomCodec::Decode(p) => Some(p.clone()),
+            CustomCodec::Both(p) => {
+                let mut p = p.clone();
+                let ident = syn::Ident::new("decode", proc_macro2::Span::call_site());
+                p.path.segments.push(ident.into());
+                Some(p)
+            }
+        }
+    }
+}
+
+/// Determine the attribute value of the `#[cbor(encode_with|decode_with|with)]` attribute.
+fn custom_codec(a: &syn::Attribute) -> syn::Result<Option<CustomCodec>> {
+    match a.parse_meta()? {
+        syn::Meta::List(ml) if ml.path.is_ident("cbor") => {
+            if let Some(syn::NestedMeta::Meta(syn::Meta::NameValue(arg))) = ml.nested.first() {
+                if arg.path.is_ident("encode_with") {
+                    if let syn::Lit::Str(path) = &arg.lit {
+                        return Ok(Some(CustomCodec::Encode(syn::parse_str(&path.value())?)))
+                    }
+                }
+                if arg.path.is_ident("decode_with") {
+                    if let syn::Lit::Str(path) = &arg.lit {
+                        return Ok(Some(CustomCodec::Decode(syn::parse_str(&path.value())?)))
+                    }
+                }
+                if arg.path.is_ident("with") {
+                    if let syn::Lit::Str(path) = &arg.lit {
+                        return Ok(Some(CustomCodec::Both(syn::parse_str(&path.value())?)))
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+    Ok(None)
+}
+
+/// Traverse all field types and collect all type parameters along the way.
+fn collect_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashSet<syn::TypeParam>
+where
+    I: Iterator<Item = &'a syn::Field>
+{
+    use syn::visit::Visit;
+
+    struct Collector {
+        all: Vec<syn::Ident>,
+        found: HashSet<syn::TypeParam>
+    }
+
+    impl<'a> Visit<'a> for Collector {
+        fn visit_field(&mut self, f: &'a syn::Field) {
+            if let syn::Type::Path(ty) = &f.ty {
+                if let Some(t) = ty.path.segments.first() {
+                    if self.all.contains(&t.ident) {
+                        self.found.insert(syn::TypeParam::from(t.ident.clone()));
+                    }
+                }
+            }
+            self.visit_type(&f.ty)
+        }
+
+        fn visit_path(&mut self, p: &'a syn::Path) {
+            if p.leading_colon.is_none() && p.segments.len() == 1 {
+                let id = &p.segments[0].ident;
+                if self.all.contains(id) {
+                    self.found.insert(syn::TypeParam::from(id.clone()));
+                }
+            }
+            syn::visit::visit_path(self, p)
+        }
+    }
+
+    let mut c = Collector {
+        all: all.type_params().map(|tp| tp.ident.clone()).collect(),
+        found: HashSet::new()
+    };
+
+    for f in fields {
+        c.visit_field(f)
+    }
+
+    c.found
 }
