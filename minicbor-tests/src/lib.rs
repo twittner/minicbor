@@ -5,6 +5,9 @@
 use minicbor::{Encode, Encoder, Decode, Decoder};
 use std::borrow::Cow;
 
+mod structs;
+mod enums;
+
 #[derive(Encode, Decode)] struct S0;
 #[derive(Encode, Decode)] enum E0 {}
 #[derive(Encode, Decode)] enum Ev { #[n(0)] V }
