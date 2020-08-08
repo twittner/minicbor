@@ -137,6 +137,29 @@ impl<W: Write> Encoder<W> {
         }
     }
 
+    /// Encode an `f32` value as a half float (`f16)`.
+    ///
+    /// Only available when the feature `half` is present.
+    ///
+    /// **NB**: The conversion from `f32` to `f16` is potentially lossy.
+    /// Generally values are truncated and rounded to the nearest 16-bit
+    /// value, except:
+    ///
+    ///   - 32-bit values which do not fit into 16 bit become ±∞.
+    ///   - 32-bit subnormal values become ±0.
+    ///   - Exponents smaller than the min. 16-bit exponent become
+    ///     16-bit subnormals or ±0.
+    ///
+    /// For further details please consult the [half][1] crate which is
+    /// used internally for `f16` support.
+    ///
+    /// [1]: https://crates.io/crates/half
+    #[cfg(feature = "half")]
+    pub fn f16(&mut self, x: f32) -> Result<&mut Self, Error<W::Error>> {
+        let n = half::f16::from_f32(x).to_bits();
+        self.put(&[SIMPLE | 25])?.put(&n.to_be_bytes()[..])
+    }
+
     /// Encode an `f32` value.
     pub fn f32(&mut self, x: f32) -> Result<&mut Self, Error<W::Error>> {
         self.put(&[SIMPLE | 26])?.put(&x.to_be_bytes()[..])

@@ -13,6 +13,7 @@ minicbor = { path = "../minicbor", features = ["std", "half", "derive"] }
 
 [dev-dependencies]
 criterion  = "0.3"
+half       = "1.6.0"
 hex        = "0.4.1"
 quickcheck = "0.9"
 rand       = "0.7"
