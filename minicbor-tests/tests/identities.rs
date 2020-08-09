@@ -68,6 +68,37 @@ fn nonzero_u64() {
 }
 
 #[test]
+fn f16() {
+    fn property(arg: f32) -> bool {
+        let mut e = minicbor::Encoder::new(Vec::new());
+        e.f16(arg).unwrap();
+        let val = minicbor::Decoder::new(e.as_ref()).f16().unwrap();
+        half::f16::from_f32(arg).to_f32().to_bits() == val.to_bits()
+    }
+    quickcheck(property as fn(f32) -> bool)
+}
+
+#[test]
+fn f32() {
+    fn property(arg: f32) -> bool {
+        let vec = minicbor::to_vec(&arg).unwrap();
+        let val: f32 = minicbor::decode(&vec).unwrap();
+        arg.to_bits() == val.to_bits()
+    }
+    quickcheck(property as fn(f32) -> bool)
+}
+
+#[test]
+fn f64() {
+    fn property(arg: f64) -> bool {
+        let vec = minicbor::to_vec(&arg).unwrap();
+        let val: f64 = minicbor::decode(&vec).unwrap();
+        arg.to_bits() == val.to_bits()
+    }
+    quickcheck(property as fn(f64) -> bool)
+}
+
+#[test]
 fn bool() {
     quickcheck(identity as fn(bool) -> bool)
 }
