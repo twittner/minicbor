@@ -579,7 +579,9 @@ where
                 .and_then(move |n| {
                     for a in &f.attrs {
                         if let Some(ff) = custom_codec(a)? {
-                            return Ok((i, n, f, Some(ff)))
+                            if ff.is_encode() {
+                                return Ok((i, n, f, Some(ff)))
+                            }
                         }
                     }
                     Ok((i, n, f, None))

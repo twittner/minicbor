@@ -315,7 +315,9 @@ where
         .map(|f| {
             for a in &f.attrs {
                 if let Some(ff) = custom_codec(a)? {
-                    return Ok(Some(ff))
+                    if ff.is_decode() {
+                        return Ok(Some(ff))
+                    }
                 }
             }
             Ok(None)

@@ -522,6 +522,16 @@ enum CustomCodec {
 }
 
 impl CustomCodec {
+    /// Is this a custom codec from `encode_with` or `with`?
+    fn is_encode(&self) -> bool {
+        matches!(self, CustomCodec::Encode(_) | CustomCodec::Both(_))
+    }
+
+    /// Is this a custom codec from `decode_with` or `with`?
+    fn is_decode(&self) -> bool {
+        matches!(self, CustomCodec::Decode(_) | CustomCodec::Both(_))
+    }
+
     /// Extract the encode function unless this `CustomCodec` does not declare one.
     fn to_encode_path(&self) -> Option<syn::ExprPath> {
         match self {
@@ -553,27 +563,27 @@ impl CustomCodec {
 
 /// Determine the attribute value of the `#[cbor(encode_with|decode_with|with)]` attribute.
 fn custom_codec(a: &syn::Attribute) -> syn::Result<Option<CustomCodec>> {
-    match a.parse_meta()? {
-        syn::Meta::List(ml) if ml.path.is_ident("cbor") => {
-            if let Some(syn::NestedMeta::Meta(syn::Meta::NameValue(arg))) = ml.nested.first() {
-                if arg.path.is_ident("encode_with") {
-                    if let syn::Lit::Str(path) = &arg.lit {
-                        return Ok(Some(CustomCodec::Encode(syn::parse_str(&path.value())?)))
-                    }
+    if let syn::Meta::List(ml) = a.parse_meta()? {
+        if !ml.path.is_ident("cbor") {
+            return Ok(None)
+        }
+        if let Some(syn::NestedMeta::Meta(syn::Meta::NameValue(arg))) = ml.nested.first() {
+            if arg.path.is_ident("encode_with") {
+                if let syn::Lit::Str(path) = &arg.lit {
+                    return Ok(Some(CustomCodec::Encode(syn::parse_str(&path.value())?)))
                 }
-                if arg.path.is_ident("decode_with") {
-                    if let syn::Lit::Str(path) = &arg.lit {
-                        return Ok(Some(CustomCodec::Decode(syn::parse_str(&path.value())?)))
-                    }
+            }
+            if arg.path.is_ident("decode_with") {
+                if let syn::Lit::Str(path) = &arg.lit {
+                    return Ok(Some(CustomCodec::Decode(syn::parse_str(&path.value())?)))
                 }
-                if arg.path.is_ident("with") {
-                    if let syn::Lit::Str(path) = &arg.lit {
-                        return Ok(Some(CustomCodec::Both(syn::parse_str(&path.value())?)))
-                    }
+            }
+            if arg.path.is_ident("with") {
+                if let syn::Lit::Str(path) = &arg.lit {
+                    return Ok(Some(CustomCodec::Both(syn::parse_str(&path.value())?)))
                 }
             }
         }
-        _ => {}
     }
     Ok(None)
 }
