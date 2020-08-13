@@ -16,7 +16,7 @@ proc-macro = true
 [dependencies]
 proc-macro2 = "1.0.18"
 quote       = "1.0.7"
-syn         = { version = "1.0.33", features = ["extra-traits"] }
+syn         = { version = "1.0.33", features = ["extra-traits", "visit"] }
 
 [dev-dependencies]
 minicbor = { path = "../minicbor", features = ["std", "derive"] }
