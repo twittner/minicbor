@@ -86,16 +86,16 @@
 //! # Attributes and borrowing
 //!
 //! Each field and variant needs to be annotated with an index number, which is
-//! used instead of the name, using either `n` or `b` as attribute names. For
-//! the encoding it makes no difference which one to choose. For decoding, `b`
-//! indicates that the value borrows from the decoding input, whereas `n`
+//! used instead of the name, using either **`n`** or **`b`** as attribute names.
+//! For the encoding it makes no difference which one to choose. For decoding,
+//! `b` indicates that the value borrows from the decoding input, whereas `n`
 //! produces non-borrowed values (except for implicit borrows).
 //!
 //! ## Encoding format
 //!
 //! The actual CBOR encoding to use can be selected by attaching either the
-//! `#[cbor(array)]` or `#[cbor(map)]` attribute to structs, enums or
-//! enum variants. By default `#[cbor(array)]` is used. The attribute
+//! **`#[cbor(array)]`** or **`#[cbor(map)]`** attribute to structs, enums or
+//! enum variants. By default `#[cbor(array)]` is implied. The attribute
 //! attached to an enum applies to all its variants but can be overriden per
 //! variant with another such attribute.
 //!
@@ -111,13 +111,29 @@
 //!
 //! ## Explicit borrowing
 //!
-//! If a type is annotated with `#[b(...)]`, all its lifetimes will be
+//! If a type is annotated with **`#[b(...)]`**, all its lifetimes will be
 //! constrained to the input lifetime.
 //!
 //! If the type is a `std::borrow::Cow<'_, str>` or `std::borrow::Cow<'_, [u8]>`
 //! type, the generated code will decode the inner type and construct a
 //! `Cow::Borrowed` variant, contrary to the `Cow` impl of `Decode` which
 //! produces owned values.
+//!
+//! ## Other attributes
+//!
+//! ### `encode_with`, `decode_with` and `with`
+//!
+//! Fields in structs and enum variants may be annotated with
+//! **`#[cbor(encode_with = "path")]`**, **`#[cbor(decode_with = "path")]`** or
+//! **`#[cbor(with = "module-path")]`** where `path` is the full path to a
+//! function which is used instead of `Encode::encode` to encode the field or
+//! `Decode::decode` to decode the field respectively. The types of these
+//! functions must be equivalent to `Encode::encode` or `Decode::decode`.
+//! The `with` attribute combines the other two with `module-path` denoting the
+//! full path to a module with two functions `encode` and `decode` as members,
+//! which are used for encoding and decoding of the field. These three
+//! attributes can either override an existing `Encode` or `Decode` impl or be
+//! used for types which do not implement those traits at all.
 //!
 //! # CBOR encoding
 //!
@@ -128,8 +144,8 @@
 //!
 //! ### Array encoding
 //!
-//! By default or if a struct has the `#[cbor(array)]` attribute, it will be
-//! represented as a CBOR array. Its index numbers are represened by the
+//! By default or if a struct has the **`#[cbor(array)]`** attribute, it will
+//! be represented as a CBOR array. Its index numbers are represened by the
 //! position of the field value in this array. Any gaps between index numbers
 //! are filled with CBOR NULL values and `Option`s which are `None` likewise
 //! end up as NULLs in this array.
@@ -145,8 +161,9 @@
 //!
 //! ### Map encoding
 //!
-//! If a struct has the `#[cbor(map)]` attribute, then it will be represented
-//! as a CBOR map with keys corresponding to the numeric index value:
+//! If a struct has the **`#[cbor(map)]`** attribute, then it will be
+//! represented as a CBOR map with keys corresponding to the numeric index
+//! value:
 //!
 //! ```text
 //! <<struct-as-map encoding>> =
@@ -476,7 +493,7 @@ impl Default for Encoding {
     }
 }
 
-/// Determine attribute value of the `#[cbor(...)]` attribute.
+/// Determine attribute value of the `#[cbor(map|array)]` attribute.
 fn encoding(a: &syn::Attribute) -> Option<Encoding> {
     match a.parse_meta().ok()? {
         syn::Meta::List(ml) if ml.path.is_ident("cbor") => {
@@ -492,4 +509,145 @@ fn encoding(a: &syn::Attribute) -> Option<Encoding> {
         _ => {}
     }
     None
+}
+
+/// Custom encode/decode functions.
+enum CustomCodec {
+    /// Custom encode function.
+    ///
+    /// Assumed to be of a type equivalent to:
+    ///
+    ///   `fn<T, W: Write>(&T, &mut Encoder<W>) -> Result<(), Error<W::Error>>`
+    ///
+    /// Declared with `#[cbor(encode_with = "...")]`.
+    Encode(syn::ExprPath),
+    /// Custom decode function.
+    ///
+    /// Assumed to be of a type equivalent to:
+    ///
+    ///   `fn<T>(&mut Decoder<'_>) -> Result<T, Error>`
+    ///
+    /// Declared with `#[cbor(decode_with = "...")]`.
+    Decode(syn::ExprPath),
+    /// A module which contains custom encode/decode functions.
+    ///
+    /// The module is assumed to contain two functions named `encode` and
+    /// `decode` whose types match those declared with
+    /// `#[cbor(encode_with = "...")]` or `#[cbor(decode_with = "...")]`
+    /// respectively. Declared with `#[cbor(with = "...")]`.
+    Both(syn::ExprPath)
+}
+
+impl CustomCodec {
+    /// Is this a custom codec from `encode_with` or `with`?
+    fn is_encode(&self) -> bool {
+        matches!(self, CustomCodec::Encode(_) | CustomCodec::Both(_))
+    }
+
+    /// Is this a custom codec from `decode_with` or `with`?
+    fn is_decode(&self) -> bool {
+        matches!(self, CustomCodec::Decode(_) | CustomCodec::Both(_))
+    }
+
+    /// Extract the encode function unless this `CustomCodec` does not declare one.
+    fn to_encode_path(&self) -> Option<syn::ExprPath> {
+        match self {
+            CustomCodec::Encode(p) => Some(p.clone()),
+            CustomCodec::Decode(_) => None,
+            CustomCodec::Both(p) => {
+                let mut p = p.clone();
+                let ident = syn::Ident::new("encode", proc_macro2::Span::call_site());
+                p.path.segments.push(ident.into());
+                Some(p)
+            }
+        }
+    }
+
+    /// Extract the decode function unless this `CustomCodec` does not declare one.
+    fn to_decode_path(&self) -> Option<syn::ExprPath> {
+        match self {
+            CustomCodec::Encode(_) => None,
+            CustomCodec::Decode(p) => Some(p.clone()),
+            CustomCodec::Both(p) => {
+                let mut p = p.clone();
+                let ident = syn::Ident::new("decode", proc_macro2::Span::call_site());
+                p.path.segments.push(ident.into());
+                Some(p)
+            }
+        }
+    }
+}
+
+/// Determine the attribute value of the `#[cbor(encode_with|decode_with|with)]` attribute.
+fn custom_codec(a: &syn::Attribute) -> syn::Result<Option<CustomCodec>> {
+    if let syn::Meta::List(ml) = a.parse_meta()? {
+        if !ml.path.is_ident("cbor") {
+            return Ok(None)
+        }
+        if let Some(syn::NestedMeta::Meta(syn::Meta::NameValue(arg))) = ml.nested.first() {
+            if arg.path.is_ident("encode_with") {
+                if let syn::Lit::Str(path) = &arg.lit {
+                    return Ok(Some(CustomCodec::Encode(syn::parse_str(&path.value())?)))
+                }
+            }
+            if arg.path.is_ident("decode_with") {
+                if let syn::Lit::Str(path) = &arg.lit {
+                    return Ok(Some(CustomCodec::Decode(syn::parse_str(&path.value())?)))
+                }
+            }
+            if arg.path.is_ident("with") {
+                if let syn::Lit::Str(path) = &arg.lit {
+                    return Ok(Some(CustomCodec::Both(syn::parse_str(&path.value())?)))
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// Traverse all field types and collect all type parameters along the way.
+fn collect_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashSet<syn::TypeParam>
+where
+    I: Iterator<Item = &'a syn::Field>
+{
+    use syn::visit::Visit;
+
+    struct Collector {
+        all: Vec<syn::Ident>,
+        found: HashSet<syn::TypeParam>
+    }
+
+    impl<'a> Visit<'a> for Collector {
+        fn visit_field(&mut self, f: &'a syn::Field) {
+            if let syn::Type::Path(ty) = &f.ty {
+                if let Some(t) = ty.path.segments.first() {
+                    if self.all.contains(&t.ident) {
+                        self.found.insert(syn::TypeParam::from(t.ident.clone()));
+                    }
+                }
+            }
+            self.visit_type(&f.ty)
+        }
+
+        fn visit_path(&mut self, p: &'a syn::Path) {
+            if p.leading_colon.is_none() && p.segments.len() == 1 {
+                let id = &p.segments[0].ident;
+                if self.all.contains(id) {
+                    self.found.insert(syn::TypeParam::from(id.clone()));
+                }
+            }
+            syn::visit::visit_path(self, p)
+        }
+    }
+
+    let mut c = Collector {
+        all: all.type_params().map(|tp| tp.ident.clone()).collect(),
+        found: HashSet::new()
+    };
+
+    for f in fields {
+        c.visit_field(f)
+    }
+
+    c.found
 }
