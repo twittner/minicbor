@@ -86,16 +86,16 @@
 //! # Attributes and borrowing
 //!
 //! Each field and variant needs to be annotated with an index number, which is
-//! used instead of the name, using either `n` or `b` as attribute names. For
-//! the encoding it makes no difference which one to choose. For decoding, `b`
-//! indicates that the value borrows from the decoding input, whereas `n`
+//! used instead of the name, using either **`n`** or **`b`** as attribute names.
+//! For the encoding it makes no difference which one to choose. For decoding,
+//! `b` indicates that the value borrows from the decoding input, whereas `n`
 //! produces non-borrowed values (except for implicit borrows).
 //!
 //! ## Encoding format
 //!
 //! The actual CBOR encoding to use can be selected by attaching either the
-//! `#[cbor(array)]` or `#[cbor(map)]` attribute to structs, enums or
-//! enum variants. By default `#[cbor(array)]` is used. The attribute
+//! **`#[cbor(array)]`** or **`#[cbor(map)]`** attribute to structs, enums or
+//! enum variants. By default `#[cbor(array)]` is implied. The attribute
 //! attached to an enum applies to all its variants but can be overriden per
 //! variant with another such attribute.
 //!
@@ -111,13 +111,29 @@
 //!
 //! ## Explicit borrowing
 //!
-//! If a type is annotated with `#[b(...)]`, all its lifetimes will be
+//! If a type is annotated with **`#[b(...)]`**, all its lifetimes will be
 //! constrained to the input lifetime.
 //!
 //! If the type is a `std::borrow::Cow<'_, str>` or `std::borrow::Cow<'_, [u8]>`
 //! type, the generated code will decode the inner type and construct a
 //! `Cow::Borrowed` variant, contrary to the `Cow` impl of `Decode` which
 //! produces owned values.
+//!
+//! ## Other attributes
+//!
+//! ### `encode_with`, `decode_with` and `with`
+//!
+//! Fields in structs and enum variants may be annotated with
+//! **`#[cbor(encode_with = "path")]`**, **`#[cbor(decode_with = "path")]`** or
+//! **`#[cbor(with = "module-path")]`** where `path` is the full path to a
+//! function which is used instead of `Encode::encode` to encode the field or
+//! `Decode::decode` to decode the field respectively. The types of these
+//! functions must be equivalent to `Encode::encode` or `Decode::decode`.
+//! The `with` attribute combines the other two with `module-path` denoting the
+//! full path to a module with two functions `encode` and `decode` as members,
+//! which are used for encoding and decoding of the field. These three
+//! attributes can either override an existing `Encode` or `Decode` impl or be
+//! used for types which do not implement those traits at all.
 //!
 //! # CBOR encoding
 //!
@@ -128,8 +144,8 @@
 //!
 //! ### Array encoding
 //!
-//! By default or if a struct has the `#[cbor(array)]` attribute, it will be
-//! represented as a CBOR array. Its index numbers are represened by the
+//! By default or if a struct has the **`#[cbor(array)]`** attribute, it will
+//! be represented as a CBOR array. Its index numbers are represened by the
 //! position of the field value in this array. Any gaps between index numbers
 //! are filled with CBOR NULL values and `Option`s which are `None` likewise
 //! end up as NULLs in this array.
@@ -145,8 +161,9 @@
 //!
 //! ### Map encoding
 //!
-//! If a struct has the `#[cbor(map)]` attribute, then it will be represented
-//! as a CBOR map with keys corresponding to the numeric index value:
+//! If a struct has the **`#[cbor(map)]`** attribute, then it will be
+//! represented as a CBOR map with keys corresponding to the numeric index
+//! value:
 //!
 //! ```text
 //! <<struct-as-map encoding>> =
