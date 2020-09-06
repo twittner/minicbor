@@ -1,5 +1,6 @@
 use crate::{check_uniq, field_indices, Idx, index_number, is_option, variant_indices};
 use crate::{collect_type_params, encoding, Encoding, custom_codec, CustomCodec};
+use crate::find_cbor_attr;
 use quote::quote;
 use std::{collections::HashSet, convert::TryInto};
 use syn::spanned::Spanned;
@@ -32,7 +33,6 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     let fields = sorted_fields(data.fields.iter())?;
     let encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
-    let statements = encode_fields(&fields, true, encoding)?;
 
     // Collect type parameters which should not have an `Encode` bound added.
     let blacklist = collect_type_params(&inp.generics, fields.iter().filter_map(|(.., f, ff)| {
@@ -43,7 +43,15 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         }
     }));
     add_encode_bound(&blacklist, inp.generics.type_params_mut())?;
+
+    // If transparent, just forward the encode call to the inner type.
+    if find_cbor_attr(inp.attrs.iter(), "transparent")?.is_some() {
+        return make_transparent_impl(inp, data)
+    }
+
     let (impl_generics, typ_generics, where_clause) = inp.generics.split_for_impl();
+
+    let statements = encode_fields(&fields, true, encoding)?;
 
     Ok(quote! {
         impl #impl_generics minicbor::Encode for #name #typ_generics #where_clause {
@@ -591,3 +599,51 @@ where
     fields.sort_unstable_by_key(|(_, n, _, _)| n.val());
     Ok(fields)
 }
+
+/// Forward the encoding because of a `#[cbor(transparent)]` attribute.
+fn make_transparent_impl
+    ( input: &syn::DeriveInput
+    , data: &syn::DataStruct
+    ) -> syn::Result<proc_macro2::TokenStream>
+{
+    if data.fields.len() != 1 {
+        let msg = "#[cbor(transparent)] requires a struct with one field";
+        return Err(syn::Error::new(input.ident.span(), msg))
+    }
+
+    let field = data.fields.iter().next().expect("struct has one field");
+
+    if let Some(a) = find_cbor_attr(field.attrs.iter(), "encode_with")? {
+        let msg = "#[cbor(encode_with)] not allowed within #[cbor(transparent)]";
+        return Err(syn::Error::new(a.span(), msg))
+    }
+
+    if let Some(a) = find_cbor_attr(field.attrs.iter(), "with")? {
+        let msg = "#[cbor(with)] not allowed within #[cbor(transparent)]";
+        return Err(syn::Error::new(a.span(), msg))
+    }
+
+    let ident =
+        if let Some(id) = &field.ident {
+            quote!(#id)
+        } else {
+            let id = syn::Index::from(0);
+            quote!(#id)
+        };
+
+    let (impl_generics, typ_generics, where_clause) = input.generics.split_for_impl();
+
+    let name = &input.ident;
+
+    Ok(quote! {
+        impl #impl_generics minicbor::Encode for #name #typ_generics #where_clause {
+            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>) -> Result<(), minicbor::encode::Error<__W777::Error>>
+            where
+                __W777: minicbor::encode::Write
+            {
+                self.#ident.encode(__e777)
+            }
+        }
+    })
+}
+

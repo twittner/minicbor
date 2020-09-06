@@ -1,6 +1,7 @@
 use crate::{check_uniq, field_indices, index_number, is_cow, is_option, variant_indices};
 use crate::{Idx, lifetimes_to_constrain, is_str, is_byte_slice, encoding, Encoding};
 use crate::{collect_type_params, CustomCodec, custom_codec};
+use crate::find_cbor_attr;
 use quote::quote;
 use std::collections::HashSet;
 use syn::spanned::Spanned;
@@ -37,13 +38,8 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     for l in lifetimes_to_constrain(indices.iter().zip(field_types.iter())) {
         lifetime.bounds.push(l.clone())
     }
-    let field_str = field_names.iter().map(|n| format!("{}::{}", name, n));
-    let numbers = field_indices(data.fields.iter())?;
-    let encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
-    let statements = gen_statements(&field_names, &field_types, &numbers, &decode_fns, encoding)?;
-
     // Collect type parameters which should not have an `Decode` bound added.
-    let blacklist = collect_type_params(&inp.generics, data.fields.iter().zip(decode_fns).filter_map(|(f, ff)| {
+    let blacklist = collect_type_params(&inp.generics, data.fields.iter().zip(&decode_fns).filter_map(|(f, ff)| {
         if let Some(CustomCodec::Decode(_)) | Some(CustomCodec::Both(_)) = ff {
             Some(f)
         } else {
@@ -55,13 +51,22 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let (impl_generics , ..) = g.split_for_impl();
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
+    // If transparent, just forward the decode call to the inner type.
+    if find_cbor_attr(inp.attrs.iter(), "transparent")?.is_some() {
+        return make_transparent_impl(inp, data, impl_generics, typ_generics, where_clause)
+    }
+
+    let field_str = field_names.iter().map(|n| format!("{}::{}", name, n));
+    let encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
+    let statements = gen_statements(&field_names, &field_types, &indices, &decode_fns, encoding)?;
+
     let result = if let syn::Fields::Named(_) = data.fields {
         quote! {
             Ok(#name {
                 #(#field_names : if let Some(x) = #field_names {
                     x
                 } else {
-                    return Err(minicbor::decode::Error::MissingValue(#numbers, #field_str))
+                    return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
                 }),*
             })
         }
@@ -72,7 +77,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             Ok(#name(#(if let Some(x) = #field_names {
                 x
             } else {
-                return Err(minicbor::decode::Error::MissingValue(#numbers, #field_str))
+                return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
             }),*))
         }
     };
@@ -354,3 +359,52 @@ fn add_lifetime(g: &syn::Generics, l: syn::LifetimeDef) -> syn::Generics {
     g2.params = Some(l.into()).into_iter().chain(g2.params).collect();
     g2
 }
+
+/// Forward the decoding because of a `#[cbor(transparent)]` attribute.
+fn make_transparent_impl
+    ( input: &syn::DeriveInput
+    , data: &syn::DataStruct
+    , impl_generics: syn::ImplGenerics
+    , typ_generics: syn::TypeGenerics
+    , where_clause: Option<&syn::WhereClause>
+    ) -> syn::Result<proc_macro2::TokenStream>
+{
+    if data.fields.len() != 1 {
+        let msg = "#[cbor(transparent)] requires a struct with one field";
+        return Err(syn::Error::new(input.ident.span(), msg))
+    }
+
+    let field = data.fields.iter().next().expect("struct has one field");
+
+    if let Some(a) = find_cbor_attr(field.attrs.iter(), "decode_with")? {
+        let msg = "#[cbor(decode_with)] not allowed within #[cbor(transparent)]";
+        return Err(syn::Error::new(a.span(), msg))
+    }
+
+    if let Some(a) = find_cbor_attr(field.attrs.iter(), "with")? {
+        let msg = "#[cbor(with)] not allowed within #[cbor(transparent)]";
+        return Err(syn::Error::new(a.span(), msg))
+    }
+
+    let name = &input.ident;
+
+    let call =
+        if let Some(id) = &field.ident {
+            quote! {
+                Ok(#name { #id: minicbor::Decode::decode(__d777)? })
+            }
+        } else {
+            quote! {
+                Ok(#name(minicbor::Decode::decode(__d777)?))
+            }
+        };
+
+    Ok(quote! {
+        impl #impl_generics minicbor::Decode<'__b777> for #name #typ_generics #where_clause {
+            fn decode(__d777: &mut minicbor::Decoder<'__b777>) -> Result<#name #typ_generics, minicbor::decode::Error> {
+                #call
+            }
+        }
+    })
+}
+

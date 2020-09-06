@@ -135,6 +135,14 @@
 //! attributes can either override an existing `Encode` or `Decode` impl or be
 //! used for types which do not implement those traits at all.
 //!
+//! ### `transparent`
+//!
+//! A **`#[cbor(transparent)]`** attribute can be attached to structs with
+//! exactly one field (aka newtypes). If present, the generated `Encode` and
+//! `Decode` impls will just forward the `encode`/`decode` calls to the inner
+//! type, i.e. the resulting CBOR representation will be identical to the one
+//! of the inner type.
+//!
 //! # CBOR encoding
 //!
 //! The CBOR values produced by a derived `Encode` implementation are of the
@@ -650,4 +658,37 @@ where
     }
 
     c.found
+}
+
+/// Check if the attribute matches the given identifier.
+fn is_cbor_attr(a: &syn::Attribute, ident: &str) -> syn::Result<bool> {
+    match a.parse_meta()? {
+        syn::Meta::List(ml) if ml.path.is_ident("cbor") => {
+            if let Some(syn::NestedMeta::Meta(syn::Meta::Path(arg))) = ml.nested.first() {
+                if arg.is_ident(ident) {
+                    return Ok(true)
+                }
+            }
+            if let Some(syn::NestedMeta::Meta(syn::Meta::NameValue(arg))) = ml.nested.first() {
+                if arg.path.is_ident(ident) {
+                    return Ok(true)
+                }
+            }
+        }
+        _ => {}
+    }
+    Ok(false)
+}
+
+/// Find any of the attributes that matches the given identifier.
+fn find_cbor_attr<'a, I>(attrs: I, ident: &str) -> syn::Result<Option<&'a syn::Attribute>>
+where
+    I: Iterator<Item = &'a syn::Attribute>
+{
+    for a in attrs {
+        if is_cbor_attr(a, ident)? {
+            return Ok(Some(a))
+        }
+    }
+    Ok(None)
 }

@@ -1,3 +1,8 @@
+# 0.5.1
+
+Update `minicbor-derive` to v0.4.1 which adds the `#[cbor(transparent)]`
+attribute.
+
 # 0.5.0
 
 Update `minicbor-derive` to v0.4.0 which adds `encode_with`, `decode_with`

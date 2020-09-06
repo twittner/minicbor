@@ -121,3 +121,23 @@ struct BS3<'a, T> {
     #[n(2)] field3: T
 }
 
+#[derive(Encode, Decode)]
+#[cbor(transparent)]
+struct W1(#[n(0)] Vec<u8>);
+
+#[derive(Encode, Decode)]
+#[cbor(transparent)]
+struct W2<T>(#[n(0)] T);
+
+#[derive(Encode, Decode)]
+#[cbor(transparent)]
+struct W3 { #[n(0)] inner: Vec<u8> }
+
+#[derive(Encode, Decode)]
+#[cbor(transparent)]
+struct W4<'a, T>(#[b(0)] BS2<'a, T>);
+
+#[derive(Encode, Decode)]
+#[cbor(transparent)]
+struct W5<'a, T> { #[b(0)] inner: BS2<'a, T> }
+
