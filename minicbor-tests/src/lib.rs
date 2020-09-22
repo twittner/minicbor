@@ -2,9 +2,10 @@
 
 #![allow(unused)]
 
-use minicbor::{Encode, Encoder, Decode, Decoder};
+use minicbor::{Encode, Encoder, Decode, Decoder, bytes::ByteSlice};
 use std::borrow::Cow;
 
+mod bytes;
 mod structs;
 mod enums;
 
@@ -40,29 +41,29 @@ fn s4_is_bound<'a, 'b: 'a>(d: &mut Decoder<'b>) -> S4<'a> {
     d.decode().unwrap()
 }
 
-// implicit borrow of &[u8]
-#[derive(Decode)] struct B1<'a> { #[n(0)] field: &'a [u8] }
+// implicit borrow of &ByteSlice
+#[derive(Decode)] struct B1<'a> { #[n(0)] field: &'a ByteSlice }
 
 fn b1_is_bound<'a, 'b: 'a>(d: &mut Decoder<'b>) -> B1<'a> {
     d.decode().unwrap()
 }
 
-// no implicit borrow of Cow<'_, [u8]>
-#[derive(Decode)] struct B2<'a> { #[n(0)] field: Cow<'a, [u8]> }
+// no implicit borrow of Cow<'_, ByteSlice>
+#[derive(Decode)] struct B2<'a> { #[n(0)] field: Cow<'a, ByteSlice> }
 
 fn b2_is_free<'a, 'b>(d: &mut Decoder<'b>) -> B2<'a> {
     d.decode().unwrap()
 }
 
-// explicit borrow of Cow<'_, [u8]>
-#[derive(Decode)] struct B3<'a> { #[b(0)] field: Cow<'a, [u8]> }
+// explicit borrow of Cow<'_, ByteSlice>
+#[derive(Decode)] struct B3<'a> { #[b(0)] field: Cow<'a, ByteSlice> }
 
 fn b3_is_bound<'a, 'b: 'a>(d: &mut Decoder<'b>) -> B3<'a> {
     d.decode().unwrap()
 }
 
-// implicit borrow of Option<&[u8]>
-#[derive(Decode)] struct B4<'a> { #[n(0)] field: Option<&'a [u8]> }
+// implicit borrow of Option<&ByteSlice>
+#[derive(Decode)] struct B4<'a> { #[n(0)] field: Option<&'a ByteSlice> }
 
 fn b4_is_bound<'a, 'b: 'a>(d: &mut Decoder<'b>) -> B4<'a> {
     d.decode().unwrap()
@@ -121,4 +122,3 @@ enum E4<'a> {
 fn e4_is_bound<'a, 'b: 'a>(d: &mut Decoder<'b>) -> E4<'a> {
     d.decode().unwrap()
 }
-

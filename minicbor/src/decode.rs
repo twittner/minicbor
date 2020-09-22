@@ -22,12 +22,6 @@ impl<'b, T: Decode<'b>> Decode<'b> for Box<T> {
     }
 }
 
-impl<'a, 'b: 'a> Decode<'b> for &'a [u8] {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        d.bytes()
-    }
-}
-
 impl<'a, 'b: 'a> Decode<'b> for &'a str {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
         d.str()

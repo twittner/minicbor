@@ -291,6 +291,17 @@ fn is_str(ty: &syn::Type) -> bool {
 
 /// Check if the given type is a `&[u8]`.
 fn is_byte_slice(ty: &syn::Type) -> bool {
+    if let syn::Type::Path(t) = ty {
+        return t.qself.is_none() &&
+            ((t.path.segments.len() == 1 && t.path.segments[0].ident == "ByteSlice")
+                || (t.path.segments.len() == 2
+                    && t.path.segments[0].ident == "bytes"
+                    && t.path.segments[1].ident == "ByteSlice")
+                || (t.path.segments.len() == 3
+                    && t.path.segments[0].ident == "minicbor"
+                    && t.path.segments[1].ident == "bytes"
+                    && t.path.segments[2].ident == "ByteSlice"))
+    }
     if let syn::Type::Slice(t) = ty {
         if let syn::Type::Path(t) = &*t.elem {
             t.qself.is_none() && t.path.segments.len() == 1 && t.path.segments[0].ident == "u8"
