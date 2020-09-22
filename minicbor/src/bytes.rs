@@ -81,28 +81,28 @@ impl Encode for ByteSlice {
 #[cfg(feature = "std")]
 impl std::borrow::Borrow<ByteSlice> for Vec<u8> {
     fn borrow(&self) -> &ByteSlice {
-        <&ByteSlice>::from(self.as_slice())
+        self.as_slice().into()
     }
 }
 
 #[cfg(feature = "std")]
 impl std::borrow::BorrowMut<ByteSlice> for Vec<u8> {
     fn borrow_mut(&mut self) -> &mut ByteSlice {
-        <&mut ByteSlice>::from(self.as_mut_slice())
+        self.as_mut_slice().into()
     }
 }
 
 #[cfg(feature = "std")]
 impl std::borrow::Borrow<ByteSlice> for ByteVec {
     fn borrow(&self) -> &ByteSlice {
-        <&ByteSlice>::from(self.as_slice())
+        self.as_slice().into()
     }
 }
 
 #[cfg(feature = "std")]
 impl std::borrow::BorrowMut<ByteSlice> for ByteVec {
     fn borrow_mut(&mut self) -> &mut ByteSlice {
-        <&mut ByteSlice>::from(self.as_mut_slice())
+        self.as_mut_slice().into()
     }
 }
 
