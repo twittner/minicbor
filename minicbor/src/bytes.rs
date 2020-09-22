@@ -24,10 +24,18 @@ use core::ops::{Deref, DerefMut};
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct ByteSlice([u8]);
 
-impl ByteSlice {
-    pub fn new<'a>(xs: &'a [u8]) -> &'a Self {
+impl<'a> From<&'a [u8]> for &'a ByteSlice {
+    fn from(xs: &'a [u8]) -> Self {
         unsafe {
-            &*(xs as *const [u8] as *const Self)
+            &*(xs as *const [u8] as *const ByteSlice)
+        }
+    }
+}
+
+impl<'a> From<&'a mut [u8]> for &'a mut ByteSlice {
+    fn from(xs: &'a mut [u8]) -> Self {
+        unsafe {
+            &mut *(xs as *mut [u8] as *mut ByteSlice)
         }
     }
 }
@@ -60,7 +68,7 @@ impl AsMut<[u8]> for ByteSlice {
 
 impl<'a, 'b: 'a> Decode<'b> for &'a ByteSlice {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
-        d.bytes().map(ByteSlice::new)
+        d.bytes().map(<&ByteSlice>::from)
     }
 }
 
@@ -73,14 +81,28 @@ impl Encode for ByteSlice {
 #[cfg(feature = "std")]
 impl std::borrow::Borrow<ByteSlice> for Vec<u8> {
     fn borrow(&self) -> &ByteSlice {
-        ByteSlice::new(self.as_slice())
+        <&ByteSlice>::from(self.as_slice())
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::borrow::BorrowMut<ByteSlice> for Vec<u8> {
+    fn borrow_mut(&mut self) -> &mut ByteSlice {
+        <&mut ByteSlice>::from(self.as_mut_slice())
     }
 }
 
 #[cfg(feature = "std")]
 impl std::borrow::Borrow<ByteSlice> for ByteVec {
     fn borrow(&self) -> &ByteSlice {
-        ByteSlice::new(self.as_slice())
+        <&ByteSlice>::from(self.as_slice())
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::borrow::BorrowMut<ByteSlice> for ByteVec {
+    fn borrow_mut(&mut self) -> &mut ByteSlice {
+        <&mut ByteSlice>::from(self.as_mut_slice())
     }
 }
 

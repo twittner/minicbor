@@ -123,7 +123,7 @@ fn byte_slice() {
     use minicbor::bytes::ByteSlice;
 
     fn property(arg: Vec<u8>) -> bool {
-        let arg: &ByteSlice = ByteSlice::new(arg.as_slice());
+        let arg: &ByteSlice = arg.as_slice().into();
         let vec = minicbor::to_vec(arg).unwrap();
         assert_eq!(Some(Type::Bytes), Decoder::new(&vec).datatype().ok());
         let val: &ByteSlice = minicbor::decode(&vec).unwrap();
