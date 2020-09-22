@@ -134,7 +134,11 @@
 //!
 //!     #[n(2)]
 //!     #[cbor(with = "minicbor::bytes")]
-//!     field2: Option<&'a [u8]>
+//!     field2: Option<&'a [u8]>,
+//!
+//!     #[n(3)]
+//!     #[cbor(with = "minicbor::bytes")]
+//!     field3: Vec<u8>
 //! }
 //! ```
 //!
