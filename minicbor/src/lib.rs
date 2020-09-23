@@ -75,9 +75,10 @@
 //! [CBOR]: https://tools.ietf.org/html/rfc7049
 //! [serde]: https://serde.rs
 
-#![forbid(unsafe_code, unused_imports, unused_variables)]
+#![forbid(unused_imports, unused_variables)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
+pub mod bytes;
 pub mod data;
 pub mod decode;
 pub mod encode;

@@ -105,19 +105,52 @@
 //! their lifetimes are constrained by the input lifetime:
 //!
 //! - `&'_ str`
-//! - `&'_ [u8]`
+//! - `&'_ minicbor::bytes::ByteSlice`
 //! - `Option<&'_ str>`
-//! - `Option<&'_ [u8]>`
+//! - `Option<&'_ minicbor::bytes::ByteSlice>`
+//!
+//! ### What about `&[u8]`?
+//!
+//! `&[u8]` is a special case of `&[T]`. The lack of trait impl specialisation
+//! in Rust makes it difficult to provide optimised support for byte slices.
+//! The generic `[T]` impl of `Encode` produces an array of `T`s. To specifically
+//! encode to and decode from CBOR bytes, the types `ByteSlice` and `ByteVec` are
+//! provided by minicbor. In addition, the attributes `encode_with`, `decode_with`
+//! and `with` can be used with `&[u8]` when deriving, e.g.
+//!
+//! ```
+//! use minicbor::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! struct Foo<'a> {
+//!     #[n(0)]
+//!     #[cbor(with = "minicbor::bytes")]
+//!     field0: &'a [u8],
+//!
+//!     #[n(1)]
+//!     #[cbor(encode_with = "minicbor::bytes::encode")]
+//!     #[cbor(decode_with = "minicbor::bytes::decode")]
+//!     field1: &'a [u8],
+//!
+//!     #[n(2)]
+//!     #[cbor(with = "minicbor::bytes")]
+//!     field2: Option<&'a [u8]>,
+//!
+//!     #[n(3)]
+//!     #[cbor(with = "minicbor::bytes")]
+//!     field3: Vec<u8>
+//! }
+//! ```
 //!
 //! ## Explicit borrowing
 //!
 //! If a type is annotated with **`#[b(...)]`**, all its lifetimes will be
 //! constrained to the input lifetime.
 //!
-//! If the type is a `std::borrow::Cow<'_, str>` or `std::borrow::Cow<'_, [u8]>`
-//! type, the generated code will decode the inner type and construct a
-//! `Cow::Borrowed` variant, contrary to the `Cow` impl of `Decode` which
-//! produces owned values.
+//! If the type is a `std::borrow::Cow<'_, str>` or
+//! `std::borrow::Cow<'_, minicbor::bytes::ByteSlice>` type, the generated code
+//! will decode the inner type and construct a `Cow::Borrowed` variant, contrary
+//! to the `Cow` impl of `Decode` which produces owned values.
 //!
 //! ## Other attributes
 //!
@@ -291,6 +324,17 @@ fn is_str(ty: &syn::Type) -> bool {
 
 /// Check if the given type is a `&[u8]`.
 fn is_byte_slice(ty: &syn::Type) -> bool {
+    if let syn::Type::Path(t) = ty {
+        return t.qself.is_none() &&
+            ((t.path.segments.len() == 1 && t.path.segments[0].ident == "ByteSlice")
+                || (t.path.segments.len() == 2
+                    && t.path.segments[0].ident == "bytes"
+                    && t.path.segments[1].ident == "ByteSlice")
+                || (t.path.segments.len() == 3
+                    && t.path.segments[0].ident == "minicbor"
+                    && t.path.segments[1].ident == "bytes"
+                    && t.path.segments[2].ident == "ByteSlice"))
+    }
     if let syn::Type::Slice(t) = ty {
         if let syn::Type::Path(t) = &*t.elem {
             t.qself.is_none() && t.path.segments.len() == 1 && t.path.segments[0].ident == "u8"

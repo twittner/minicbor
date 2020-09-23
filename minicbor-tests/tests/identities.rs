@@ -1,4 +1,4 @@
-use minicbor::{Encode, Decode};
+use minicbor::{Encode, Decode, Decoder, data::Type};
 use quickcheck::quickcheck;
 
 fn identity<T: Encode + Eq + for<'a> Decode<'a>>(arg: T) -> bool {
@@ -116,6 +116,36 @@ fn string() {
 #[test]
 fn bytes() {
     quickcheck(identity as fn(Vec<u8>) -> bool)
+}
+
+#[test]
+fn byte_slice() {
+    use minicbor::bytes::ByteSlice;
+
+    fn property(arg: Vec<u8>) -> bool {
+        let arg: &ByteSlice = arg.as_slice().into();
+        let vec = minicbor::to_vec(arg).unwrap();
+        assert_eq!(Some(Type::Bytes), Decoder::new(&vec).datatype().ok());
+        let val: &ByteSlice = minicbor::decode(&vec).unwrap();
+        arg == val
+    }
+
+    quickcheck(property as fn(Vec<u8>) -> bool)
+}
+
+#[test]
+fn byte_vec() {
+    use minicbor::bytes::ByteVec;
+
+    fn property(arg: Vec<u8>) -> bool {
+        let arg = ByteVec::from(arg);
+        let vec = minicbor::to_vec(&arg).unwrap();
+        assert_eq!(Some(Type::Bytes), Decoder::new(&vec).datatype().ok());
+        let val: ByteVec = minicbor::decode(&vec).unwrap();
+        arg == val
+    }
+
+    quickcheck(property as fn(Vec<u8>) -> bool)
 }
 
 #[test]
