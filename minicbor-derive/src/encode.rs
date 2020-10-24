@@ -34,6 +34,10 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let fields = sorted_fields(data.fields.iter())?;
     let encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
 
+    if find_cbor_attr(inp.attrs.iter(), "index_only", false)?.is_some() {
+        return Err(syn::Error::new(inp.span(), "index_only is not supported on structs"))
+    }
+
     // Collect type parameters which should not have an `Encode` bound added.
     let blacklist = collect_type_params(&inp.generics, fields.iter().filter_map(|(.., f, ff)| {
         if let Some(CustomCodec::Encode(_)) | Some(CustomCodec::Both(_)) = ff {
@@ -45,7 +49,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     add_encode_bound(&blacklist, inp.generics.type_params_mut())?;
 
     // If transparent, just forward the encode call to the inner type.
-    if find_cbor_attr(inp.attrs.iter(), "transparent")?.is_some() {
+    if find_cbor_attr(inp.attrs.iter(), "transparent", false)?.is_some() {
         return make_transparent_impl(inp, data)
     }
 
@@ -77,6 +81,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let name = &inp.ident;
     check_uniq(data.enum_token.span(), variant_indices(data.variants.iter())?)?;
 
+    let index_only = find_cbor_attr(inp.attrs.iter(), "index_only", false)?.is_some();
+
     let enum_encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
     let mut blacklist = HashSet::new();
     let mut rows = Vec::new();
@@ -87,6 +93,12 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let encoding = var.attrs.iter().filter_map(encoding).next().unwrap_or(enum_encoding);
         let row = match &var.fields {
             syn::Fields::Unit => match encoding {
+                Encoding::Array | Encoding::Map if index_only => quote! {
+                    #name::#con => {
+                        __e777.u32(#idx)?;
+                        Ok(())
+                    }
+                },
                 Encoding::Array => quote! {
                     #name::#con => {
                         __e777.array(2)?;
@@ -103,6 +115,9 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         Ok(())
                     }
                 }
+            }
+            syn::Fields::Named(f) if index_only => {
+                return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
             }
             syn::Fields::Named(fields) => {
                 let idents = fields.named.iter().map(|f| f.ident.clone().unwrap());
@@ -123,6 +138,9 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         #statements
                     }
                 }
+            }
+            syn::Fields::Unnamed(f) if index_only => {
+                return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
             }
             syn::Fields::Unnamed(fields) => {
                 let idents = fields.unnamed.iter().enumerate().map(|(i, _)| {
@@ -613,12 +631,12 @@ fn make_transparent_impl
 
     let field = data.fields.iter().next().expect("struct has one field");
 
-    if let Some(a) = find_cbor_attr(field.attrs.iter(), "encode_with")? {
+    if let Some(a) = find_cbor_attr(field.attrs.iter(), "encode_with", true)? {
         let msg = "#[cbor(encode_with)] not allowed within #[cbor(transparent)]";
         return Err(syn::Error::new(a.span(), msg))
     }
 
-    if let Some(a) = find_cbor_attr(field.attrs.iter(), "with")? {
+    if let Some(a) = find_cbor_attr(field.attrs.iter(), "with", true)? {
         let msg = "#[cbor(with)] not allowed within #[cbor(transparent)]";
         return Err(syn::Error::new(a.span(), msg))
     }

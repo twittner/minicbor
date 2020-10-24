@@ -179,3 +179,39 @@ fn mixed_encoding_2() {
     assert_eq!(&[0xa2, 0, 1, 1, 0x82, 2, 0xa1, 0, 2][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap())
 }
+
+#[test]
+fn index_only_enum() {
+    #[derive(Debug, Encode, Decode, PartialEq, Eq)]
+    #[cbor(index_only)]
+    enum E {
+        #[n(0)] A,
+        #[n(1)] B
+    }
+
+    let bytes = minicbor::to_vec(&E::A).unwrap();
+    assert_eq!(&[0x0][..], &bytes[..]);
+    assert_eq!(E::A, minicbor::decode(&bytes).unwrap());
+
+    let bytes = minicbor::to_vec(&E::B).unwrap();
+    assert_eq!(&[0x1][..], &bytes[..]);
+    assert_eq!(E::B, minicbor::decode(&bytes).unwrap())
+}
+
+#[test]
+fn regular_enum() {
+    #[derive(Debug, Encode, Decode, PartialEq, Eq)]
+    enum E {
+        #[n(0)] A,
+        #[n(1)] B
+    }
+
+    let bytes = minicbor::to_vec(&E::A).unwrap();
+    assert_eq!(&[0x82, 0, 0x80][..], &bytes[..]);
+    assert_eq!(E::A, minicbor::decode(&bytes).unwrap());
+
+    let bytes = minicbor::to_vec(&E::B).unwrap();
+    assert_eq!(&[0x82, 1, 0x80][..], &bytes[..]);
+    assert_eq!(E::B, minicbor::decode(&bytes).unwrap())
+}
+
