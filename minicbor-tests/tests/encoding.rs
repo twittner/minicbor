@@ -190,12 +190,33 @@ fn index_only_enum() {
     }
 
     let bytes = minicbor::to_vec(&E::A).unwrap();
-    assert_eq!(&[0x0][..], &bytes[..]);
+    assert_eq!(&[0][..], &bytes[..]);
     assert_eq!(E::A, minicbor::decode(&bytes).unwrap());
 
     let bytes = minicbor::to_vec(&E::B).unwrap();
-    assert_eq!(&[0x1][..], &bytes[..]);
-    assert_eq!(E::B, minicbor::decode(&bytes).unwrap())
+    assert_eq!(&[1][..], &bytes[..]);
+    assert_eq!(E::B, minicbor::decode(&bytes).unwrap());
+
+    let mut e = minicbor::Encoder::new(Vec::new());
+    e.array(4).unwrap()
+        .encode(E::A).unwrap()
+        .encode(E::B).unwrap()
+        .encode(32u8).unwrap()
+        .encode("foo").unwrap();
+
+    let mut d = minicbor::Decoder::new(e.as_ref());
+    assert_eq!(Some(4), d.array().unwrap());
+    assert_eq!(E::A, d.probe().decode().unwrap());
+    assert_eq!(0, d.probe().u32().unwrap());
+    d.skip().unwrap();
+    assert_eq!(E::B, d.probe().decode().unwrap());
+    assert_eq!(1, d.probe().u32().unwrap());
+    d.skip().unwrap();
+    assert_eq!(32u8, d.probe().decode().unwrap());
+    d.skip().unwrap();
+    assert_eq!("foo", d.probe().str().unwrap());
+    d.skip().unwrap();
+    assert!(matches!(d.skip(), Err(minicbor::decode::Error::EndOfInput)))
 }
 
 #[test]
@@ -212,6 +233,27 @@ fn regular_enum() {
 
     let bytes = minicbor::to_vec(&E::B).unwrap();
     assert_eq!(&[0x82, 1, 0x80][..], &bytes[..]);
-    assert_eq!(E::B, minicbor::decode(&bytes).unwrap())
+    assert_eq!(E::B, minicbor::decode(&bytes).unwrap());
+
+    let mut e = minicbor::Encoder::new(Vec::new());
+    e.array(4).unwrap()
+        .encode(E::A).unwrap()
+        .encode(E::B).unwrap()
+        .encode(32u8).unwrap()
+        .encode("foo").unwrap();
+
+    let mut d = minicbor::Decoder::new(e.as_ref());
+    assert_eq!(Some(4), d.array().unwrap());
+    assert_eq!(E::A, d.probe().decode().unwrap());
+    assert_eq!(Some(2), d.probe().array().unwrap());
+    d.skip().unwrap();
+    assert_eq!(E::B, d.probe().decode().unwrap());
+    assert_eq!(Some(2), d.probe().array().unwrap());
+    d.skip().unwrap();
+    assert_eq!(32u8, d.probe().decode().unwrap());
+    d.skip().unwrap();
+    assert_eq!("foo", d.probe().str().unwrap());
+    d.skip().unwrap();
+    assert!(matches!(d.skip(), Err(minicbor::decode::Error::EndOfInput)))
 }
 
