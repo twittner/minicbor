@@ -1,3 +1,10 @@
+# 0.7.0
+
+Add `#[cbor(index_only)]` attribute to support a more compact encoding for
+enums without fields (see [[1]] for details).
+
+[1]: https://twittner.gitlab.io/minicbor/minicbor_derive/index.html#index_only
+
 # 0.6.0
 
 Remove the `&[u8]` impl for `Decode` (see issue #4) and add a new module
