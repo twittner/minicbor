@@ -176,6 +176,13 @@
 //! type, i.e. the resulting CBOR representation will be identical to the one
 //! of the inner type.
 //!
+//! ## `index_only`
+//!
+//! Enumerations which do not contain fields may have the
+//! **`#[cbor(index_only)]`** attribute attached to them. This changes the
+//! encoding to encode only the variant index (cf. section
+//! [CBOR encoding](#cbor-encoding) for details).
+//!
 //! # CBOR encoding
 //!
 //! The CBOR values produced by a derived `Encode` implementation are of the
@@ -219,13 +226,17 @@
 //!
 //! ## Enums
 //!
-//! Each enum variant is encoded as a two-element array. The first element
-//! is the variant index and the second the actual variant value:
+//! Unless the `#[cbor(index_only)]` attribute is used for enums without any
+//! fields, each enum variant is encoded as a two-element array. The first
+//! element is the variant index and the second the actual variant value.
+//! Otherwise, if enums do not have fields and the `index_only` attribute is
+//! present, only the variant index is encoded:
 //!
 //! ```text
 //! <<enum encoding>> =
 //!     | `array(2)` n <<struct-as-array encoding>> ; if #[cbor(array)]
 //!     | `array(2)` n <<struct-as-map encoding>>   ; if #[cbor(map)]
+//!     | n                                         ; if #[cbor(index_only)]
 //! ```
 //!
 //! ## Which encoding to use?
@@ -245,7 +256,9 @@
 //! `None`s. They are best encoded as maps.
 //!
 //! When selecting the encoding, future changes to the type should be considered
-//! as they may turn a dense type into a sparse one over time.
+//! as they may turn a dense type into a sparse one over time. This also applies
+//! to [`index_only`](#index_only) which should be used only with enums which
+//! are not expected to ever have fields in their variants.
 
 extern crate proc_macro;
 
@@ -549,12 +562,14 @@ impl Default for Encoding {
 fn encoding(a: &syn::Attribute) -> Option<Encoding> {
     match a.parse_meta().ok()? {
         syn::Meta::List(ml) if ml.path.is_ident("cbor") => {
-            if let Some(syn::NestedMeta::Meta(syn::Meta::Path(arg))) = ml.nested.first() {
-                if arg.is_ident("map") {
-                    return Some(Encoding::Map)
-                }
-                if arg.is_ident("array") {
-                    return Some(Encoding::Array)
+            for nested in &ml.nested {
+                if let syn::NestedMeta::Meta(syn::Meta::Path(arg)) = nested {
+                    if arg.is_ident("map") {
+                        return Some(Encoding::Map)
+                    }
+                    if arg.is_ident("array") {
+                        return Some(Encoding::Array)
+                    }
                 }
             }
         }
@@ -636,20 +651,22 @@ fn custom_codec(a: &syn::Attribute) -> syn::Result<Option<CustomCodec>> {
         if !ml.path.is_ident("cbor") {
             return Ok(None)
         }
-        if let Some(syn::NestedMeta::Meta(syn::Meta::NameValue(arg))) = ml.nested.first() {
-            if arg.path.is_ident("encode_with") {
-                if let syn::Lit::Str(path) = &arg.lit {
-                    return Ok(Some(CustomCodec::Encode(syn::parse_str(&path.value())?)))
+        for nested in &ml.nested {
+            if let syn::NestedMeta::Meta(syn::Meta::NameValue(arg)) = nested {
+                if arg.path.is_ident("encode_with") {
+                    if let syn::Lit::Str(path) = &arg.lit {
+                        return Ok(Some(CustomCodec::Encode(syn::parse_str(&path.value())?)))
+                    }
                 }
-            }
-            if arg.path.is_ident("decode_with") {
-                if let syn::Lit::Str(path) = &arg.lit {
-                    return Ok(Some(CustomCodec::Decode(syn::parse_str(&path.value())?)))
+                if arg.path.is_ident("decode_with") {
+                    if let syn::Lit::Str(path) = &arg.lit {
+                        return Ok(Some(CustomCodec::Decode(syn::parse_str(&path.value())?)))
+                    }
                 }
-            }
-            if arg.path.is_ident("with") {
-                if let syn::Lit::Str(path) = &arg.lit {
-                    return Ok(Some(CustomCodec::Both(syn::parse_str(&path.value())?)))
+                if arg.path.is_ident("with") {
+                    if let syn::Lit::Str(path) = &arg.lit {
+                        return Ok(Some(CustomCodec::Both(syn::parse_str(&path.value())?)))
+                    }
                 }
             }
         }
@@ -705,17 +722,20 @@ where
 }
 
 /// Check if the attribute matches the given identifier.
-fn is_cbor_attr(a: &syn::Attribute, ident: &str) -> syn::Result<bool> {
+fn is_cbor_attr(a: &syn::Attribute, ident: &str, key_val: bool) -> syn::Result<bool> {
     match a.parse_meta()? {
         syn::Meta::List(ml) if ml.path.is_ident("cbor") => {
-            if let Some(syn::NestedMeta::Meta(syn::Meta::Path(arg))) = ml.nested.first() {
-                if arg.is_ident(ident) {
-                    return Ok(true)
-                }
-            }
-            if let Some(syn::NestedMeta::Meta(syn::Meta::NameValue(arg))) = ml.nested.first() {
-                if arg.path.is_ident(ident) {
-                    return Ok(true)
+            for nested in &ml.nested {
+                match nested {
+                    syn::NestedMeta::Meta(syn::Meta::Path(arg)) if !key_val=>
+                        if arg.is_ident(ident) {
+                            return Ok(true)
+                        }
+                    syn::NestedMeta::Meta(syn::Meta::NameValue(arg)) if key_val =>
+                        if arg.path.is_ident(ident) {
+                            return Ok(true)
+                        }
+                    _ => {}
                 }
             }
         }
@@ -725,12 +745,12 @@ fn is_cbor_attr(a: &syn::Attribute, ident: &str) -> syn::Result<bool> {
 }
 
 /// Find any of the attributes that matches the given identifier.
-fn find_cbor_attr<'a, I>(attrs: I, ident: &str) -> syn::Result<Option<&'a syn::Attribute>>
+fn find_cbor_attr<'a, I>(attrs: I, ident: &str, kv: bool) -> syn::Result<Option<&'a syn::Attribute>>
 where
     I: Iterator<Item = &'a syn::Attribute>
 {
     for a in attrs {
-        if is_cbor_attr(a, ident)? {
+        if is_cbor_attr(a, ident, kv)? {
             return Ok(Some(a))
         }
     }
