@@ -33,6 +33,10 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let indices = field_indices(data.fields.iter())?;
     check_uniq(name.span(), indices.iter().cloned())?;
 
+    if find_cbor_attr(inp.attrs.iter(), "index_only", false)?.is_some() {
+        return Err(syn::Error::new(inp.span(), "index_only is not supported on structs"))
+    }
+
     let (field_names, field_types, decode_fns) = fields(data.fields.iter())?;
     let mut lifetime = decode_lifetime()?;
     for l in lifetimes_to_constrain(indices.iter().zip(field_types.iter())) {
@@ -52,7 +56,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     // If transparent, just forward the decode call to the inner type.
-    if find_cbor_attr(inp.attrs.iter(), "transparent")?.is_some() {
+    if find_cbor_attr(inp.attrs.iter(), "transparent", false)?.is_some() {
         return make_transparent_impl(inp, data, impl_generics, typ_generics, where_clause)
     }
 
@@ -104,6 +108,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let name = &inp.ident;
     check_uniq(data.enum_token.span(), variant_indices(data.variants.iter())?)?;
 
+    let index_only = find_cbor_attr(inp.attrs.iter(), "index_only", false)?.is_some();
+
     let enum_encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
     let mut blacklist = HashSet::new();
     let mut lifetime = decode_lifetime()?;
@@ -114,10 +120,14 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let indices = field_indices(var.fields.iter())?;
         check_uniq(con.span(), indices.iter().cloned())?;
         let row = if let syn::Fields::Unit = &var.fields {
-            quote!(#idx => {
-                __d777.skip()?;
-                Ok(#name::#con)
-            })
+            if index_only {
+                quote!(#idx => Ok(#name::#con),)
+            } else {
+                quote!(#idx => {
+                    __d777.skip()?;
+                    Ok(#name::#con)
+                })
+            }
         } else {
             let (field_names, field_types, decode_fns) = fields(var.fields.iter())?;
             for l in lifetimes_to_constrain(indices.iter().zip(field_types.iter())) {
@@ -169,12 +179,21 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let (impl_generics , ..) = g.split_for_impl();
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
+
+    let check = if index_only {
+        quote!()
+    } else {
+        quote! {
+            if Some(2) != __d777.array()? {
+                return Err(minicbor::decode::Error::Message("expected enum (2-element array)"))
+            }
+        }
+    };
+
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'__b777> for #name #typ_generics #where_clause {
             fn decode(__d777: &mut minicbor::Decoder<'__b777>) -> Result<#name #typ_generics, minicbor::decode::Error> {
-                if Some(2) != __d777.array()? {
-                    return Err(minicbor::decode::Error::Message("expected enum (2-element array)"))
-                }
+                #check
                 match __d777.u32()? {
                     #(#rows)*
                     n => Err(minicbor::decode::Error::UnknownVariant(n))
@@ -376,12 +395,12 @@ fn make_transparent_impl
 
     let field = data.fields.iter().next().expect("struct has one field");
 
-    if let Some(a) = find_cbor_attr(field.attrs.iter(), "decode_with")? {
+    if let Some(a) = find_cbor_attr(field.attrs.iter(), "decode_with", true)? {
         let msg = "#[cbor(decode_with)] not allowed within #[cbor(transparent)]";
         return Err(syn::Error::new(a.span(), msg))
     }
 
-    if let Some(a) = find_cbor_attr(field.attrs.iter(), "with")? {
+    if let Some(a) = find_cbor_attr(field.attrs.iter(), "with", true)? {
         let msg = "#[cbor(with)] not allowed within #[cbor(transparent)]";
         return Err(syn::Error::new(a.span(), msg))
     }
