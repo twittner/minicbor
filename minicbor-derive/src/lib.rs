@@ -474,11 +474,7 @@ impl ToTokens for Idx {
 impl Idx {
     /// Test if `Idx` is the `B` variant.
     fn is_b(self) -> bool {
-        if let Idx::B(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Idx::B(_))
     }
 
     /// Get the numeric index value.
