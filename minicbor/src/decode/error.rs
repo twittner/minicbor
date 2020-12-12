@@ -22,6 +22,13 @@ pub enum Error {
     Message(&'static str)
 }
 
+impl Error {
+    /// Is this an end of input error?
+    pub fn is_end_of_input(&self) -> bool {
+        matches!(self, Error::EndOfInput)
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
