@@ -1,0 +1,20 @@
+[package]
+name          = "minicbor-io"
+version       = "0.1.0"
+authors       = ["Toralf Wittner <tw@dtex.org>"]
+license       = "BlueOak-1.0.0"
+edition       = "2018"
+description   = "I/O utilities for minicbor."
+repository    = "https://gitlab.com/twittner/minicbor"
+documentation = "https://twittner.gitlab.io/minicbor/minicbor-io/"
+keywords      = ["cbor", "encoding", "binary"]
+categories    = ["encoding"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[dependencies]
+minicbor = { path = "../minicbor", version = "0.7.0", features = ["std"] }
+
+[dev-dependencies]
+quickcheck = "0.9"
