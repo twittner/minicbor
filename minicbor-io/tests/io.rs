@@ -12,7 +12,7 @@ quickcheck::quickcheck! {
         w.write(val).unwrap();
 
         let mut r = Reader::new(io::Cursor::new(w.into_parts().0));
-        let val: &ByteSlice = r.read().unwrap();
+        let val: &ByteSlice = r.read().unwrap().unwrap();
         val.as_ref() == d.as_slice()
     }
 
@@ -21,7 +21,7 @@ quickcheck::quickcheck! {
         w.write(num).unwrap();
 
         let mut r = Reader::new(io::Cursor::new(w.into_parts().0));
-        let val: u64 = r.read().unwrap();
+        let val: u64 = r.read().unwrap().unwrap();
         val == num
     }
 }

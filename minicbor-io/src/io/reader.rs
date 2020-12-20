@@ -8,7 +8,7 @@ use std::{fmt, io};
 pub struct Reader<R> {
     reader: R,
     buffer: Vec<u8>,
-    max_len: usize
+    max_len: u32
 }
 
 /// Possible read errors.
@@ -37,7 +37,7 @@ impl<R> Reader<R> {
     ///
     /// If length values greater than this are decoded, an
     /// [`Error::InvalidLen`] will be returned.
-    pub fn set_max_len(&mut self, val: usize) {
+    pub fn set_max_len(&mut self, val: u32) {
         self.max_len = val
     }
 
@@ -49,34 +49,35 @@ impl<R> Reader<R> {
 
 impl<R: io::Read> Reader<R> {
     /// Read the next CBOR item and decode it.
-    pub fn read<'a, T>(&'a mut self) -> Result<T, Error>
+    pub fn read<'a, T>(&'a mut self) -> Result<Option<T>, Error>
     where
         T: Decode<'a>
     {
-        let n = self.read_len()?;
+        let len = match self.read_len() {
+            Ok(n) if n > self.max_len => {
+                return Err(Error::InvalidLen)
+            }
+            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => {
+                return Ok(None)
+            }
+            Ok(n)  => n,
+            Err(e) => return Err(Error::Io(e))
+        };
+
         self.buffer.clear();
-        self.buffer.resize(n, 0u8);
+        self.buffer.resize(len as usize, 0u8);
         self.reader.read_exact(&mut self.buffer)?;
-        minicbor::decode(&self.buffer).map_err(Error::Decode)
+
+        minicbor::decode(&self.buffer)
+            .map(Some)
+            .map_err(Error::Decode)
     }
 
     /// Read the length preceding the CBOR value.
-    fn read_len(&mut self) -> Result<usize, Error> {
-        let mut buf = [0; 8];
-        for i in 0 .. buf.len() {
-            self.reader.read_exact(&mut buf[i .. i + 1])?;
-            match minicbor::decode(&buf[.. i + 1]) {
-                Ok(n) => {
-                    if n > self.max_len {
-                        return Err(Error::InvalidLen)
-                    }
-                    return Ok(n)
-                }
-                Err(e) if e.is_end_of_input() => continue,
-                Err(e) => return Err(Error::Decode(e))
-            }
-        }
-        Err(Error::InvalidLen)
+    fn read_len(&mut self) -> io::Result<u32> {
+        let mut buf = [0; 4];
+        self.reader.read_exact(buf.as_mut())?;
+        Ok(u32::from_be_bytes(buf))
     }
 }
 

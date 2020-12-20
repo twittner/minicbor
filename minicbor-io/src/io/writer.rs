@@ -8,7 +8,7 @@ use std::{fmt, io};
 pub struct Writer<W> {
     writer: W,
     buffer: Vec<u8>,
-    max_len: usize
+    max_len: u32
 }
 
 /// Possible write errors.
@@ -37,7 +37,7 @@ impl<W> Writer<W> {
     ///
     /// If length values greater than this are encoded, an
     /// [`Error::InvalidLen`] will be returned.
-    pub fn set_max_len(&mut self, val: usize) {
+    pub fn set_max_len(&mut self, val: u32) {
         self.max_len = val
     }
 
@@ -48,17 +48,18 @@ impl<W> Writer<W> {
 }
 
 impl<W: io::Write> Writer<W> {
-    /// Encode and write a CBOR item and return the number of bytes written.
+    /// Encode and write a CBOR value and return its size in bytes.
     pub fn write<T>(&mut self, val: T) -> Result<usize, Error>
     where
         T: Encode
     {
         self.buffer.clear();
         minicbor::encode(val, &mut self.buffer)?;
-        if self.buffer.len() > self.max_len {
+        if self.buffer.len() > self.max_len as usize {
             return Err(Error::InvalidLen)
         }
-        minicbor::encode(self.buffer.len(), &mut self.writer)?;
+        let n = (self.buffer.len() as u32).to_be_bytes();
+        self.writer.write_all(&n)?;
         self.writer.write_all(&self.buffer)?;
         Ok(self.buffer.len())
     }
