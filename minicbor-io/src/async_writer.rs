@@ -6,7 +6,7 @@ use std::io;
 
 /// Wraps an [`AsyncWrite`] and writes length-delimited CBOR values.
 ///
-/// *Requires cargo feature* `"aio"`.
+/// *Requires cargo feature* `"async-io"`.
 #[derive(Debug)]
 pub struct AsyncWriter<W> {
     writer: W,

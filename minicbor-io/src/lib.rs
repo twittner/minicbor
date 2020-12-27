@@ -6,20 +6,20 @@ mod error;
 mod reader;
 mod writer;
 
-#[cfg(feature = "aio")]
+#[cfg(feature = "async-io")]
 mod async_reader;
 
-#[cfg(feature = "aio")]
+#[cfg(feature = "async-io")]
 mod async_writer;
 
 pub use error::Error;
 pub use reader::Reader;
 pub use writer::Writer;
 
-#[cfg(feature = "aio")]
+#[cfg(feature = "async-io")]
 pub use async_reader::AsyncReader;
 
-#[cfg(feature = "aio")]
+#[cfg(feature = "async-io")]
 pub use async_writer::AsyncWriter;
 
 /// Ensure we can safely cast a `u32` to a `usize`.

@@ -14,7 +14,7 @@ categories    = ["encoding"]
 all-features = true
 
 [features]
-aio = ["futures-core", "futures-io", "futures-util"]
+async-io = ["futures-core", "futures-io", "futures-util"]
 
 [dependencies]
 futures-core = { version = "0.3.8", optional = true }
@@ -24,7 +24,7 @@ minicbor = { path = "../minicbor", version = "0.7.0", features = ["std"] }
 
 [dev-dependencies]
 minicbor = { path = "../minicbor", version = "0.7.0", features = ["std", "derive"] }
-minicbor-io = { path = ".", features = ["aio"] }
+minicbor-io = { path = ".", features = ["async-io"] }
 quickcheck = "0.9"
 rand = "0.7"
 tokio = { version = "1.0", features = ["macros", "net", "rt"] }

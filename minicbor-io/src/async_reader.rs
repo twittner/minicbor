@@ -6,7 +6,7 @@ use std::io;
 
 /// Wraps an [`AsyncRead`] and reads length-delimited CBOR values.
 ///
-/// *Requires cargo feature* `"aio"`.
+/// *Requires cargo feature* `"async-io"`.
 #[derive(Debug)]
 pub struct AsyncReader<R> {
     reader: R,
