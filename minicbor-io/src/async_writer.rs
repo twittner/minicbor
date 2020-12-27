@@ -57,13 +57,6 @@ impl<W> AsyncWriter<W> {
     pub fn into_parts(self) -> (W, Vec<u8>) {
         (self.writer, self.buffer)
     }
-
-    /// If an [`AsyncWriter::write`] operation is cancelled for good, this
-    /// method can be used to reset the internal state so that the next call to
-    /// `AsyncWriter::write` does not resume sending previously buffered bytes.
-    pub fn reset(&mut self) {
-        self.state = State::None
-    }
 }
 
 impl<W: AsyncWrite + Unpin> AsyncWriter<W> {
@@ -74,20 +67,13 @@ impl<W: AsyncWrite + Unpin> AsyncWriter<W> {
     ///
     /// # Cancellation
     ///
-    /// The future returned by `AsyncWriter::write` can be dropped while still
-    /// pending. Subsequent calls to `AsyncWriter::write` will resume where the
-    /// previous future left off, i.e. the buffered data of a previous
-    /// call will be written before the new value is encoded, buffered and
-    /// passed to the inner writer. [`AsyncWriter::flush`] also finishes any
-    /// buffered data.
-    ///
-    /// If an ongoing write operation should be aborted permanently,
-    /// [`AsyncWriter::reset`] can be used to put the internal state back to its
-    /// initial value such that the next `AsyncWriter::write` call does not
-    /// resume the previous operation.
+    /// If the future returned by `AsyncWriter::write` is dropped while still
+    /// pending, subsequent calls to `AsyncWriter::write` will discard any
+    /// buffered data and instead encode, buffer and commit the new value.
+    /// Cancelling a future thus cancels the transfer. However, it is also
+    /// possible to resume the transfer by calling [`AsyncWriter::sync`]
+    /// after cancellation, which is normally called implicitly by this method.
     pub async fn write<T: Encode>(&mut self, val: T) -> Result<usize, Error> {
-        self.sync().await?;
-
         self.buffer.resize(4, 0u8);
         minicbor::encode(val, &mut self.buffer)?;
         if self.buffer.len() - 4 > self.max_len {
@@ -102,15 +88,12 @@ impl<W: AsyncWrite + Unpin> AsyncWriter<W> {
         Ok(self.buffer.len() - 4)
     }
 
-    /// Flush buffered data and the inner `AsyncWrite`r.
-    pub async fn flush(&mut self) -> Result<(), Error> {
-        self.sync().await?;
-        self.writer.flush().await?;
-        Ok(())
-    }
-
-    /// Commit buffer to `AsyncWrite`r.
-    async fn sync(&mut self) -> Result<(), Error> {
+    /// Commit any buffered data to the inner `AsyncWrite`.
+    ///
+    /// This method is implicitly called by [`AsyncWriter::write`]. The only
+    /// reason to call it explicitly is to resume the write operation started
+    /// by a previously unfinished, i.e. cancelled, `AsyncWriter::write` call.
+    pub async fn sync(&mut self) -> Result<(), Error> {
         loop {
             match self.state {
                 State::None => {
@@ -129,5 +112,11 @@ impl<W: AsyncWrite + Unpin> AsyncWriter<W> {
                 }
             }
         }
+    }
+
+    /// Flush the inner `AsyncWrite`.
+    pub async fn flush(&mut self) -> Result<(), Error> {
+        self.writer.flush().await?;
+        Ok(())
     }
 }
