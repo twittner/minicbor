@@ -1,5 +1,5 @@
 use minicbor::bytes::ByteSlice;
-use minicbor_io::io::{Reader, Writer};
+use minicbor_io::{Reader, Writer};
 use std::io;
 
 quickcheck::quickcheck! {

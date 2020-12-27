@@ -4,10 +4,10 @@ version       = "0.1.0"
 authors       = ["Toralf Wittner <tw@dtex.org>"]
 license       = "BlueOak-1.0.0"
 edition       = "2018"
-description   = "I/O utilities for minicbor."
+description   = "A set of I/O utilities for minicbor."
 repository    = "https://gitlab.com/twittner/minicbor"
 documentation = "https://twittner.gitlab.io/minicbor/minicbor-io/"
-keywords      = ["cbor", "encoding", "binary"]
+keywords      = ["cbor", "encoding", "binary", "io"]
 categories    = ["encoding"]
 
 [package.metadata.docs.rs]
@@ -21,7 +21,12 @@ futures-core = { version = "0.3.8", optional = true }
 futures-io = { version = "0.3.8", optional = true }
 futures-util = { version = "0.3.8", features = ["io"], optional = true }
 minicbor = { path = "../minicbor", version = "0.7.0", features = ["std"] }
-static_assertions = "1.1.0"
 
 [dev-dependencies]
+minicbor = { path = "../minicbor", version = "0.7.0", features = ["std", "derive"] }
+minicbor-io = { path = ".", features = ["aio"] }
 quickcheck = "0.9"
+rand = "0.7"
+tokio = { version = "1.0", features = ["macros", "net", "rt"] }
+tokio-util = { version = "0.6", features = ["compat"] }
+
