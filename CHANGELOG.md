@@ -1,3 +1,7 @@
+# 0.1.1 (minicbor-io)
+
+Fix link to documentation in `Cargo.toml`.
+
 # 0.1.0 (minicbor-io)
 
 Initial release of [`minicbor-io`][2] which provides some I/O utilities.
