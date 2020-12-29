@@ -20,6 +20,10 @@
 //! Optionally, `Encode` and `Decode` can be derived for structs and enums
 //! using the respective derive macros. See [`minicbor_derive`] for details.
 //!
+//! For I/O support see [`minicbor-io`][1].
+//!
+//! [1]: https://twittner.gitlab.io/minicbor/minicbor_io/
+//!
 //! # Example: generic encoding and decoding
 //!
 //! ```
