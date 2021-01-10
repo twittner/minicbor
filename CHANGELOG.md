@@ -1,3 +1,7 @@
+# 0.1.2 (minicbor-io)
+
+Update dev-dependencies.
+
 # 0.1.1 (minicbor-io)
 
 Fix link to documentation in `Cargo.toml`.
