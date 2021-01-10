@@ -28,7 +28,7 @@ fn encode_serde_decode_minicbor() {
 struct Cbor(Value);
 
 impl Arbitrary for Cbor {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         Cbor(gen_value(g, 7))
     }
 }
@@ -71,19 +71,20 @@ fn check<'a>(d: &mut Decoder<'a>, c: Cbor) -> Result<(), decode::Error> {
 
 // Generate an arbitrary `serde_cbor::Value`.
 // (`rem` denotes the remaining recursion depth.)
-fn gen_value<G: Gen>(g: &mut G, rem: usize) -> Value {
-    match g.gen_range(0, 9) {
+fn gen_value(g: &mut Gen, rem: usize) -> Value {
+    let mut r = rand::thread_rng();
+    match r.gen_range(0 .. 9) {
         0 => Value::Null,
         1 => Value::Bool(true),
         2 => Value::Bool(false),
-        3 => Value::Integer(g.gen::<i128>() % std::i64::MAX as i128),
-        4 => Value::Float(g.gen()),
+        3 => Value::Integer(r.gen::<i128>() % std::i64::MAX as i128),
+        4 => Value::Float(r.gen()),
         5 => Value::Bytes(Arbitrary::arbitrary(g)),
         6 => Value::Text(Arbitrary::arbitrary(g)),
         7 => Value::Array({
             let mut v = Vec::new();
             if rem > 0 {
-                for _ in 0 .. g.gen_range(0, 12) {
+                for _ in 0 .. r.gen_range(0 .. 12) {
                     v.push(gen_value(g, rem - 1))
                 }
             }
@@ -92,7 +93,7 @@ fn gen_value<G: Gen>(g: &mut G, rem: usize) -> Value {
         _ => Value::Map({
             let mut m = BTreeMap::new();
             if rem > 0 {
-                for _ in 0 .. g.gen_range(0, 12) {
+                for _ in 0 .. r.gen_range(0 .. 12) {
                     m.insert(gen_value(g, rem - 1), gen_value(g, rem - 1));
                 }
             }

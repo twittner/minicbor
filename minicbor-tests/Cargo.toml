@@ -13,10 +13,10 @@ minicbor = { path = "../minicbor", features = ["std", "half", "derive"] }
 
 [dev-dependencies]
 criterion  = "0.3"
-half       = "1.6.0"
-hex        = "0.4.1"
-quickcheck = "0.9"
-rand       = "0.7"
+half       = "1.6"
+hex        = "0.4.2"
+quickcheck = "1.0.1"
+rand       = "0.8"
 serde      = { version = "1.0", features = ["derive"] }
 serde_cbor = "0.11"
 

@@ -2,7 +2,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use minicbor::{Encode, Decode};
 use rand::{distributions::Alphanumeric, prelude::*};
 use serde::{Serialize, Deserialize};
-use std::borrow::Cow;
+use std::{borrow::Cow, iter};
 
 criterion_group!(benches, benchmark);
 criterion_main!(benches);
@@ -70,7 +70,7 @@ fn benchmark(c: &mut Criterion) {
 
 fn gen_addressbook(n: usize) -> AddressBook<'static> {
     fn gen_string(g: &mut ThreadRng) -> Cow<'static, str> {
-        Cow::Owned(Alphanumeric.sample_iter(g).take(128).collect())
+        Cow::Owned(iter::repeat_with(|| char::from(g.sample(Alphanumeric))).take(128).collect())
     }
 
     fn gen_address(g: &mut ThreadRng) -> Address<'static> {
@@ -84,7 +84,7 @@ fn gen_addressbook(n: usize) -> AddressBook<'static> {
     }
 
     fn gen_style(g: &mut ThreadRng) -> Option<Style<'static>> {
-        let s = match g.gen_range(0, 5) {
+        let s = match g.gen_range(0 .. 5) {
             0 => return None,
             1 => Style::Version1,
             2 => Style::Version2,
@@ -123,7 +123,7 @@ fn gen_addressbook(n: usize) -> AddressBook<'static> {
         },
         style: gen_style(&mut g),
         rating: if g.gen() {
-            Some(g.gen_range(-2342.42342, 234423.2342))
+            Some(g.gen_range(-2342.42342 .. 234423.2342))
         } else {
             None
         }
