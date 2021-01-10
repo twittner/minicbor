@@ -2,7 +2,6 @@
 
 use minicbor::{Encode, Decode};
 use quickcheck::{Arbitrary, Gen, quickcheck};
-use rand::Rng;
 use std::{borrow::Cow, fmt};
 
 #[derive(Debug, Clone, Encode, Decode, PartialEq, Eq)]
@@ -211,8 +210,8 @@ impl<'a> SomeVersion<'a> {
 }
 
 impl Arbitrary for SomeVersion<'static> {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
-        match g.next_u32() % 6 {
+    fn arbitrary(g: &mut Gen) -> Self {
+        match rand::random::<u8>() % 6 {
             0 => SomeVersion::V1(Arbitrary::arbitrary(g)),
             1 => SomeVersion::V2(Arbitrary::arbitrary(g)),
             2 => SomeVersion::V3(Arbitrary::arbitrary(g)),
@@ -234,7 +233,7 @@ impl fmt::Debug for Message {
 }
 
 impl Arbitrary for Message {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         let v = SomeVersion::arbitrary(g);
         let b = v.encode();
         Message(v, b)
@@ -242,10 +241,10 @@ impl Arbitrary for Message {
 }
 
 impl Arbitrary for Version1<'static> {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         Version1 {
-            field_a: g.gen(),
-            field_b: if g.gen() {
+            field_a: rand::random(),
+            field_b: if rand::random() {
                 Some(Cow::Owned(Arbitrary::arbitrary(g)))
             } else {
                 None
@@ -255,10 +254,10 @@ impl Arbitrary for Version1<'static> {
 }
 
 impl Arbitrary for Version2<'static> {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         Version2 {
-            field_a: g.gen(),
-            field_b: if g.gen() {
+            field_a: rand::random(),
+            field_b: if rand::random() {
                 Some(Cow::Owned(Arbitrary::arbitrary(g)))
             } else {
                 None
@@ -269,18 +268,18 @@ impl Arbitrary for Version2<'static> {
 }
 
 impl Arbitrary for Version3 {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         Version3 {
-            field_a: g.gen(),
+            field_a: rand::random(),
             field_c: Arbitrary::arbitrary(g)
         }
     }
 }
 
 impl Arbitrary for Version4 {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         Version4 {
-            field_a: g.gen(),
+            field_a: rand::random(),
             field_c: Arbitrary::arbitrary(g),
             field_d: Arbitrary::arbitrary(g),
         }
@@ -288,9 +287,9 @@ impl Arbitrary for Version4 {
 }
 
 impl Arbitrary for Version5 {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         Version5 {
-            field_a: g.gen(),
+            field_a: rand::random(),
             field_c: Arbitrary::arbitrary(g),
             field_d: Arbitrary::arbitrary(g),
         }
@@ -298,9 +297,9 @@ impl Arbitrary for Version5 {
 }
 
 impl Arbitrary for Version6<'static> {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         Version6 {
-            field_a: g.gen(),
+            field_a: rand::random(),
             field_c: Arbitrary::arbitrary(g),
             field_d: Arbitrary::arbitrary(g),
         }
@@ -308,25 +307,25 @@ impl Arbitrary for Version6<'static> {
 }
 
 impl Arbitrary for Enum1 {
-    fn arbitrary<G: Gen>(_: &mut G) -> Self {
+    fn arbitrary(_: &mut Gen) -> Self {
         Enum1::Con1
     }
 }
 
 impl Arbitrary for Enum2 {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         Enum2::Con1(Arbitrary::arbitrary(g))
     }
 }
 
 impl Arbitrary for Enum3<'static> {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
-        if g.gen() {
+    fn arbitrary(g: &mut Gen) -> Self {
+        if rand::random() {
             Enum3::Con1(Arbitrary::arbitrary(g))
         } else {
             Enum3::Con2 {
                 foo: Arbitrary::arbitrary(g),
-                bar: if g.gen() {
+                bar: if rand::random() {
                     Some(Cow::Owned(Arbitrary::arbitrary(g)))
                 } else {
                     None
