@@ -1,3 +1,16 @@
+# 0.2.0 (minicbor-io)
+
+`Reader` and `AsyncReader` always return `UnexpectedEof` when reading 0 bytes
+while decoding a frame, unless at the very beginning of a frame, when not
+even the length prefix has been read, where `Ok(None)` would be returned
+instead. Previous versions returned `Ok(None)` while reading a partial length
+prefix.
+
+# 0.7.1 (minicbor)
+# 0.6.1 (minicbor-derive)
+
+Maintenance release.
+
 # 0.1.2 (minicbor-io)
 
 Update dev-dependencies.
