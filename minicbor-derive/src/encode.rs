@@ -226,8 +226,8 @@ fn encode_fields
         // For each `Option` that follows the highest index is updated
         // if the value is a `Some`.
         Encoding::Array => {
-            for j in (0 .. fields.len()).rev() {
-                let (i, n, f, _) = fields[j];
+            for f in fields.iter().rev() {
+                let (i, n, f, _) = f;
                 let n = n.val();
                 if !is_option(&f.ty, |_| true) {
                     max_index = Some(n);
@@ -245,7 +245,7 @@ fn encode_fields
                         }
                     },
                     None if has_self => {
-                        let i = syn::Index::from(i);
+                        let i = syn::Index::from(*i);
                         quote! {
                             if self.#i.is_some() {
                                 __max_index777 = Some(#n)
@@ -270,8 +270,8 @@ fn encode_fields
         // and here for each `Option` we check if it is `None` and if
         // so substract 1 from the total.
         Encoding::Map => {
-            for j in 0 .. fields.len() {
-                let (i, _, f, _) = fields[j];
+            for f in fields {
+                let (i, _, f, _) = f;
                 if !is_option(&f.ty, |_| true) {
                     continue
                 }
@@ -287,7 +287,7 @@ fn encode_fields
                         }
                     },
                     None if has_self => {
-                        let i = syn::Index::from(i);
+                        let i = syn::Index::from(*i);
                         quote! {
                             if self.#i.is_none() {
                                 __max_fields777 -= 1
