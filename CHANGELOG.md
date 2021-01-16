@@ -1,3 +1,8 @@
+# 0.2.2 (minicbor-io)
+
+Use same version for `minicbor` dependency in `dependencies` and
+`dev-dependencies`.
+
 # 0.2.1 (minicbor-io)
 
 `Reader` and `AsyncReader` always return `UnexpectedEof` when reading 0 bytes
