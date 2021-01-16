@@ -55,13 +55,22 @@ impl<R: io::Read> Reader<R> {
     /// otherwise either `Some` value or an error is returned.
     pub fn read<'a, T: Decode<'a>>(&'a mut self) -> Result<Option<T>, Error> {
         let mut buf = [0; 4];
-        let len = match self.reader.read_exact(buf.as_mut()) {
-            Ok(()) => u32::from_be_bytes(buf) as usize,
-            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => {
-                return Ok(None)
+        let mut len = 0;
+        while len < 4 {
+            match self.reader.read(&mut buf[len ..]) {
+                Ok(0) if len == 0 =>
+                    return Ok(None),
+                Ok(0) =>
+                    return Err(Error::Io(io::ErrorKind::UnexpectedEof.into())),
+                Ok(n) =>
+                    len += n,
+                Err(e) if e.kind() == io::ErrorKind::Interrupted =>
+                    continue,
+                Err(e) =>
+                    return Err(Error::Io(e))
             }
-            Err(e) => return Err(Error::Io(e))
-        };
+        }
+        let len = u32::from_be_bytes(buf) as usize;
         if len > self.max_len {
             return Err(Error::InvalidLen)
         }
