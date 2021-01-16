@@ -94,8 +94,12 @@ impl<R: AsyncRead + Unpin> AsyncReader<R> {
                 }
                 State::ReadLen(ref mut buf, ref mut o) => {
                     let n = self.reader.read(&mut buf[usize::from(*o) ..]).await?;
-                    if n == 0 && *o == 0 {
-                        return Ok(None)
+                    if n == 0 {
+                        return if *o == 0 {
+                            Ok(None)
+                        } else {
+                            Err(Error::Io(io::ErrorKind::UnexpectedEof.into()))
+                        }
                     }
                     *o += n as u8
                 }

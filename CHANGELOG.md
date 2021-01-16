@@ -1,4 +1,4 @@
-# 0.2.0 (minicbor-io)
+# 0.2.1 (minicbor-io)
 
 `Reader` and `AsyncReader` always return `UnexpectedEof` when reading 0 bytes
 while decoding a frame, unless at the very beginning of a frame, when not
