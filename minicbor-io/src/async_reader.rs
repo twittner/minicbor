@@ -94,7 +94,7 @@ impl<R: AsyncRead + Unpin> AsyncReader<R> {
                 }
                 State::ReadLen(ref mut buf, ref mut o) => {
                     let n = self.reader.read(&mut buf[usize::from(*o) ..]).await?;
-                    if n == 0 {
+                    if n == 0 && *o == 0 {
                         return Ok(None)
                     }
                     *o += n as u8

@@ -7,7 +7,7 @@ mod unit {
         unimplemented!()
     }
 
-    pub(super) fn decode<'a>(_d: &mut Decoder<'a>) -> Result<Unit, decode::Error> {
+    pub(super) fn decode(_d: &mut Decoder<'_>) -> Result<Unit, decode::Error> {
         unimplemented!()
     }
 }
@@ -46,7 +46,7 @@ mod generic {
         unimplemented!()
     }
 
-    pub(super) fn decode<'a, T>(_d: &mut Decoder<'a>) -> Result<T, decode::Error> {
+    pub(super) fn decode<T>(_d: &mut Decoder<'_>) -> Result<T, decode::Error> {
         unimplemented!()
     }
 }
