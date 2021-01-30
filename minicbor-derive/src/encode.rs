@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use crate::{check_uniq, field_indices, Idx, index_number, is_option, variant_indices};
 use crate::{collect_type_params, encoding, Encoding, custom_codec, CustomCodec};
 use crate::find_cbor_attr;
@@ -32,7 +34,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     check_uniq(name.span(), field_indices(data.fields.iter())?)?;
 
     let fields = sorted_fields(data.fields.iter())?;
-    let encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
+    let encoding = inp.attrs.iter().find_map(encoding).unwrap_or_default();
 
     if find_cbor_attr(inp.attrs.iter(), "index_only", false)?.is_some() {
         return Err(syn::Error::new(inp.span(), "index_only is not supported on structs"))
@@ -83,14 +85,14 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let index_only = find_cbor_attr(inp.attrs.iter(), "index_only", false)?.is_some();
 
-    let enum_encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
+    let enum_encoding = inp.attrs.iter().find_map(encoding).unwrap_or_default();
     let mut blacklist = HashSet::new();
     let mut rows = Vec::new();
     for var in data.variants.iter() {
         let con = &var.ident;
         let idx = index_number(var.ident.span(), &var.attrs)?;
         check_uniq(con.span(), field_indices(var.fields.iter())?)?;
-        let encoding = var.attrs.iter().filter_map(encoding).next().unwrap_or(enum_encoding);
+        let encoding = var.attrs.iter().find_map(encoding).unwrap_or(enum_encoding);
         let row = match &var.fields {
             syn::Fields::Unit => match encoding {
                 Encoding::Array | Encoding::Map if index_only => quote! {

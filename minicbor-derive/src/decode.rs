@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use crate::{check_uniq, field_indices, index_number, is_cow, is_option, variant_indices};
 use crate::{Idx, lifetimes_to_constrain, is_str, is_byte_slice, encoding, Encoding};
 use crate::{collect_type_params, CustomCodec, custom_codec};
@@ -61,7 +63,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     }
 
     let field_str = field_names.iter().map(|n| format!("{}::{}", name, n));
-    let encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
+    let encoding = inp.attrs.iter().find_map(encoding).unwrap_or_default();
     let statements = gen_statements(&field_names, &field_types, &indices, &decode_fns, encoding)?;
 
     let result = if let syn::Fields::Named(_) = data.fields {
@@ -110,7 +112,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let index_only = find_cbor_attr(inp.attrs.iter(), "index_only", false)?.is_some();
 
-    let enum_encoding = inp.attrs.iter().filter_map(encoding).next().unwrap_or_default();
+    let enum_encoding = inp.attrs.iter().find_map(encoding).unwrap_or_default();
     let mut blacklist = HashSet::new();
     let mut lifetime = decode_lifetime()?;
     let mut rows = Vec::new();
@@ -135,7 +137,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             }
             let field_str = field_names.iter().map(|n| format!("{}::{}::{}", name, con, n));
             let numbers = field_indices(var.fields.iter())?;
-            let encoding = var.attrs.iter().filter_map(encoding).next().unwrap_or(enum_encoding);
+            let encoding = var.attrs.iter().find_map(encoding).unwrap_or(enum_encoding);
             // Collect type parameters which should not have an `Decode` bound added.
             blacklist.extend(collect_type_params(&inp.generics, var.fields.iter().zip(&decode_fns).filter_map(|(f, ff)| {
                 if let Some(CustomCodec::Decode(_)) | Some(CustomCodec::Both(_)) = ff {
