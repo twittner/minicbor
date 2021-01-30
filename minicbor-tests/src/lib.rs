@@ -122,3 +122,22 @@ enum E4<'a> {
 fn e4_is_bound<'a, 'b: 'a>(d: &mut Decoder<'b>) -> E4<'a> {
     d.decode().unwrap()
 }
+
+#[derive(Encode, Decode)]
+struct Foo<'a>(#[b(0)] Cow<'a, minicbor::bytes::ByteSlice>);
+
+#[derive(Encode, Decode)]
+struct Bar<'a>(#[n(0)] Cow<'a, minicbor::bytes::ByteSlice>);
+
+#[derive(Encode, Decode)]
+#[cbor(transparent)]
+struct Trans1<'a>(#[b(0)] Foo<'a>);
+
+#[derive(Encode, Decode)]
+#[cbor(transparent)]
+struct Trans2<'a>(#[n(0)] Bar<'a>);
+
+#[derive(Encode, Decode)]
+#[cbor(transparent)]
+struct Trans3<'a>(#[b(0)] Bar<'a>);
+
