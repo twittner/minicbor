@@ -131,9 +131,9 @@ impl From<Vec<u8>> for ByteVec {
 }
 
 #[cfg(feature = "std")]
-impl Into<Vec<u8>> for ByteVec {
-    fn into(self) -> Vec<u8> {
-        self.0
+impl From<ByteVec> for Vec<u8> {
+    fn from(b: ByteVec) -> Self {
+        b.0
     }
 }
 

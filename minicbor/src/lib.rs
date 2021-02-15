@@ -113,6 +113,7 @@
 #![forbid(unused_imports, unused_variables)]
 #![allow(clippy::needless_lifetimes)]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![feature(maybe_uninit_uninit_array, maybe_uninit_array_assume_init)]
 
 pub mod bytes;
 pub mod data;

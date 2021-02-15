@@ -200,7 +200,7 @@ macro_rules! decode_nonzero {
         $(
             impl<'b> Decode<'b> for $t {
                 fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-                    Ok(<$t>::new(Decode::decode(d)?).ok_or(Error::Message($msg))?)
+                    <$t>::new(Decode::decode(d)?).ok_or(Error::Message($msg))
                 }
             }
         )*
@@ -243,34 +243,28 @@ decode_sequential! {
     std::collections::LinkedList<T>, push_back
 }
 
-macro_rules! decode_arrays {
-    ($($n:expr)*) => {
-        $(
-            impl<'b, T: Decode<'b> + Default> Decode<'b> for [T; $n] {
-                fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-                    let iter: ArrayIter<T> = d.array_iter()?;
-                    let mut a: [T; $n] = Default::default();
-                    let mut i = 0;
-                    for x in iter {
-                        if i >= a.len() {
-                            let msg = concat!("array has more than ", $n, " elements");
-                            return Err(Error::Message(msg))
-                        }
-                        a[i] = x?;
-                        i += 1;
-                    }
-                    if i < a.len() {
-                        let msg = concat!("array has less than ", $n, " elements");
-                        return Err(Error::Message(msg))
-                    }
-                    Ok(a)
-                }
+impl<'b, T, const N: usize> Decode<'b> for [T; N]
+where
+    T: Decode<'b> + Default
+{
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        use core::mem::MaybeUninit;
+        let iter: ArrayIter<T> = d.array_iter()?;
+        let mut a = MaybeUninit::uninit_array();
+        let mut i = 0;
+        for x in iter {
+            if i >= a.len() {
+                return Err(Error::Message("array has more elements than expected"))
             }
-        )*
+            a[i] = MaybeUninit::new(x?);
+            i += 1;
+        }
+        if i < a.len() {
+            return Err(Error::Message("array has less elements than expected"))
+        }
+        Ok(unsafe { MaybeUninit::array_assume_init(a) })
     }
 }
-
-decode_arrays!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
 
 macro_rules! decode_tuples {
     ($( $len:expr => { $($T:ident)+ } )+) => {

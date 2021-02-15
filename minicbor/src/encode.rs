@@ -214,23 +214,15 @@ encode_sequential! {
     std::collections::BTreeSet<T>
 }
 
-macro_rules! encode_arrays {
-    ($($n:expr)*) => {
-        $(
-            impl<T: Encode> Encode for [T; $n] {
-                fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-                    e.array($n)?;
-                    for x in self {
-                        x.encode(e)?
-                    }
-                    Ok(())
-                }
-            }
-        )*
+impl<T: Encode, const N: usize> Encode for [T; N] {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(as_u64(N))?;
+        for x in self {
+            x.encode(e)?
+        }
+        Ok(())
     }
 }
-
-encode_arrays!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
 
 macro_rules! encode_tuples {
     ($( $len:expr => { $($T:ident ($idx:tt))+ } )+) => {
