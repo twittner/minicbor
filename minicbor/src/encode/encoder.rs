@@ -139,7 +139,7 @@ impl<W: Write> Encoder<W> {
 
     /// Encode an `f32` value as a half float (`f16)`.
     ///
-    /// Only available when the feature `half` is present.
+    /// *Requires feature* `"half"`.
     ///
     /// **NB**: The conversion from `f32` to `f16` is potentially lossy.
     /// Generally values are truncated and rounded to the nearest 16-bit

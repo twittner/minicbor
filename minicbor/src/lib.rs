@@ -17,8 +17,13 @@
 //! which returns a [`data::Type`] that can represent every possible CBOR type
 //! and decoding can thus proceed based on this information.
 //!
+//! Finally, it is also possible to just tokenise the input bytes using a
+//! [`Tokenizer`](decode::Tokenizer), i.e. an `Iterator` over CBOR
+//! [`Token`](decode::Token)s.
+//!
 //! Optionally, `Encode` and `Decode` can be derived for structs and enums
-//! using the respective derive macros. See [`minicbor_derive`] for details.
+//! using the respective derive macros (*requires feature* `"derive"`).
+//! See [`minicbor_derive`] for details.
 //!
 //! For I/O support see [`minicbor-io`][1].
 //!
@@ -62,16 +67,41 @@
 //! # Example: ad-hoc decoding
 //!
 //! ```
-//! use minicbor::{data, Decoder};
+//! use minicbor::Decoder;
+//! use minicbor::data::Tag;
 //!
 //! let input = [
 //!     0xc0, 0x74, 0x32, 0x30, 0x31, 0x33, 0x2d, 0x30,
 //!     0x33, 0x2d, 0x32, 0x31, 0x54, 0x32, 0x30, 0x3a,
 //!     0x30, 0x34, 0x3a, 0x30, 0x30, 0x5a
 //! ];
-//! let mut decoder = Decoder::new(&input[..]);
-//! assert_eq!(data::Tag::DateTime, decoder.tag()?);
+//!
+//! let mut decoder = Decoder::new(&input);
+//! assert_eq!(Tag::DateTime, decoder.tag()?);
 //! assert_eq!("2013-03-21T20:04:00Z", decoder.str()?);
+//! # Ok::<_, Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Example: tokenisation
+//!
+//! ```
+//! use minicbor::data::Tag;
+//! use minicbor::decode::{Token, Tokenizer};
+//!
+//! let input  = [0x83, 0x01, 0x9f, 0x02, 0x03, 0xff, 0x82, 0x04, 0x05];
+//! let tokens = Tokenizer::new(&input).collect::<Result<Vec<Token>, _>>()?;
+//!
+//! assert_eq! { &tokens[..],
+//!     &[Token::Array(3),
+//!       Token::U8(1),
+//!       Token::BeginArray,
+//!       Token::U8(2),
+//!       Token::U8(3),
+//!       Token::Break,
+//!       Token::Array(2),
+//!       Token::U8(4),
+//!       Token::U8(5)]
+//! };
 //!
 //! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```
@@ -122,7 +152,7 @@ where
 
 /// Encode a type implementing [`Encode`] and return the encoded byte vector.
 ///
-/// Only available with feature `std`.
+/// *Requires feature* `"std"`.
 #[cfg(feature = "std")]
 pub fn to_vec<T>(x: T) -> Result<Vec<u8>, encode::Error<std::io::Error>>
 where

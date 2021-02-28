@@ -9,6 +9,12 @@ pub use decoder::{Decoder, Probe};
 pub use decoder::{ArrayIter, BytesIter, MapIter, StrIter};
 pub use error::Error;
 
+#[cfg(feature = "half")]
+mod generic;
+
+#[cfg(feature = "half")]
+pub use generic::{Token, Tokenizer};
+
 /// A type that can be decoded from CBOR.
 pub trait Decode<'b>: Sized {
     /// Decode a value using the given `Decoder`.
