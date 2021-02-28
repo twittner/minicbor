@@ -1,3 +1,7 @@
+# 0.7.2 (minicbor)
+
+Bugfix: `Type::read` used 0xc9 instead of 0xc0 when reading `Type::Tag`.
+
 # 0.2.2 (minicbor-io)
 
 Use same version for `minicbor` dependency in `dependencies` and
