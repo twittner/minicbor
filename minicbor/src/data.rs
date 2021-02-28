@@ -42,7 +42,7 @@ impl Type {
             0x60 ..= 0x7b | 0x7f => Type::String,
             0x80 ..= 0x9b | 0x9f => Type::Array,
             0xa0 ..= 0xbb | 0xbf => Type::Map,
-            0xc9 ..= 0xdb        => Type::Tag,
+            0xc0 ..= 0xdb        => Type::Tag,
             0xe0 ..= 0xf3 | 0xf8 => Type::Simple,
             0xf4 | 0xf5          => Type::Bool,
             0xf6                 => Type::Null,
