@@ -10,10 +10,10 @@ pub use decoder::{ArrayIter, BytesIter, MapIter, StrIter};
 pub use error::Error;
 
 #[cfg(feature = "half")]
-mod generic;
+mod tokens;
 
 #[cfg(feature = "half")]
-pub use generic::{Token, Tokenizer};
+pub use tokens::{Token, Tokenizer};
 
 /// A type that can be decoded from CBOR.
 pub trait Decode<'b>: Sized {

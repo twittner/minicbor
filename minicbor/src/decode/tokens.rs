@@ -47,7 +47,7 @@ pub enum Token<'b> {
 /// [`Error::EndOfInput`] is returned which is mapped to `None`.
 ///
 /// *Requires feature* `"half"`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tokenizer<'b> {
     decoder: Decoder<'b>
 }
@@ -113,6 +113,142 @@ impl<'b> Tokenizer<'b> {
 
     fn skip_byte(&mut self) {
         self.decoder.set_position(self.decoder.position() + 1)
+    }
+}
+
+/// Pretty print the sequence of [`Token`]s.
+///
+/// The following syntax is used:
+///
+/// - (Indefinite) maps are enclosed in curly braces (`{`, `}`).
+/// - (Indefinite) arrays are enclosed in brackets (`[`, `]`).
+/// - Indefinite bytes and strings are enclosed in angle brackets (`<`, `>`)
+///   and the individual chunks are separated by commas (`,`).
+/// - Other tokens are displayed according to their `Display` implementation.
+#[cfg(feature = "std")]
+impl fmt::Display for Tokenizer<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        /// Control stack element.
+        enum E {
+            N,               // get next token
+            A(Option<u64>),  // array
+            M(Option<u64>),  // map
+            B,               // indefinite bytes
+            D,               // indefinite text
+            S(&'static str), // display string
+            X(&'static str)  // display string (unless next token is BREAK)
+        }
+
+        let mut iter = Tokenizer::from(self.decoder.clone()).peekable();
+        let mut stack = Vec::new();
+
+        stack.push(E::N);
+
+        while let Some(elt) = stack.pop() {
+            match elt {
+                E::N => match iter.next() {
+                    Some(Ok(Token::Array(n))) => {
+                        stack.push(E::A(Some(n)));
+                        f.write_str("[")?
+                    }
+                    Some(Ok(Token::Map(n))) => {
+                        stack.push(E::M(Some(n)));
+                        f.write_str("{")?
+                    }
+                    Some(Ok(Token::BeginArray)) => {
+                        stack.push(E::A(None));
+                        f.write_str("[")?
+                    }
+                    Some(Ok(Token::BeginMap)) => {
+                        stack.push(E::M(None));
+                        f.write_str("{")?
+                    }
+                    Some(Ok(Token::BeginBytes)) => {
+                        stack.push(E::B);
+                        f.write_str("<")?
+                    }
+                    Some(Ok(Token::BeginString)) => {
+                        stack.push(E::D);
+                        f.write_str("<")?
+                    }
+                    Some(Ok(t))  => t.fmt(f)?,
+                    Some(Err(e)) => {
+                        write!(f, "decode error: {}", e)?;
+                        return Ok(())
+                    }
+                    None => continue
+                }
+                E::S(s) => f.write_str(s)?,
+                E::X(s) => match iter.peek() {
+                    Some(Ok(Token::Break)) | None => continue,
+                    Some(Ok(_))  => f.write_str(s)?,
+                    Some(Err(e)) => {
+                        write!(f, "decode error: {}", e)?;
+                        return Ok(())
+                    }
+                }
+                E::A(Some(0)) => f.write_str("]")?,
+                E::A(Some(1)) => {
+                    stack.push(E::A(Some(0)));
+                    stack.push(E::N)
+                }
+                E::A(Some(n)) => {
+                    stack.push(E::A(Some(n - 1)));
+                    stack.push(E::S(", "));
+                    stack.push(E::N)
+                }
+                E::A(None) => if let Some(Ok(Token::Break)) = iter.peek() {
+                    iter.next();
+                    f.write_str("]")?
+                } else {
+                    stack.push(E::A(None));
+                    stack.push(E::X(", "));
+                    stack.push(E::N)
+                }
+                E::M(Some(0)) => f.write_str("}")?,
+                E::M(Some(1)) => {
+                    stack.push(E::M(Some(0)));
+                    stack.push(E::N);
+                    stack.push(E::S(": "));
+                    stack.push(E::N)
+                }
+                E::M(Some(n)) => {
+                    stack.push(E::M(Some(n - 1)));
+                    stack.push(E::S(", "));
+                    stack.push(E::N);
+                    stack.push(E::S(": "));
+                    stack.push(E::N)
+                }
+                E::M(None) => if let Some(Ok(Token::Break)) = iter.peek() {
+                    iter.next();
+                    f.write_str("}")?
+                } else {
+                    stack.push(E::M(None));
+                    stack.push(E::X(", "));
+                    stack.push(E::N);
+                    stack.push(E::S(": "));
+                    stack.push(E::N)
+                }
+                E::B => if let Some(Ok(Token::Break)) = iter.peek() {
+                    iter.next();
+                    f.write_str(">")?
+                } else {
+                    stack.push(E::B);
+                    stack.push(E::X(", "));
+                    stack.push(E::N)
+                }
+                E::D => if let Some(Ok(Token::Break)) = iter.peek() {
+                    iter.next();
+                    f.write_str(">")?
+                } else {
+                    stack.push(E::D);
+                    stack.push(E::X(", "));
+                    stack.push(E::N)
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 

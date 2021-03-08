@@ -46,6 +46,12 @@ pub struct Decoder<'b> {
     pos: usize
 }
 
+impl AsRef<[u8]> for Decoder<'_> {
+    fn as_ref(&self) -> &[u8] {
+        self.buf
+    }
+}
+
 impl<'b> Decoder<'b> {
     /// Construct a `Decoder` for the given byte slice.
     pub fn new(bytes: &'b [u8]) -> Self {

@@ -89,6 +89,9 @@
 //! use minicbor::decode::{Token, Tokenizer};
 //!
 //! let input  = [0x83, 0x01, 0x9f, 0x02, 0x03, 0xff, 0x82, 0x04, 0x05];
+//!
+//! assert_eq!("[1, [2, 3], [4, 5]]", format!("{}", Tokenizer::new(&input)));
+//!
 //! let tokens = Tokenizer::new(&input).collect::<Result<Vec<Token>, _>>()?;
 //!
 //! assert_eq! { &tokens[..],
