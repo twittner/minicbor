@@ -182,7 +182,7 @@ impl<W: Write> Encoder<W> {
 
     /// Encode a CBOR tag.
     pub fn tag(&mut self, x: Tag) -> Result<&mut Self, Error<W::Error>> {
-        self.type_len(TAGGED, x.into())
+        self.type_len(TAGGED, x.numeric())
     }
 
     /// Encode a byte slice.

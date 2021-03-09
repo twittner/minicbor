@@ -107,7 +107,7 @@ impl Tag {
         }
     }
 
-    pub(crate) fn into(self) -> u64 {
+    pub(crate) fn numeric(self) -> u64 {
         match self {
             Tag::DateTime      => 0x00,
             Tag::Timestamp     => 0x01,
