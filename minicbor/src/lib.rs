@@ -114,6 +114,7 @@
 //! [serde]: https://serde.rs
 
 #![forbid(unused_imports, unused_variables)]
+#![allow(clippy::needless_lifetimes)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub mod bytes;
