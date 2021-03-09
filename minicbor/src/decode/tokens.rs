@@ -116,21 +116,35 @@ impl<'b> Tokenizer<'b> {
     }
 }
 
-/// Pretty print the sequence of [`Token`]s.
+/// Display the sequence of [`Token`]s in [diagnostic notation][1].
 ///
-/// The following syntax is used:
+/// Quick syntax summary:
 ///
-/// - (Indefinite) maps are enclosed in curly braces (`{`, `}`).
-/// - (Indefinite) arrays are enclosed in brackets (`[`, `]`).
-/// - Indefinite bytes and strings are enclosed in angle brackets (`<`, `>`)
-///   and the individual chunks are separated by commas (`,`).
-/// - Other tokens are displayed according to their `Display` implementation.
+/// - Maps are enclosed in curly braces (`{`, `}`).
+/// - Indefinite maps are enclosed in curly braces with a leading underscore
+///   (`{_`, `}`).
+/// - Arrays are enclosed in brackets (`[`, `]`).
+/// - Indefinite arrays are enclosed in brackets with a leading underscore
+///   (`[_`, `]`).
+/// - Indefinite bytes and strings are enclosed in parentheses with a leading
+///   underscore (`(_`, `)`), unless immediately followed by a BREAK in which
+///   case `''_` would be used for the bytes case and `""_` for the string case.
+/// - Tagged values are enclosed in `(` and `)` with the numeric tag value in
+///   front of the opening parenthesis.
+/// - Bytes are hex encoded and enclosed in `h'` and `'`.
+/// - Strings are enclosed in double quotes.
+/// - Simple values are shown as `simple(n)` where `n` is the numeric value.
+/// - Numbers and booleans are displayed as in Rust.
+/// - Undefined and null are shown as `undefined` and `null`.
+///
+/// [1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
 #[cfg(feature = "std")]
 impl fmt::Display for Tokenizer<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         /// Control stack element.
         enum E {
             N,               // get next token
+            T(bool),         // tag
             A(Option<u64>),  // array
             M(Option<u64>),  // map
             B,               // indefinite bytes
@@ -157,21 +171,36 @@ impl fmt::Display for Tokenizer<'_> {
                     }
                     Some(Ok(Token::BeginArray)) => {
                         stack.push(E::A(None));
-                        f.write_str("[")?
+                        f.write_str("[_ ")?
                     }
                     Some(Ok(Token::BeginMap)) => {
                         stack.push(E::M(None));
-                        f.write_str("{")?
+                        f.write_str("{_ ")?
                     }
-                    Some(Ok(Token::BeginBytes)) => {
+                    Some(Ok(Token::BeginBytes)) => if let Some(Ok(Token::Break)) = iter.peek() {
+                        iter.next();
+                        if stack.is_empty() { stack.push(E::N) }
+                        f.write_str("''_")?
+                    } else {
                         stack.push(E::B);
-                        f.write_str("<")?
+                        f.write_str("(_ ")?
                     }
-                    Some(Ok(Token::BeginString)) => {
+                    Some(Ok(Token::BeginString)) => if let Some(Ok(Token::Break)) = iter.peek() {
+                        iter.next();
+                        if stack.is_empty() { stack.push(E::N) }
+                        f.write_str("\"\"_")?
+                    } else {
                         stack.push(E::D);
-                        f.write_str("<")?
+                        f.write_str("(_ ")?
                     }
-                    Some(Ok(t))  => t.fmt(f)?,
+                    Some(Ok(Token::Tag(t))) => {
+                        stack.push(E::T(true));
+                        write!(f, "{}(", t.numeric())?
+                    }
+                    Some(Ok(t)) => {
+                        if stack.is_empty() { stack.push(E::N) }
+                        t.fmt(f)?
+                    }
                     Some(Err(e)) => {
                         write!(f, "decode error: {}", e)?;
                         return Ok(())
@@ -187,7 +216,18 @@ impl fmt::Display for Tokenizer<'_> {
                         return Ok(())
                     }
                 }
-                E::A(Some(0)) => f.write_str("]")?,
+                E::T(false) => {
+                    if stack.is_empty() { stack.push(E::N) }
+                    f.write_str(")")?
+                }
+                E::T(true) => {
+                    stack.push(E::T(false));
+                    stack.push(E::N)
+                }
+                E::A(Some(0)) => {
+                    if stack.is_empty() { stack.push(E::N) }
+                    f.write_str("]")?
+                }
                 E::A(Some(1)) => {
                     stack.push(E::A(Some(0)));
                     stack.push(E::N)
@@ -199,13 +239,17 @@ impl fmt::Display for Tokenizer<'_> {
                 }
                 E::A(None) => if let Some(Ok(Token::Break)) = iter.peek() {
                     iter.next();
+                    if stack.is_empty() { stack.push(E::N) }
                     f.write_str("]")?
                 } else {
                     stack.push(E::A(None));
                     stack.push(E::X(", "));
                     stack.push(E::N)
                 }
-                E::M(Some(0)) => f.write_str("}")?,
+                E::M(Some(0)) => {
+                    if stack.is_empty() { stack.push(E::N) }
+                    f.write_str("}")?
+                }
                 E::M(Some(1)) => {
                     stack.push(E::M(Some(0)));
                     stack.push(E::N);
@@ -221,6 +265,7 @@ impl fmt::Display for Tokenizer<'_> {
                 }
                 E::M(None) => if let Some(Ok(Token::Break)) = iter.peek() {
                     iter.next();
+                    if stack.is_empty() { stack.push(E::N) }
                     f.write_str("}")?
                 } else {
                     stack.push(E::M(None));
@@ -231,7 +276,8 @@ impl fmt::Display for Tokenizer<'_> {
                 }
                 E::B => if let Some(Ok(Token::Break)) = iter.peek() {
                     iter.next();
-                    f.write_str(">")?
+                    if stack.is_empty() { stack.push(E::N) }
+                    f.write_str(")")?
                 } else {
                     stack.push(E::B);
                     stack.push(E::X(", "));
@@ -239,7 +285,8 @@ impl fmt::Display for Tokenizer<'_> {
                 }
                 E::D => if let Some(Ok(Token::Break)) = iter.peek() {
                     iter.next();
-                    f.write_str(">")?
+                    if stack.is_empty() { stack.push(E::N) }
+                    f.write_str(")")?
                 } else {
                     stack.push(E::D);
                     stack.push(E::X(", "));
@@ -254,19 +301,20 @@ impl fmt::Display for Tokenizer<'_> {
 
 /// Pretty print a token.
 ///
-/// The following syntax is used:
+/// Since we only show a single token we can not use diagnostic notation
+/// as in the `Display` impl of [`Tokenizer`]. Instead, the following
+/// syntax is used:
 ///
-/// - Numeric values and booleans are displayed as literals, e.g.
-///   `Token::U16(12)` becomes `12`.
+/// - Numeric values and booleans are displayed as in Rust.
 /// - Text strings are displayed in double quotes.
-/// - Byte strings are displayed in angle brackets and each byte is
-///   base-16 encoded, e.g. `<01 02 ef>`.
+/// - Byte strings are displayed in single quotes prefixed with `h` and
+///   hex-encoded, e.g. `h'01 02 ef'`.
 /// - An array is displayed as `A[n]` where `n` denotes the number of elements.
 ///   The following `n` tokens are elements of this array.
 /// - A map is displayed as `M[n]` where `n` denotes the number of pairs.
 ///   The following `n` tokens are entries of this map.
-/// - Tags are displayed with `T(t)` where `t` is the [`Tag`].
-/// - Simple values are displayed as `#n` where `n` denotes the numeric
+/// - Tags are displayed with `T(t)` where `t` is the tag number.
+/// - Simple values are displayed as `simple(n)` where `n` denotes the numeric
 ///   value.
 /// - Indefinite items start with:
 ///     * `?B[` for byte strings,
@@ -275,7 +323,7 @@ impl fmt::Display for Tokenizer<'_> {
 ///     * `?M[` for maps,
 ///   and end with `]` when a `Token::Break` is encountered. All tokens
 ///   in between belong to the indefinite container.
-/// - `Token::Null` is displayed as `NULL` and `Token::Undefined` as `UNDEFINED`.
+/// - `Token::Null` is displayed as `null` and `Token::Undefined` as `undefined`.
 impl fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -294,17 +342,17 @@ impl fmt::Display for Token<'_> {
             Token::String(n)   => write!(f, "\"{}\"", n),
             Token::Array(n)    => write!(f, "A[{}]", n),
             Token::Map(n)      => write!(f, "M[{}]", n),
-            Token::Tag(t)      => write!(f, "T({:?})", t),
-            Token::Simple(n)   => write!(f, "#{}", n),
+            Token::Tag(t)      => write!(f, "T({})", t.numeric()),
+            Token::Simple(n)   => write!(f, "simple({})", n),
             Token::Break       => f.write_str("]"),
-            Token::Null        => f.write_str("NULL"),
-            Token::Undefined   => f.write_str("UNDEFINED"),
+            Token::Null        => f.write_str("null"),
+            Token::Undefined   => f.write_str("undefined"),
             Token::BeginBytes  => f.write_str("?B["),
             Token::BeginString => f.write_str("?S["),
             Token::BeginArray  => f.write_str("?A["),
             Token::BeginMap    => f.write_str("?M["),
             Token::Bytes(b)    => {
-                f.write_str("<")?;
+                f.write_str("h'")?;
                 let mut i = b.len();
                 for x in *b {
                     if i > 1 {
@@ -314,7 +362,7 @@ impl fmt::Display for Token<'_> {
                     }
                     i -= 1;
                 }
-                f.write_str(">")
+                f.write_str("'")
             }
         }
     }
