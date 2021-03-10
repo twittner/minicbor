@@ -134,7 +134,8 @@ impl<'b> Tokenizer<'b> {
 /// - Bytes are hex encoded and enclosed in `h'` and `'`.
 /// - Strings are enclosed in double quotes.
 /// - Simple values are shown as `simple(n)` where `n` is the numeric value.
-/// - Numbers and booleans are displayed as in Rust.
+/// - Numbers and booleans are displayed as in Rust (floats always use scientific
+///   notation).
 /// - Undefined and null are shown as `undefined` and `null`.
 ///
 /// [1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
@@ -144,7 +145,7 @@ impl fmt::Display for Tokenizer<'_> {
         /// Control stack element.
         enum E {
             N,               // get next token
-            T(bool),         // tag
+            T,               // tag
             A(Option<u64>),  // array
             M(Option<u64>),  // map
             B,               // indefinite bytes
@@ -156,141 +157,123 @@ impl fmt::Display for Tokenizer<'_> {
         let mut iter = Tokenizer::from(self.decoder.clone()).peekable();
         let mut stack = Vec::new();
 
-        stack.push(E::N);
-
-        while let Some(elt) = stack.pop() {
-            match elt {
-                E::N => match iter.next() {
-                    Some(Ok(Token::Array(n))) => {
-                        stack.push(E::A(Some(n)));
-                        f.write_str("[")?
+        while iter.peek().is_some() {
+            stack.push(E::N);
+            while let Some(elt) = stack.pop() {
+                match elt {
+                    E::N => match iter.next() {
+                        Some(Ok(Token::Array(n))) => {
+                            stack.push(E::A(Some(n)));
+                            f.write_str("[")?
+                        }
+                        Some(Ok(Token::Map(n))) => {
+                            stack.push(E::M(Some(n)));
+                            f.write_str("{")?
+                        }
+                        Some(Ok(Token::BeginArray)) => {
+                            stack.push(E::A(None));
+                            f.write_str("[_ ")?
+                        }
+                        Some(Ok(Token::BeginMap)) => {
+                            stack.push(E::M(None));
+                            f.write_str("{_ ")?
+                        }
+                        Some(Ok(Token::BeginBytes)) => if let Some(Ok(Token::Break)) = iter.peek() {
+                            iter.next();
+                            f.write_str("''_")?
+                        } else {
+                            stack.push(E::B);
+                            f.write_str("(_ ")?
+                        }
+                        Some(Ok(Token::BeginString)) => if let Some(Ok(Token::Break)) = iter.peek() {
+                            iter.next();
+                            f.write_str("\"\"_")?
+                        } else {
+                            stack.push(E::D);
+                            f.write_str("(_ ")?
+                        }
+                        Some(Ok(Token::Tag(t))) => {
+                            stack.push(E::T);
+                            write!(f, "{}(", t.numeric())?
+                        }
+                        Some(Ok(t))  => t.fmt(f)?,
+                        Some(Err(e)) => {
+                            write!(f, "decode error: {}", e)?;
+                            return Ok(())
+                        }
+                        None => continue
                     }
-                    Some(Ok(Token::Map(n))) => {
-                        stack.push(E::M(Some(n)));
-                        f.write_str("{")?
+                    E::S(s) => f.write_str(s)?,
+                    E::X(s) => match iter.peek() {
+                        Some(Ok(Token::Break)) | None => continue,
+                        Some(Ok(_))  => f.write_str(s)?,
+                        Some(Err(e)) => {
+                            write!(f, "decode error: {}", e)?;
+                            return Ok(())
+                        }
                     }
-                    Some(Ok(Token::BeginArray)) => {
-                        stack.push(E::A(None));
-                        f.write_str("[_ ")?
+                    E::T => {
+                        stack.push(E::S(")"));
+                        stack.push(E::N)
                     }
-                    Some(Ok(Token::BeginMap)) => {
-                        stack.push(E::M(None));
-                        f.write_str("{_ ")?
+                    E::A(Some(0)) => f.write_str("]")?,
+                    E::A(Some(1)) => {
+                        stack.push(E::A(Some(0)));
+                        stack.push(E::N)
                     }
-                    Some(Ok(Token::BeginBytes)) => if let Some(Ok(Token::Break)) = iter.peek() {
+                    E::A(Some(n)) => {
+                        stack.push(E::A(Some(n - 1)));
+                        stack.push(E::S(", "));
+                        stack.push(E::N)
+                    }
+                    E::A(None) => if let Some(Ok(Token::Break)) = iter.peek() {
                         iter.next();
-                        if stack.is_empty() { stack.push(E::N) }
-                        f.write_str("''_")?
+                        f.write_str("]")?
+                    } else {
+                        stack.push(E::A(None));
+                        stack.push(E::X(", "));
+                        stack.push(E::N)
+                    }
+                    E::M(Some(0)) => f.write_str("}")?,
+                    E::M(Some(1)) => {
+                        stack.push(E::M(Some(0)));
+                        stack.push(E::N);
+                        stack.push(E::S(": "));
+                        stack.push(E::N)
+                    }
+                    E::M(Some(n)) => {
+                        stack.push(E::M(Some(n - 1)));
+                        stack.push(E::S(", "));
+                        stack.push(E::N);
+                        stack.push(E::S(": "));
+                        stack.push(E::N)
+                    }
+                    E::M(None) => if let Some(Ok(Token::Break)) = iter.peek() {
+                        iter.next();
+                        f.write_str("}")?
+                    } else {
+                        stack.push(E::M(None));
+                        stack.push(E::X(", "));
+                        stack.push(E::N);
+                        stack.push(E::S(": "));
+                        stack.push(E::N)
+                    }
+                    E::B => if let Some(Ok(Token::Break)) = iter.peek() {
+                        iter.next();
+                        f.write_str(")")?
                     } else {
                         stack.push(E::B);
-                        f.write_str("(_ ")?
+                        stack.push(E::X(", "));
+                        stack.push(E::N)
                     }
-                    Some(Ok(Token::BeginString)) => if let Some(Ok(Token::Break)) = iter.peek() {
+                    E::D => if let Some(Ok(Token::Break)) = iter.peek() {
                         iter.next();
-                        if stack.is_empty() { stack.push(E::N) }
-                        f.write_str("\"\"_")?
+                        f.write_str(")")?
                     } else {
                         stack.push(E::D);
-                        f.write_str("(_ ")?
+                        stack.push(E::X(", "));
+                        stack.push(E::N)
                     }
-                    Some(Ok(Token::Tag(t))) => {
-                        stack.push(E::T(true));
-                        write!(f, "{}(", t.numeric())?
-                    }
-                    Some(Ok(t)) => {
-                        if stack.is_empty() { stack.push(E::N) }
-                        t.fmt(f)?
-                    }
-                    Some(Err(e)) => {
-                        write!(f, "decode error: {}", e)?;
-                        return Ok(())
-                    }
-                    None => continue
-                }
-                E::S(s) => f.write_str(s)?,
-                E::X(s) => match iter.peek() {
-                    Some(Ok(Token::Break)) | None => continue,
-                    Some(Ok(_))  => f.write_str(s)?,
-                    Some(Err(e)) => {
-                        write!(f, "decode error: {}", e)?;
-                        return Ok(())
-                    }
-                }
-                E::T(false) => {
-                    if stack.is_empty() { stack.push(E::N) }
-                    f.write_str(")")?
-                }
-                E::T(true) => {
-                    stack.push(E::T(false));
-                    stack.push(E::N)
-                }
-                E::A(Some(0)) => {
-                    if stack.is_empty() { stack.push(E::N) }
-                    f.write_str("]")?
-                }
-                E::A(Some(1)) => {
-                    stack.push(E::A(Some(0)));
-                    stack.push(E::N)
-                }
-                E::A(Some(n)) => {
-                    stack.push(E::A(Some(n - 1)));
-                    stack.push(E::S(", "));
-                    stack.push(E::N)
-                }
-                E::A(None) => if let Some(Ok(Token::Break)) = iter.peek() {
-                    iter.next();
-                    if stack.is_empty() { stack.push(E::N) }
-                    f.write_str("]")?
-                } else {
-                    stack.push(E::A(None));
-                    stack.push(E::X(", "));
-                    stack.push(E::N)
-                }
-                E::M(Some(0)) => {
-                    if stack.is_empty() { stack.push(E::N) }
-                    f.write_str("}")?
-                }
-                E::M(Some(1)) => {
-                    stack.push(E::M(Some(0)));
-                    stack.push(E::N);
-                    stack.push(E::S(": "));
-                    stack.push(E::N)
-                }
-                E::M(Some(n)) => {
-                    stack.push(E::M(Some(n - 1)));
-                    stack.push(E::S(", "));
-                    stack.push(E::N);
-                    stack.push(E::S(": "));
-                    stack.push(E::N)
-                }
-                E::M(None) => if let Some(Ok(Token::Break)) = iter.peek() {
-                    iter.next();
-                    if stack.is_empty() { stack.push(E::N) }
-                    f.write_str("}")?
-                } else {
-                    stack.push(E::M(None));
-                    stack.push(E::X(", "));
-                    stack.push(E::N);
-                    stack.push(E::S(": "));
-                    stack.push(E::N)
-                }
-                E::B => if let Some(Ok(Token::Break)) = iter.peek() {
-                    iter.next();
-                    if stack.is_empty() { stack.push(E::N) }
-                    f.write_str(")")?
-                } else {
-                    stack.push(E::B);
-                    stack.push(E::X(", "));
-                    stack.push(E::N)
-                }
-                E::D => if let Some(Ok(Token::Break)) = iter.peek() {
-                    iter.next();
-                    if stack.is_empty() { stack.push(E::N) }
-                    f.write_str(")")?
-                } else {
-                    stack.push(E::D);
-                    stack.push(E::X(", "));
-                    stack.push(E::N)
                 }
             }
         }
@@ -305,7 +288,8 @@ impl fmt::Display for Tokenizer<'_> {
 /// as in the `Display` impl of [`Tokenizer`]. Instead, the following
 /// syntax is used:
 ///
-/// - Numeric values and booleans are displayed as in Rust.
+/// - Numeric values and booleans are displayed as in Rust. Floats are always
+///   shown in scientific notation.
 /// - Text strings are displayed in double quotes.
 /// - Byte strings are displayed in single quotes prefixed with `h` and
 ///   hex-encoded, e.g. `h'01 02 ef'`.
@@ -336,9 +320,9 @@ impl fmt::Display for Token<'_> {
             Token::I16(n)      => write!(f, "{}", n),
             Token::I32(n)      => write!(f, "{}", n),
             Token::I64(n)      => write!(f, "{}", n),
-            Token::F16(n)      => write!(f, "{}", n),
-            Token::F32(n)      => write!(f, "{}", n),
-            Token::F64(n)      => write!(f, "{}", n),
+            Token::F16(n)      => write!(f, "{:e}", n),
+            Token::F32(n)      => write!(f, "{:e}", n),
+            Token::F64(n)      => write!(f, "{:e}", n),
             Token::String(n)   => write!(f, "\"{}\"", n),
             Token::Array(n)    => write!(f, "A[{}]", n),
             Token::Map(n)      => write!(f, "M[{}]", n),
