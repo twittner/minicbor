@@ -116,29 +116,6 @@ impl<'b> Tokenizer<'b> {
     }
 }
 
-/// Display the sequence of [`Token`]s in [diagnostic notation][1].
-///
-/// Quick syntax summary:
-///
-/// - Maps are enclosed in curly braces (`{`, `}`).
-/// - Indefinite maps are enclosed in curly braces with a leading underscore
-///   (`{_`, `}`).
-/// - Arrays are enclosed in brackets (`[`, `]`).
-/// - Indefinite arrays are enclosed in brackets with a leading underscore
-///   (`[_`, `]`).
-/// - Indefinite bytes and strings are enclosed in parentheses with a leading
-///   underscore (`(_`, `)`), unless immediately followed by a BREAK in which
-///   case `''_` would be used for the bytes case and `""_` for the string case.
-/// - Tagged values are enclosed in `(` and `)` with the numeric tag value in
-///   front of the opening parenthesis.
-/// - Bytes are hex encoded and enclosed in `h'` and `'`.
-/// - Strings are enclosed in double quotes.
-/// - Simple values are shown as `simple(n)` where `n` is the numeric value.
-/// - Numbers and booleans are displayed as in Rust (floats always use scientific
-///   notation).
-/// - Undefined and null are shown as `undefined` and `null`.
-///
-/// [1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
 #[cfg(feature = "std")]
 impl fmt::Display for Tokenizer<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

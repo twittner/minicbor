@@ -168,10 +168,33 @@ where
     Ok(e.into_inner())
 }
 
-/// Display the given CBOR bytes.
+/// Display the given CBOR bytes in [diagnostic notation][1].
 ///
-/// *Requires feature* `"std"`.
-#[cfg(feature = "std")]
+/// *Requires features* `"std"` and `"half"`.
+///
+/// Quick syntax summary:
+///
+/// - Maps are enclosed in curly braces: `{` and `}`.
+/// - Arrays are enclosed in brackets: `[` and `]`.
+/// - Indefinite maps start with `{_` instead of `{`.
+/// - Indefinite arrays start with `[_` instead of `[`.
+/// - Bytes are hex encoded and enclosed in `h'` and `'`.
+/// - Strings are enclosed in double quotes.
+/// - Numbers and booleans are displayed as in Rust but floats are always
+///   shown in scientific notation (this differs slightly from the RFC
+///   format).
+/// - Indefinite bytes are enclosed in `(_` and `)` except for the empty
+///   sequence which is shown as `''_`.
+/// - Indefinite strings are enclosed in `(_` and `)` except for the empty
+///   sequence which is shown as `""_`.
+/// - Tagged values are enclosed in `t(` and `)` where `t` is the numeric
+///   tag value.
+/// - Simple values are shown as `simple(n)` where `n` is the numeric
+///   simple value.
+/// - Undefined and null are shown as `undefined` and `null`.
+///
+/// [1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
+#[cfg(all(feature = "std", feature = "half"))]
 pub fn display<'b>(cbor: &'b [u8]) -> impl std::fmt::Display + 'b {
     decode::Tokenizer::new(cbor)
 }
