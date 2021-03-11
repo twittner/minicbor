@@ -11,11 +11,11 @@ generically as a mere sequence of tokens.
 
 Add a function `display` which displays CBOR bytes in [diagnostic notation][1].
 
-[1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
-
 # 0.3.0 (minicbor-io)
 
 Depend on `minicbor-0.8.0`.
+
+[1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
 
 ------------------------------------------------------------------------------------------
 # 0.7.2 (minicbor)
