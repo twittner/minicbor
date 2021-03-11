@@ -1,4 +1,23 @@
 ------------------------------------------------------------------------------------------
+# 0.8.0 (minicbor)
+
+Change `data::Type` to distinguish between indefinite arrays, maps, bytes and strings
+and regular ones by introducing constructors such as `Type::ArrayIndef`.
+*If `data::Type` is used directly, then this is a breaking change* because previously,
+indefinite types have been part of the regular constructors.
+
+Add new types `decode::Token` and `decode::Tokenizer` to allow decoding CBOR bytes
+generically as a mere sequence of tokens.
+
+Add a function `display` which displays CBOR bytes in [diagnostic notation][1].
+
+[1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
+
+# 0.3.0 (minicbor-io)
+
+Depend on `minicbor-0.8.0`.
+
+------------------------------------------------------------------------------------------
 # 0.7.2 (minicbor)
 
 Bugfix: `Type::read` used `0xc9` instead of `0xc0` when reading `Type::Tag`.
