@@ -175,7 +175,7 @@ impl fmt::Display for Tokenizer<'_> {
                         }
                         Some(Ok(t))  => t.fmt(f)?,
                         Some(Err(e)) => {
-                            write!(f, "decode error: {}", e)?;
+                            write!(f, " !!! decoding error: {}", e)?;
                             return Ok(())
                         }
                         None => continue
@@ -185,7 +185,7 @@ impl fmt::Display for Tokenizer<'_> {
                         Some(Ok(Token::Break)) | None => continue,
                         Some(Ok(_))  => f.write_str(s)?,
                         Some(Err(e)) => {
-                            write!(f, "decode error: {}", e)?;
+                            write!(f, " !!! decoding error: {}", e)?;
                             return Ok(())
                         }
                     }

@@ -26,7 +26,7 @@ fn main() {
                 }
             } else {
                 eprintln!("-f | --file requires a path as argument.");
-                process::exit(1);
+                process::exit(1)
             }
         Some("-") | None => {
             let mut v = Vec::new();
