@@ -1,4 +1,4 @@
-//! Generic CBOR tokenisation.
+//! Generic CBOR tokenization.
 
 use core::fmt;
 use crate::Decoder;

@@ -17,7 +17,7 @@
 //! which returns a [`data::Type`] that can represent every possible CBOR type
 //! and decoding can thus proceed based on this information.
 //!
-//! Finally, it is also possible to just tokenise the input bytes using a
+//! Finally, it is also possible to just tokenize the input bytes using a
 //! [`Tokenizer`](decode::Tokenizer), i.e. an `Iterator` over CBOR
 //! [`Token`](decode::Token)s.
 //!
@@ -82,7 +82,7 @@
 //! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```
 //!
-//! # Example: tokenisation
+//! # Example: tokenization
 //!
 //! ```
 //! use minicbor::display;
