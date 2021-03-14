@@ -10,16 +10,14 @@
 //! to [serde]'s `Serialize` and `Deserialize` traits but do not abstract
 //! over the encoder/decoder.
 //!
-//! As mentioned, encoding and decoding proceeds in a type-directed way, i.e.
-//! by calling methods for expected data item types, e.g. [`Decoder::u32`]
-//! or [`Encoder::str`]. In addition there is support for data type
-//! inspection. The `Decoder` can be queried for the current data type
-//! which returns a [`data::Type`] that can represent every possible CBOR type
-//! and decoding can thus proceed based on this information.
-//!
-//! Finally, it is also possible to just tokenize the input bytes using a
-//! [`Tokenizer`](decode::Tokenizer), i.e. an `Iterator` over CBOR
-//! [`Token`](decode::Token)s.
+//! Encoding and decoding proceeds in a type-directed way, i.e.  by calling
+//! methods for expected data item types, e.g. [`Decoder::u32`] or
+//! [`Encoder::str`]. In addition there is support for data type inspection.
+//! The `Decoder` can be queried for the current data type which returns a
+//! [`data::Type`] that can represent every possible CBOR type and decoding
+//! can thus proceed based on this information. It is also possible to just
+//! tokenize the input bytes using a [`Tokenizer`](decode::Tokenizer), i.e.
+//! an `Iterator` over CBOR [`Token`](decode::Token)s.
 //!
 //! Optionally, `Encode` and `Decode` can be derived for structs and enums
 //! using the respective derive macros (*requires feature* `"derive"`).
@@ -192,6 +190,9 @@ where
 /// - Simple values are shown as `simple(n)` where `n` is the numeric
 ///   simple value.
 /// - Undefined and null are shown as `undefined` and `null`.
+///
+/// No error is produced should decoding fail, the error message
+/// becomes part of the display.
 ///
 /// [1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
 #[cfg(all(feature = "std", feature = "half"))]

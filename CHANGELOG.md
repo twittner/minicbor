@@ -2,8 +2,7 @@
 
 Change `data::Type` to distinguish between indefinite arrays, maps, bytes and strings,
 and regular ones by introducing constructors such as `Type::ArrayIndef`.
-*If `data::Type` is used directly, then this is a breaking change* because previously,
-indefinite types have been part of the regular constructors.
+*This is potentially a breaking change for code that uses `data::Type`*.
 
 Add new types `decode::Token` and `decode::Tokenizer` to allow decoding CBOR bytes
 generically as a mere sequence of tokens.
