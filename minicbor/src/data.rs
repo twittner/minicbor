@@ -19,9 +19,13 @@ pub enum Type {
     F64,
     Simple,
     Bytes,
+    BytesIndef,
     String,
+    StringIndef,
     Array,
+    ArrayIndef,
     Map,
+    MapIndef,
     Tag,
     Break,
     Unknown(u8)
@@ -38,10 +42,14 @@ impl Type {
             0x39                 => Type::I16,
             0x3a                 => Type::I32,
             0x3b                 => Type::I64,
-            0x40 ..= 0x5b | 0x5f => Type::Bytes,
-            0x60 ..= 0x7b | 0x7f => Type::String,
-            0x80 ..= 0x9b | 0x9f => Type::Array,
-            0xa0 ..= 0xbb | 0xbf => Type::Map,
+            0x40 ..= 0x5b        => Type::Bytes,
+            0x5f                 => Type::BytesIndef,
+            0x60 ..= 0x7b        => Type::String,
+            0x7f                 => Type::StringIndef,
+            0x80 ..= 0x9b        => Type::Array,
+            0x9f                 => Type::ArrayIndef,
+            0xa0 ..= 0xbb        => Type::Map,
+            0xbf                 => Type::MapIndef,
             0xc0 ..= 0xdb        => Type::Tag,
             0xe0 ..= 0xf3 | 0xf8 => Type::Simple,
             0xf4 | 0xf5          => Type::Bool,
@@ -99,7 +107,7 @@ impl Tag {
         }
     }
 
-    pub(crate) fn into(self) -> u64 {
+    pub(crate) fn numeric(self) -> u64 {
         match self {
             Tag::DateTime      => 0x00,
             Tag::Timestamp     => 0x01,
