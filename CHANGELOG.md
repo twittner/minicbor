@@ -1,3 +1,15 @@
+# 0.3.1 (minicbor-io)
+
+Depend on `minicbor-0.8.1`.
+
+# 0.8.1 (minicbor)
+
+Depend on `minicbor-derive-0.6.3`.
+
+# 0.6.3 (minicbor-derive)
+
+Improve macro hygiene.
+
 # 0.8.0 (minicbor)
 
 Change `data::Type` to distinguish between indefinite arrays, maps, bytes and strings,

@@ -571,7 +571,11 @@ fn display() {
         (r#"-100"#,                         "3863"),
         (r#"-1000"#,                        "3903e7"),
         (r#"0e0"#,                          "f90000"),
-        (r#"0e0"#,                          "f98000"),
+        // https://github.com/rust-lang/rust/pull/78618 has changed the format
+        // of f32/f64 to keep the minus sign for -0. This is currently in
+        // nightly, but not yet in stable, so we temporarily disable the
+        // following test. TODO: Enable the test again.
+        // (r#"-0e0"#,                          "f98000"),
         (r#"1e0"#,                          "f93c00"),
         (r#"1.1e0"#,                        "fb3ff199999999999a"),
         (r#"1.5e0"#,                        "f93e00"),
