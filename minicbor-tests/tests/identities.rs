@@ -134,6 +134,17 @@ fn byte_slice() {
 }
 
 #[test]
+fn byte_array() {
+    use minicbor::bytes::ByteArray;
+
+    let arg = ByteArray::from([1,2,3,4,5,6,7,8]);
+    let vec = minicbor::to_vec(&arg).unwrap();
+    assert_eq!(Some(Type::Bytes), Decoder::new(&vec).datatype().ok());
+    let val: ByteArray<8> = minicbor::decode(&vec).unwrap();
+    assert_eq!(arg, val)
+}
+
+#[test]
 fn byte_vec() {
     use minicbor::bytes::ByteVec;
 

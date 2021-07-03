@@ -22,3 +22,17 @@ struct ByteVec {
     field: Vec<u8>
 }
 
+#[derive(Encode, Decode)]
+struct ByteArray {
+    #[n(0)]
+    #[cbor(with = "minicbor::bytes")]
+    field: [u8; 64]
+}
+
+#[derive(Encode, Decode)]
+struct GenericByteArray<const N: usize> {
+    #[n(0)]
+    #[cbor(with = "minicbor::bytes")]
+    field: [u8; N]
+}
+
