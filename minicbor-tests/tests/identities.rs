@@ -109,6 +109,16 @@ fn char() {
 }
 
 #[test]
+fn option() {
+    quickcheck(identity as fn(Option<char>) -> bool)
+}
+
+#[test]
+fn result() {
+    quickcheck(identity as fn(Result<u64, String>) -> bool)
+}
+
+#[test]
 fn string() {
     quickcheck(identity as fn(String) -> bool)
 }

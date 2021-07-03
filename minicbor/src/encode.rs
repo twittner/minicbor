@@ -58,6 +58,16 @@ impl<T: Encode> Encode for Option<T> {
     }
 }
 
+impl<T: Encode, E: Encode> Encode for Result<T, E> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(2)?;
+        match self {
+            Ok(v)  => e.u32(0)?.encode(v)?.ok(),
+            Err(v) => e.u32(1)?.encode(v)?.ok()
+        }
+    }
+}
+
 #[cfg(feature = "std")]
 impl Encode for String {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
