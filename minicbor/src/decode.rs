@@ -62,6 +62,23 @@ impl<'b, T: Decode<'b>> Decode<'b> for Option<T> {
     }
 }
 
+impl<'b, T, E> Decode<'b> for Result<T, E>
+where
+    T: Decode<'b>,
+    E: Decode<'b>
+{
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        if Some(2) != d.array()? {
+            return Err(Error::Message("expected enum (2-element array)"))
+        }
+        match d.u32()? {
+            0 => T::decode(d).map(Ok),
+            1 => E::decode(d).map(Err),
+            n => Err(Error::UnknownVariant(n))
+        }
+    }
+}
+
 #[cfg(feature = "std")]
 impl<'b, T> Decode<'b> for std::collections::BinaryHeap<T>
 where
@@ -200,7 +217,7 @@ macro_rules! decode_nonzero {
         $(
             impl<'b> Decode<'b> for $t {
                 fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-                    Ok(<$t>::new(Decode::decode(d)?).ok_or(Error::Message($msg))?)
+                    <$t>::new(Decode::decode(d)?).ok_or(Error::Message($msg))
                 }
             }
         )*
