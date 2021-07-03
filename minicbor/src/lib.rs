@@ -114,6 +114,9 @@
 #![allow(clippy::needless_lifetimes)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 pub mod bytes;
 pub mod data;
 pub mod decode;
@@ -167,7 +170,7 @@ where
 
 /// Display the given CBOR bytes in [diagnostic notation][1].
 ///
-/// *Requires features* `"std"` and `"half"`.
+/// *Requires features* `"alloc"` and `"half"`.
 ///
 /// Quick syntax summary:
 ///
@@ -194,8 +197,8 @@ where
 /// becomes part of the display.
 ///
 /// [1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
-#[cfg(all(feature = "std", feature = "half"))]
-pub fn display<'b>(cbor: &'b [u8]) -> impl std::fmt::Display + 'b {
+#[cfg(all(feature = "alloc", feature = "half"))]
+pub fn display<'b>(cbor: &'b [u8]) -> impl core::fmt::Display + 'b {
     decode::Tokenizer::new(cbor)
 }
 
