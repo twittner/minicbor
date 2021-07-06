@@ -1,4 +1,5 @@
 use core::{fmt, str};
+use crate::data::Type;
 
 /// Decoding errors.
 #[non_exhaustive]
@@ -13,7 +14,7 @@ pub enum Error {
     /// A numeric value exceeds its value range.
     Overflow(u64, &'static str),
     /// An unexpected type was encountered.
-    TypeMismatch(u8, &'static str),
+    TypeMismatch(Type, &'static str),
     /// An unknown enum variant was encountered.
     UnknownVariant(u32),
     /// A value was missing at the specified index.
@@ -29,7 +30,7 @@ impl fmt::Display for Error {
             Error::InvalidChar(n)     => write!(f, "invalid char: {:#x?}", n),
             Error::Utf8(e)            => write!(f, "invalid utf-8: {}", e),
             Error::Overflow(n, m)     => write!(f, "{}: {} overflows target type", m, n),
-            Error::TypeMismatch(t, m) => write!(f, "type mismatch: {:#x?}, {}", t, m),
+            Error::TypeMismatch(t, m) => write!(f, "unexpected type: {}, {}", t, m),
             Error::UnknownVariant(n)  => write!(f, "unknown enum variant {}", n),
             Error::MissingValue(n, s) => write!(f, "missing value at index {} for {}", n, s),
             Error::Message(m)         => write!(f, "{}", m)

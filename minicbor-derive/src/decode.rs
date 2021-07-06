@@ -90,7 +90,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'__b777> for #name #typ_generics #where_clause {
-            fn decode(__d777: &mut minicbor::Decoder<'__b777>) -> Result<#name #typ_generics, minicbor::decode::Error> {
+            fn decode(__d777: &mut minicbor::Decoder<'__b777>) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #statements
                 #result
             }
@@ -194,7 +194,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'__b777> for #name #typ_generics #where_clause {
-            fn decode(__d777: &mut minicbor::Decoder<'__b777>) -> Result<#name #typ_generics, minicbor::decode::Error> {
+            fn decode(__d777: &mut minicbor::Decoder<'__b777>) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #check
                 match __d777.u32()? {
                     #(#rows)*
@@ -274,7 +274,7 @@ fn gen_statements
 
     Ok(match encoding {
         Encoding::Array => quote! {
-            #(let mut #names : Option<#types> = #inits;)*
+            #(let mut #names : core::option::Option<#types> = #inits;)*
 
             if let Some(__len777) = __d777.array()? {
                 for __i777 in 0 .. __len777 {
@@ -296,7 +296,7 @@ fn gen_statements
             }
         },
         Encoding::Map => quote! {
-            #(let mut #names : Option<#types> = #inits;)*
+            #(let mut #names : core::option::Option<#types> = #inits;)*
 
             if let Some(__len777) = __d777.map()? {
                 for _ in 0 .. __len777 {
@@ -422,7 +422,7 @@ fn make_transparent_impl
 
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'__b777> for #name #typ_generics #where_clause {
-            fn decode(__d777: &mut minicbor::Decoder<'__b777>) -> Result<#name #typ_generics, minicbor::decode::Error> {
+            fn decode(__d777: &mut minicbor::Decoder<'__b777>) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #call
             }
         }

@@ -1,5 +1,7 @@
 //! Information about CBOR data types and tags.
 
+use core::fmt;
+
 /// CBOR data types.
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum Type {
@@ -29,6 +31,39 @@ pub enum Type {
     Tag,
     Break,
     Unknown(u8)
+}
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Type::Bool        => f.write_str("bool"),
+            Type::Null        => f.write_str("null"),
+            Type::Undefined   => f.write_str("undefined"),
+            Type::U8          => f.write_str("u8"),
+            Type::U16         => f.write_str("u16"),
+            Type::U32         => f.write_str("u32"),
+            Type::U64         => f.write_str("u64"),
+            Type::I8          => f.write_str("i8"),
+            Type::I16         => f.write_str("i16"),
+            Type::I32         => f.write_str("i32"),
+            Type::I64         => f.write_str("i64"),
+            Type::F16         => f.write_str("f16"),
+            Type::F32         => f.write_str("f32"),
+            Type::F64         => f.write_str("f64"),
+            Type::Simple      => f.write_str("simple"),
+            Type::Bytes       => f.write_str("bytes"),
+            Type::BytesIndef  => f.write_str("indefinite bytes"),
+            Type::String      => f.write_str("string"),
+            Type::StringIndef => f.write_str("indefinite string"),
+            Type::Array       => f.write_str("array"),
+            Type::ArrayIndef  => f.write_str("indefinite array"),
+            Type::Map         => f.write_str("map"),
+            Type::MapIndef    => f.write_str("indefinite map"),
+            Type::Tag         => f.write_str("tag"),
+            Type::Break       => f.write_str("break"),
+            Type::Unknown(n)  => write!(f, "{:#x}", n)
+        }
+    }
 }
 
 impl Type {

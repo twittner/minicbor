@@ -82,32 +82,32 @@ impl<'b> Tokenizer<'b> {
     /// well-formed CBOR items.
     pub fn token(&mut self) -> Result<Token<'b>, Error> {
         match self.decoder.datatype()? {
-            Type::Bool        => self.decoder.bool().map(Token::Bool),
-            Type::U8          => self.decoder.u8().map(Token::U8),
-            Type::U16         => self.decoder.u16().map(Token::U16),
-            Type::U32         => self.decoder.u32().map(Token::U32),
-            Type::U64         => self.decoder.u64().map(Token::U64),
-            Type::I8          => self.decoder.i8().map(Token::I8),
-            Type::I16         => self.decoder.i16().map(Token::I16),
-            Type::I32         => self.decoder.i32().map(Token::I32),
-            Type::I64         => self.decoder.i64().map(Token::I64),
-            Type::F16         => self.decoder.f16().map(Token::F16),
-            Type::F32         => self.decoder.f32().map(Token::F32),
-            Type::F64         => self.decoder.f64().map(Token::F64),
-            Type::Bytes       => self.decoder.bytes().map(Token::Bytes),
-            Type::String      => self.decoder.str().map(Token::String),
-            Type::Tag         => self.decoder.tag().map(Token::Tag),
-            Type::Simple      => self.decoder.simple().map(Token::Simple),
-            Type::Array       => self.decoder.array().map(|n| Token::Array(n.expect("array len"))),
-            Type::Map         => self.decoder.map().map(|n| Token::Map(n.expect("map len"))),
-            Type::BytesIndef  => { self.skip_byte(); Ok(Token::BeginBytes)  }
-            Type::StringIndef => { self.skip_byte(); Ok(Token::BeginString) }
-            Type::ArrayIndef  => { self.skip_byte(); Ok(Token::BeginArray)  }
-            Type::MapIndef    => { self.skip_byte(); Ok(Token::BeginMap)    }
-            Type::Null        => { self.skip_byte(); Ok(Token::Null)        }
-            Type::Undefined   => { self.skip_byte(); Ok(Token::Undefined)   }
-            Type::Break       => { self.skip_byte(); Ok(Token::Break)       }
-            Type::Unknown(n)  => Err(Error::TypeMismatch(n, "unknown cbor type"))
+            Type::Bool         => self.decoder.bool().map(Token::Bool),
+            Type::U8           => self.decoder.u8().map(Token::U8),
+            Type::U16          => self.decoder.u16().map(Token::U16),
+            Type::U32          => self.decoder.u32().map(Token::U32),
+            Type::U64          => self.decoder.u64().map(Token::U64),
+            Type::I8           => self.decoder.i8().map(Token::I8),
+            Type::I16          => self.decoder.i16().map(Token::I16),
+            Type::I32          => self.decoder.i32().map(Token::I32),
+            Type::I64          => self.decoder.i64().map(Token::I64),
+            Type::F16          => self.decoder.f16().map(Token::F16),
+            Type::F32          => self.decoder.f32().map(Token::F32),
+            Type::F64          => self.decoder.f64().map(Token::F64),
+            Type::Bytes        => self.decoder.bytes().map(Token::Bytes),
+            Type::String       => self.decoder.str().map(Token::String),
+            Type::Tag          => self.decoder.tag().map(Token::Tag),
+            Type::Simple       => self.decoder.simple().map(Token::Simple),
+            Type::Array        => self.decoder.array().map(|n| Token::Array(n.expect("array len"))),
+            Type::Map          => self.decoder.map().map(|n| Token::Map(n.expect("map len"))),
+            Type::BytesIndef   => { self.skip_byte(); Ok(Token::BeginBytes)  }
+            Type::StringIndef  => { self.skip_byte(); Ok(Token::BeginString) }
+            Type::ArrayIndef   => { self.skip_byte(); Ok(Token::BeginArray)  }
+            Type::MapIndef     => { self.skip_byte(); Ok(Token::BeginMap)    }
+            Type::Null         => { self.skip_byte(); Ok(Token::Null)        }
+            Type::Undefined    => { self.skip_byte(); Ok(Token::Undefined)   }
+            Type::Break        => { self.skip_byte(); Ok(Token::Break)       }
+            t@Type::Unknown(_) => Err(Error::TypeMismatch(t, "unknown cbor type"))
         }
     }
 
@@ -116,7 +116,7 @@ impl<'b> Tokenizer<'b> {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl fmt::Display for Tokenizer<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         /// Control stack element.
@@ -132,7 +132,7 @@ impl fmt::Display for Tokenizer<'_> {
         }
 
         let mut iter = Tokenizer::from(self.decoder.clone()).peekable();
-        let mut stack = Vec::new();
+        let mut stack = alloc::vec::Vec::new();
 
         while iter.peek().is_some() {
             stack.push(E::N);
