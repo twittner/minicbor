@@ -116,7 +116,7 @@ impl<'b> Tokenizer<'b> {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl fmt::Display for Tokenizer<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         /// Control stack element.
@@ -132,7 +132,7 @@ impl fmt::Display for Tokenizer<'_> {
         }
 
         let mut iter = Tokenizer::from(self.decoder.clone()).peekable();
-        let mut stack = Vec::new();
+        let mut stack = alloc::vec::Vec::new();
 
         while iter.peek().is_some() {
             stack.push(E::N);
