@@ -14,7 +14,8 @@ categories    = ["encoding"]
 all-features = true
 
 [features]
-std = []
+alloc  = []
+std    = ["alloc"]
 derive = ["minicbor-derive"]
 
 [dependencies]
