@@ -1,13 +1,17 @@
 //! Attribute handling.
 
+pub mod typeparam;
 pub mod codec;
 pub mod encoding;
 pub mod idx;
 
 use std::collections::HashMap;
 use std::fmt;
+use std::hash::Hash;
+use std::iter;
 use syn::spanned::Spanned;
 
+pub use typeparam::TypeParams;
 pub use codec::CustomCodec;
 pub use encoding::Encoding;
 pub use idx::Idx;
@@ -22,7 +26,8 @@ enum Kind {
     Encoding,
     Index,
     IndexOnly,
-    Transparent
+    Transparent,
+    TypeParam
 }
 
 #[derive(Debug, Clone)]
@@ -30,7 +35,8 @@ enum Value {
     Codec(CustomCodec, proc_macro2::Span),
     Encoding(Encoding, proc_macro2::Span),
     Index(Idx, proc_macro2::Span),
-    Span(proc_macro2::Span)
+    Span(proc_macro2::Span),
+    TypeParam(TypeParams, proc_macro2::Span)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -110,23 +116,58 @@ impl Attributes {
                         attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Map, nested.span()))?
                     } else if arg.is_ident("array") {
                         attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Array, nested.span()))?
+                    } else {
+                        return Err(syn::Error::new(nested.span(), "unknown attribute"))
                     }
                 syn::NestedMeta::Meta(syn::Meta::NameValue(arg)) =>
                     if arg.path.is_ident("encode_with") {
                         if let syn::Lit::Str(path) = &arg.lit {
                             let cc = CustomCodec::Encode(syn::parse_str(&path.value())?);
                             attrs.try_insert(Kind::Codec, Value::Codec(cc, nested.span()))?
+                        } else {
+                            return Err(syn::Error::new(arg.span(), "string required"))
                         }
                     } else if arg.path.is_ident("decode_with") {
                         if let syn::Lit::Str(path) = &arg.lit {
                             let cc = CustomCodec::Decode(syn::parse_str(&path.value())?);
                             attrs.try_insert(Kind::Codec, Value::Codec(cc, nested.span()))?
+                        } else {
+                            return Err(syn::Error::new(arg.span(), "string required"))
                         }
                     } else if arg.path.is_ident("with") {
                         if let syn::Lit::Str(path) = &arg.lit {
                             let cc = CustomCodec::Module(syn::parse_str(&path.value())?);
                             attrs.try_insert(Kind::Codec, Value::Codec(cc, nested.span()))?
+                        } else {
+                            return Err(syn::Error::new(arg.span(), "string required"))
                         }
+                    } else if arg.path.is_ident("encode_bound") {
+                        if let syn::Lit::Str(path) = &arg.lit {
+                            let t: syn::TypeParam = syn::parse_str(&path.value())?;
+                            let b = TypeParams::Encode(iter::once((t.ident.clone(), t)).collect());
+                            attrs.try_insert(Kind::TypeParam, Value::TypeParam(b, nested.span()))?
+                        } else {
+                            return Err(syn::Error::new(arg.span(), "string required"))
+                        }
+                    } else if arg.path.is_ident("decode_bound") {
+                        if let syn::Lit::Str(path) = &arg.lit {
+                            let t: syn::TypeParam = syn::parse_str(&path.value())?;
+                            let b = TypeParams::Decode(iter::once((t.ident.clone(), t)).collect());
+                            attrs.try_insert(Kind::TypeParam, Value::TypeParam(b, nested.span()))?
+                        } else {
+                            return Err(syn::Error::new(arg.span(), "string required"))
+                        }
+                    } else if arg.path.is_ident("bound") {
+                        if let syn::Lit::Str(path) = &arg.lit {
+                            let t: syn::TypeParam = syn::parse_str(&path.value())?;
+                            let m = iter::once((t.ident.clone(), t)).collect::<HashMap<_, _>>();
+                            let b = TypeParams::Both { encode: m.clone(), decode: m };
+                            attrs.try_insert(Kind::TypeParam, Value::TypeParam(b, nested.span()))?
+                        } else {
+                            return Err(syn::Error::new(arg.span(), "string required"))
+                        }
+                    } else {
+                        return Err(syn::Error::new(nested.span(), "unknown attribute"))
                     }
                 syn::NestedMeta::Meta(syn::Meta::List(arg)) =>
                     if arg.path.is_ident("n") {
@@ -143,8 +184,12 @@ impl Attributes {
                         } else {
                             return Err(syn::Error::new(arg.span(), "b expects a u32 argument"))
                         }
+                    } else {
+                        return Err(syn::Error::new(nested.span(), "unknown attribute"))
                     }
-                syn::NestedMeta::Lit(_) => {}
+                syn::NestedMeta::Lit(_) => {
+                    return Err(syn::Error::new(nested.span(), "unknown attribute"))
+                }
             }
         }
         Ok(attrs)
@@ -160,6 +205,10 @@ impl Attributes {
 
     pub fn codec(&self) -> Option<&CustomCodec> {
         self.get(Kind::Codec).and_then(|v| v.codec())
+    }
+
+    pub fn type_params(&self) -> Option<&TypeParams> {
+        self.get(Kind::TypeParam).and_then(|v| v.type_params())
     }
 
     pub fn transparent(&self) -> bool {
@@ -185,29 +234,29 @@ impl Attributes {
     fn try_insert(&mut self, key: Kind, val: Value) -> syn::Result<()> {
         match self.0 {
             Level::Struct => match key {
-                Kind::Encoding | Kind::Transparent => {}
-                Kind::Codec | Kind::Index | Kind::IndexOnly => {
+                Kind::Encoding  | Kind::Transparent => {}
+                Kind::TypeParam | Kind::Codec | Kind::Index | Kind::IndexOnly => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
                 }
             }
             Level::Field => match key {
-                Kind::Codec | Kind::Index => {}
-                Kind::Encoding | Kind::IndexOnly | Kind::Transparent => {
+                Kind::TypeParam | Kind::Codec     | Kind::Index => {}
+                Kind::Encoding  | Kind::IndexOnly | Kind::Transparent => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
                 }
             }
             Level::Enum => match key {
-                Kind::Encoding | Kind::IndexOnly => {}
-                Kind::Codec | Kind::Index | Kind::Transparent => {
+                Kind::Encoding  | Kind::IndexOnly => {}
+                Kind::TypeParam | Kind::Codec | Kind::Index | Kind::Transparent => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
                 }
             }
             Level::Variant => match key {
-                Kind::Encoding | Kind::Index => {}
-                Kind::Codec | Kind::IndexOnly | Kind::Transparent => {
+                Kind::Encoding  | Kind::Index => {}
+                Kind::TypeParam | Kind::Codec | Kind::IndexOnly | Kind::Transparent => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
                 }
@@ -227,6 +276,13 @@ impl Attributes {
                     }
                     _ => return Err(syn::Error::new(s, "duplicate attribute"))
                 }
+            } else if let Some(Value::TypeParam(cb, _)) = self.get_mut(key) {
+                let s = val.span();
+                if let Value::TypeParam(p, _) = val {
+                    cb.try_merge(s, p)?;
+                    return Ok(())
+                }
+                return Err(syn::Error::new(s, "duplicate attribute"))
             } else {
                 return Err(syn::Error::new(val.span(), "duplicate attribute"))
             }
@@ -239,10 +295,11 @@ impl Attributes {
 impl Value {
     fn span(&self) -> proc_macro2::Span {
         match self {
-            Value::Codec(_, s)    => *s,
-            Value::Encoding(_, s) => *s,
-            Value::Index(_, s)    => *s,
-            Value::Span(s)        => *s
+            Value::TypeParam(_, s) => *s,
+            Value::Codec(_, s)     => *s,
+            Value::Encoding(_, s)  => *s,
+            Value::Index(_, s)     => *s,
+            Value::Span(s)         => *s
         }
     }
 
@@ -269,6 +326,14 @@ impl Value {
             None
         }
     }
+
+    fn type_params(&self) -> Option<&TypeParams> {
+        if let Value::TypeParam(t, _) = self {
+            Some(t)
+        } else {
+            None
+        }
+    }
 }
 
 fn parse_u32_arg(a: &syn::Attribute) -> syn::Result<u32> {
@@ -280,3 +345,4 @@ fn parse_int(n: &syn::LitInt) -> syn::Result<u32> {
      .parse()
      .map_err(|_| syn::Error::new(n.span(), "expected `u32` value"))
 }
+

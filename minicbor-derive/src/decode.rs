@@ -1,3 +1,4 @@
+use crate::Mode;
 use crate::{add_bound_to_type_params, collect_type_params, is_cow, is_option, is_str, is_byte_slice};
 use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
 use crate::fields::Fields;
@@ -52,7 +53,12 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         collect_type_params(&inp.generics, iter)
     };
 
-    add_bound_to_type_params(gen_decode_bound()?, inp.generics.type_params_mut(), &blacklist);
+    {
+        let bound  = gen_decode_bound()?;
+        let params = inp.generics.type_params_mut();
+        add_bound_to_type_params(bound, params, &blacklist, &fields.attrs, Mode::Decode);
+    }
+
     let g = add_lifetime(&inp.generics, lifetime);
     let (impl_generics, ..) = g.split_for_impl();
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
@@ -96,8 +102,8 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     };
 
     Ok(quote! {
-        impl #impl_generics minicbor::Decode<'__b777> for #name #typ_generics #where_clause {
-            fn decode(__d777: &mut minicbor::Decoder<'__b777>) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
+        impl #impl_generics minicbor::Decode<'bytes> for #name #typ_generics #where_clause {
+            fn decode(__d777: &mut minicbor::Decoder<'bytes>) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #statements
                 #result
             }
@@ -121,6 +127,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let variants      = Variants::try_from(data.enum_token.span(), data.variants.iter())?;
 
     let mut blacklist = HashSet::new();
+    let mut field_attrs = Vec::new();
     let mut lifetime = gen_lifetime()?;
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
@@ -182,10 +189,16 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 }
             }
         };
+        field_attrs.extend_from_slice(&fields.attrs);
         rows.push(row)
     }
 
-    add_bound_to_type_params(gen_decode_bound()?, inp.generics.type_params_mut(), &blacklist);
+    {
+        let bound  = gen_decode_bound()?;
+        let params = inp.generics.type_params_mut();
+        add_bound_to_type_params(bound, params, &blacklist, &field_attrs, Mode::Decode);
+    }
+
     let g = add_lifetime(&inp.generics, lifetime);
     let (impl_generics , ..) = g.split_for_impl();
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
@@ -201,8 +214,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     };
 
     Ok(quote! {
-        impl #impl_generics minicbor::Decode<'__b777> for #name #typ_generics #where_clause {
-            fn decode(__d777: &mut minicbor::Decoder<'__b777>) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
+        impl #impl_generics minicbor::Decode<'bytes> for #name #typ_generics #where_clause {
+            fn decode(__d777: &mut minicbor::Decoder<'bytes>) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #check
                 match __d777.u32()? {
                     #(#rows)*
@@ -346,8 +359,8 @@ fn make_transparent_impl
         };
 
     Ok(quote! {
-        impl #impl_generics minicbor::Decode<'__b777> for #name #typ_generics #where_clause {
-            fn decode(__d777: &mut minicbor::Decoder<'__b777>) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
+        impl #impl_generics minicbor::Decode<'bytes> for #name #typ_generics #where_clause {
+            fn decode(__d777: &mut minicbor::Decoder<'bytes>) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #call
             }
         }
@@ -355,5 +368,5 @@ fn make_transparent_impl
 }
 
 fn gen_decode_bound() -> syn::Result<syn::TypeParamBound> {
-    syn::parse_str("minicbor::Decode<'__b777>")
+    syn::parse_str("minicbor::Decode<'bytes>")
 }

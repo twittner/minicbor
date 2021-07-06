@@ -1,3 +1,4 @@
+use crate::Mode;
 use crate::{add_bound_to_type_params, collect_type_params, is_option};
 use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
 use crate::fields::Fields;
@@ -47,7 +48,12 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         collect_type_params(&inp.generics, iter)
     };
 
-    add_bound_to_type_params(gen_encode_bound()?, inp.generics.type_params_mut(), &blacklist);
+    {
+        let bound  = gen_encode_bound()?;
+        let params = inp.generics.type_params_mut();
+        add_bound_to_type_params(bound, params, &blacklist, &fields.attrs, Mode::Encode);
+    }
+
     let (impl_generics, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     // If transparent, just forward the encode call to the inner type.
@@ -91,6 +97,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let variants      = Variants::try_from(data.enum_token.span(), data.variants.iter())?;
 
     let mut blacklist = HashSet::new();
+    let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.span(), var.fields.iter())?;
@@ -161,10 +168,16 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 }
             }
         };
+        field_attrs.extend_from_slice(&fields.attrs);
         rows.push(row)
     }
 
-    add_bound_to_type_params(gen_encode_bound()?, inp.generics.type_params_mut(), &blacklist);
+    {
+        let bound  = gen_encode_bound()?;
+        let params = inp.generics.type_params_mut();
+        add_bound_to_type_params(bound, params, &blacklist, &field_attrs, Mode::Encode);
+    }
+
     let (impl_generics, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     let body = if rows.is_empty() {
@@ -304,6 +317,15 @@ fn encode_fields
 
     let mut statements = Vec::new();
 
+    const IS_NAME: bool = true;
+    const NO_NAME: bool = false;
+    const HAS_SELF: bool = true;
+    const NO_SELF: bool = false;
+    const IS_OPT: bool = true;
+    const NO_OPT: bool = false;
+    const HAS_GAPS: bool = true;
+    const NO_GAPS: bool = false;
+
     match encoding {
         // Under map encoding each field is encoded with its index.
         // If the field type is an `Option` and `None`, neither the
@@ -317,29 +339,29 @@ fn encode_fields
             let statement =
                 match (is_name, has_self, is_opt) {
                     // struct
-                    (true, true, true) => quote! {
+                    (IS_NAME, HAS_SELF, IS_OPT) => quote! {
                         if let Some(x) = &self.#ident {
                             __e777.u32(#idx)?;
                             #encode_fn(x, __e777)?
                         }
                     },
-                    (true, true, false) => quote! {
+                    (IS_NAME, HAS_SELF, NO_OPT) => quote! {
                         __e777.u32(#idx)?;
                         #encode_fn(&self.#ident, __e777)?;
                     },
                     // tuple struct
-                    (true, false, true) => quote! {
+                    (IS_NAME, NO_SELF, IS_OPT) => quote! {
                         if let Some(x) = #ident {
                             __e777.u32(#idx)?;
                             #encode_fn(x, __e777)?
                         }
                     },
-                    (true, false, false) => quote! {
+                    (IS_NAME, NO_SELF, NO_OPT) => quote! {
                         __e777.u32(#idx)?;
                         #encode_fn(#ident, __e777)?;
                     },
                     // enum struct
-                    (false, true, true) => {
+                    (NO_NAME, HAS_SELF, IS_OPT) => {
                         let i = syn::Index::from(*i);
                         quote! {
                             if let Some(x) = &self.#i {
@@ -348,7 +370,7 @@ fn encode_fields
                             }
                         }
                     }
-                    (false, true, false) => {
+                    (NO_NAME, HAS_SELF, NO_OPT) => {
                         let i = syn::Index::from(*i);
                         quote! {
                             __e777.u32(#idx)?;
@@ -356,13 +378,13 @@ fn encode_fields
                         }
                     }
                     // enum tuple
-                    (false, false, true) => quote! {
+                    (NO_NAME, NO_SELF, IS_OPT) => quote! {
                         if let Some(x) = #ident {
                             __e777.u32(#idx)?;
                             #encode_fn(x, __e777)?
                         }
                     },
-                    (false, false, false) => quote! {
+                    (NO_NAME, NO_SELF, NO_OPT) => quote! {
                         __e777.u32(#idx)?;
                         #encode_fn(#ident, __e777)?;
                     }
@@ -394,7 +416,7 @@ fn encode_fields
                 let statement =
                     match (is_name, has_self, is_opt, gaps > 0) {
                         // struct
-                        (true, true, true, true) => quote! {
+                        (IS_NAME, HAS_SELF, IS_OPT, HAS_GAPS) => quote! {
                             if Some(#idx) <= __max_index777 {
                                 for _ in 0 .. #gaps {
                                     __e777.null()?;
@@ -402,22 +424,22 @@ fn encode_fields
                                 #encode_fn(&self.#ident, __e777)?
                             }
                         },
-                        (true, true, true, false) => quote! {
+                        (IS_NAME, HAS_SELF, IS_OPT, NO_GAPS) => quote! {
                             if Some(#idx) <= __max_index777 {
                                 #encode_fn(&self.#ident, __e777)?
                             }
                         },
-                        (true, true, false, true) => quote! {
+                        (IS_NAME, HAS_SELF, NO_OPT, HAS_GAPS) => quote! {
                             for _ in 0 .. #gaps {
                                 __e777.null()?;
                             }
                             #encode_fn(&self.#ident, __e777)?;
                         },
-                        (true, true, false, false) => quote! {
+                        (IS_NAME, HAS_SELF, NO_OPT, NO_GAPS) => quote! {
                             #encode_fn(&self.#ident, __e777)?;
                         },
                         // enum struct
-                        (true, false, true, true) => quote! {
+                        (IS_NAME, NO_SELF, IS_OPT, HAS_GAPS) => quote! {
                             if Some(#idx) <= __max_index777 {
                                 for _ in 0 .. #gaps {
                                     __e777.null()?;
@@ -425,22 +447,22 @@ fn encode_fields
                                 #encode_fn(#ident, __e777)?
                             }
                         },
-                        (true, false, true, false) => quote! {
+                        (IS_NAME, NO_SELF, IS_OPT, NO_GAPS) => quote! {
                             if Some(#idx) <= __max_index777 {
                                 #encode_fn(#ident, __e777)?
                             }
                         },
-                        (true, false, false, true) => quote! {
+                        (IS_NAME, NO_SELF, NO_OPT, HAS_GAPS) => quote! {
                             for _ in 0 .. #gaps {
                                 __e777.null()?;
                             }
                             #encode_fn(#ident, __e777)?;
                         },
-                        (true, false, false, false) => quote! {
+                        (IS_NAME, NO_SELF, NO_OPT, NO_GAPS) => quote! {
                             #encode_fn(#ident, __e777)?;
                         },
                         // tuple struct
-                        (false, true, true, true) => {
+                        (NO_NAME, HAS_SELF, IS_OPT, HAS_GAPS) => {
                             let i = syn::Index::from(*i);
                             quote! {
                                 if Some(#idx) <= __max_index777 {
@@ -451,7 +473,7 @@ fn encode_fields
                                 }
                             }
                         }
-                        (false, true, true, false) => {
+                        (NO_NAME, HAS_SELF, IS_OPT, NO_GAPS) => {
                             let i = syn::Index::from(*i);
                             quote! {
                                 if Some(#idx) <= __max_index777 {
@@ -459,7 +481,7 @@ fn encode_fields
                                 }
                             }
                          }
-                        (false, true, false, true) => {
+                        (NO_NAME, HAS_SELF, NO_OPT, HAS_GAPS) => {
                             let i = syn::Index::from(*i);
                             quote! {
                                 for _ in 0 .. #gaps {
@@ -468,14 +490,14 @@ fn encode_fields
                                 #encode_fn(&self.#i, __e777)?;
                             }
                         }
-                        (false, true, false, false) => {
+                        (NO_NAME, HAS_SELF, NO_OPT, NO_GAPS) => {
                             let i = syn::Index::from(*i);
                             quote! {
                                 #encode_fn(&self.#i, __e777)?;
                             }
                         }
                         // enum tuple
-                        (false, false, true, true) => quote! {
+                        (NO_NAME, NO_SELF, IS_OPT, HAS_GAPS) => quote! {
                             if Some(#idx) <= __max_index777 {
                                 for _ in 0 .. #gaps {
                                     __e777.null()?;
@@ -483,18 +505,18 @@ fn encode_fields
                                 #encode_fn(#ident, __e777)?
                             }
                         },
-                        (false, false, true, false) => quote! {
+                        (NO_NAME, NO_SELF, IS_OPT, NO_GAPS) => quote! {
                             if Some(#idx) <= __max_index777 {
                                 #encode_fn(#ident, __e777)?
                             }
                         },
-                        (false, false, false, true) => quote! {
+                        (NO_NAME, NO_SELF, NO_OPT, HAS_GAPS) => quote! {
                             for _ in 0 .. #gaps {
                                 __e777.null()?;
                             }
                             #encode_fn(#ident, __e777)?;
                         },
-                        (false, false, false, false) => quote! {
+                        (NO_NAME, NO_SELF, NO_OPT, NO_GAPS) => quote! {
                             #encode_fn(#ident, __e777)?;
                         }
                     };

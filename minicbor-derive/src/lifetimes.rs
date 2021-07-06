@@ -2,11 +2,9 @@ use crate::{is_str, is_byte_slice};
 use crate::attrs::Idx;
 use std::collections::HashSet;
 
-pub const LIFETIME: &str = "'__b777";
-
-/// Generate the '__b777 lifetime.
+/// Generate the decode lifetime.
 pub fn gen_lifetime() -> syn::Result<syn::LifetimeDef> {
-    syn::parse_str(LIFETIME)
+    syn::parse_str("'bytes")
 }
 
 /// Return a modified clone of `syn::Generics` with the given lifetime
