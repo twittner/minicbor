@@ -21,6 +21,15 @@ impl<W: std::io::Write> Write for W {
 }
 
 #[cfg(not(feature = "std"))]
+impl<W: Write + ?Sized> Write for &mut W {
+    type Error = W::Error;
+
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
+        (**self).write_all(buf)
+    }
+}
+
+#[cfg(not(feature = "std"))]
 impl Write for &mut [u8] {
     type Error = EndOfSlice;
 
