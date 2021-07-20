@@ -9,11 +9,11 @@
 ## `0.9.0`
 
 - **Breaking**: The `decode::Error::TypeMismatch` constructor changed to use a `data::Type`
-  instead of a `u8` as its first parameter.
+  instead of a `u8` as its first parameter. See merge request !6 for details.
 - Added feature flag `alloc` (implied by `std`), which enables most collections types in a `no_std`
-  environment. See merge request #9 for details.
+  environment. See merge request !9 for details.
 - Added `ByteArray` to support compact encoding of `u8`-arrays, similarly to the already existing
-  `ByteSlice` and `ByteVec` types added in `minicbor-0.6.0`.
+  `ByteSlice` and `ByteVec` types added in `minicbor-0.6.0`. See merge request !10 for details.
 - Depend on `minicbor-derive-0.6.4`.
 
 ## `0.8.1`
@@ -65,7 +65,7 @@
 
 ## `0.6.4`
 
-- Improve hygiene (see merge request #7).
+- Improve hygiene (see merge request !7).
 
 ## `0.6.3`
 
