@@ -119,14 +119,14 @@ where
 }
 
 impl<T> Encode for core::marker::PhantomData<T> {
-    fn encode<W: Write>(&self, _: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        Ok(())
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(0)?.ok()
     }
 }
 
 impl Encode for () {
-    fn encode<W: Write>(&self, _: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        Ok(())
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(0)?.ok()
     }
 }
 

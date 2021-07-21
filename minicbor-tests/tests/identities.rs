@@ -114,6 +114,11 @@ fn option() {
 }
 
 #[test]
+fn option_unit() {
+    quickcheck(identity as fn(Option<()>) -> bool)
+}
+
+#[test]
 fn result() {
     quickcheck(identity as fn(Result<u64, String>) -> bool)
 }

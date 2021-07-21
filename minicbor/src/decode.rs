@@ -159,13 +159,19 @@ where
 }
 
 impl<'b, T> Decode<'b> for core::marker::PhantomData<T> {
-    fn decode(_: &mut Decoder<'b>) -> Result<Self, Error> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        if Some(0) != d.array()? {
+            return Err(Error::Message("expected phantom data, i.e. an empty array"))
+        }
         Ok(core::marker::PhantomData)
     }
 }
 
 impl<'b> Decode<'b> for () {
-    fn decode(_: &mut Decoder<'b>) -> Result<Self, Error> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        if Some(0) != d.array()? {
+            return Err(Error::Message("expected unit, i.e. an empty array"))
+        }
         Ok(())
     }
 }
