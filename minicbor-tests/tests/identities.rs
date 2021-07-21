@@ -1,5 +1,6 @@
 use minicbor::{Encode, Decode, Decoder, data::Type};
 use quickcheck::quickcheck;
+use std::marker::PhantomData;
 
 fn identity<T: Encode + Eq + for<'a> Decode<'a>>(arg: T) -> bool {
     let vec = minicbor::to_vec(&arg).unwrap();
@@ -119,8 +120,29 @@ fn option_unit() {
 }
 
 #[test]
+fn phantom_data() {
+    let p: PhantomData<fn()> = PhantomData;
+    assert!(identity(p))
+}
+
+#[test]
 fn result() {
     quickcheck(identity as fn(Result<u64, String>) -> bool)
+}
+
+#[test]
+fn result_unit_ok() {
+    quickcheck(identity as fn(Result<(), String>) -> bool)
+}
+
+#[test]
+fn result_unit_err() {
+    quickcheck(identity as fn(Result<u64, ()>) -> bool)
+}
+
+#[test]
+fn result_option() {
+    quickcheck(identity as fn(Result<Option<()>, String>) -> bool)
 }
 
 #[test]

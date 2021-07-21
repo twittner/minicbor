@@ -8,7 +8,8 @@
 
 ## `0.9.0`
 
-- **Breaking**: The `decode::Error::TypeMismatch` constructor changed to use a `data::Type`
+- ⚠️ **Breaking** ⚠️: The encoding of `()` and `PhantomData` has changed. See commit b6b1f907.
+- ⚠️ **Breaking** ⚠️: The `decode::Error::TypeMismatch` constructor changed to use a `data::Type`
   instead of a `u8` as its first parameter. See merge request !6 for details.
 - Added feature flag `alloc` (implied by `std`), which enables most collections types in a `no_std`
   environment. See merge request !9 for details.
@@ -22,7 +23,7 @@
 
 ## `0.8.0`
 
-- **Breaking**: Change `data::Type` to distinguish between indefinite arrays, maps, bytes and
+- ⚠️ **Breaking** ⚠️: Change `data::Type` to distinguish between indefinite arrays, maps, bytes and
   strings, and regular ones by introducing constructors such as `Type::ArrayIndef`.
 - Add new types `decode::Token` and `decode::Tokenizer` to allow decoding CBOR bytes
   generically as a mere sequence of tokens.
