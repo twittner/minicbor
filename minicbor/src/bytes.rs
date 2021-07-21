@@ -1,20 +1,24 @@
-//! Newtypes for `&[u8]` and `Vec<u8>`.
+//! Newtypes for `&[u8]`, `[u8;N]` and `Vec<u8>`.
 //!
-//! To support specialised encoding and decoding of byte slices and vectors,
-//! which are represented as CBOR bytes instead of arrays of `u8`s, the types
-//! `ByteSlice` and `ByteVec` (requires feature "std") are provided. These
-//! implement [`Encode`] and [`Decode`] by translating to and from CBOR bytes.
+//! To support specialised encoding and decoding of byte slices, byte arrays,
+//! and vectors which are represented as CBOR bytes instead of arrays of `u8`s,
+//! the types `ByteSlice`, `ByteArray` and `ByteVec` (requires feature "alloc")
+//! are provided. These implement [`Encode`] and [`Decode`] by translating to
+//! and from CBOR bytes.
 //!
 //! If the feature "derive" is present, specialised traits `EncodeBytes` and
 //! `DecodeBytes` are also provided. These are implemented for the
 //! aforementioned newtypes as well as for their `Option` variations and
-//! regular `&[u8]` and `Vec<u8>`. They enable the direct use of `&[u8]` and
-//! `Vec<u8>` in types deriving `Encode` and `Decode` if used with a
-//! `#[cbor(with = "minicbor::bytes")]` annotation.
+//! regular `&[u8]`, `[u8; N]` and `Vec<u8>`. They enable the direct use of
+//! `&[u8]`, `[u8; N]` and `Vec<u8>` in types deriving `Encode` and `Decode`
+//! if used with a `#[cbor(with = "minicbor::bytes")]` annotation.
 
 use crate::decode::{self, Decode, Decoder};
 use crate::encode::{self, Encode, Encoder, Write};
 use core::ops::{Deref, DerefMut};
+
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 
 /// Newtype for `[u8]`.
 ///
@@ -78,36 +82,36 @@ impl Encode for ByteSlice {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::borrow::Borrow<ByteSlice> for Vec<u8> {
+#[cfg(feature = "alloc")]
+impl core::borrow::Borrow<ByteSlice> for Vec<u8> {
     fn borrow(&self) -> &ByteSlice {
         self.as_slice().into()
     }
 }
 
-#[cfg(feature = "std")]
-impl std::borrow::BorrowMut<ByteSlice> for Vec<u8> {
+#[cfg(feature = "alloc")]
+impl core::borrow::BorrowMut<ByteSlice> for Vec<u8> {
     fn borrow_mut(&mut self) -> &mut ByteSlice {
         self.as_mut_slice().into()
     }
 }
 
-#[cfg(feature = "std")]
-impl std::borrow::Borrow<ByteSlice> for ByteVec {
+#[cfg(feature = "alloc")]
+impl core::borrow::Borrow<ByteSlice> for ByteVec {
     fn borrow(&self) -> &ByteSlice {
         self.as_slice().into()
     }
 }
 
-#[cfg(feature = "std")]
-impl std::borrow::BorrowMut<ByteSlice> for ByteVec {
+#[cfg(feature = "alloc")]
+impl core::borrow::BorrowMut<ByteSlice> for ByteVec {
     fn borrow_mut(&mut self) -> &mut ByteSlice {
         self.as_mut_slice().into()
     }
 }
 
-#[cfg(feature = "std")]
-impl ToOwned for ByteSlice {
+#[cfg(feature = "alloc")]
+impl alloc::borrow::ToOwned for ByteSlice {
     type Owned = ByteVec;
 
     fn to_owned(&self) -> Self::Owned {
@@ -115,29 +119,92 @@ impl ToOwned for ByteSlice {
     }
 }
 
+/// Newtype for `[u8; N]`.
+///
+/// Used to implement `Encode` and `Decode` which translate to
+/// CBOR bytes instead of arrays for `u8`s.
+#[repr(transparent)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
+pub struct ByteArray<const N: usize>([u8; N]);
+
+impl<const N: usize> From<[u8; N]> for ByteArray<N> {
+    fn from(a: [u8; N]) -> Self {
+        ByteArray(a)
+    }
+}
+
+impl<const N: usize> From<ByteArray<N>> for [u8; N] {
+    fn from(a: ByteArray<N>) -> Self {
+        a.0
+    }
+}
+
+impl<const N: usize> Deref for ByteArray<N> {
+    type Target = [u8; N];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<const N: usize> DerefMut for ByteArray<N> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<const N: usize> AsRef<[u8; N]> for ByteArray<N> {
+    fn as_ref(&self) -> &[u8; N] {
+        &self.0
+    }
+}
+
+impl<const N: usize> AsMut<[u8; N]> for ByteArray<N> {
+    fn as_mut(&mut self) -> &mut [u8; N] {
+        &mut self.0
+    }
+}
+
+impl<'b, const N: usize> Decode<'b> for ByteArray<N> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
+        use core::convert::TryFrom;
+        let slice = d.bytes()?;
+        let array = <[u8; N]>::try_from(slice).map_err(|_| {
+            decode::Error::Message("byte slice length does not match expected array length")
+        })?;
+        Ok(ByteArray(array))
+    }
+}
+
+impl<const N: usize> Encode for ByteArray<N> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+        e.bytes(&self.0[..])?.ok()
+    }
+}
+
 /// Newtype for `Vec<u8>`.
 ///
 /// Used to implement `Encode` and `Decode` which translate to
 /// CBOR bytes instead of arrays for `u8`s.
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct ByteVec(Vec<u8>);
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl From<Vec<u8>> for ByteVec {
     fn from(xs: Vec<u8>) -> Self {
         ByteVec(xs)
     }
 }
 
-#[cfg(feature = "std")]
-impl Into<Vec<u8>> for ByteVec {
-    fn into(self) -> Vec<u8> {
-        self.0
+#[cfg(feature = "alloc")]
+impl From<ByteVec> for Vec<u8> {
+    fn from(b: ByteVec) -> Self {
+        b.0
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl Deref for ByteVec {
     type Target = Vec<u8>;
 
@@ -146,21 +213,21 @@ impl Deref for ByteVec {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl DerefMut for ByteVec {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl Decode<'_> for ByteVec {
     fn decode(d: &mut Decoder<'_>) -> Result<Self, decode::Error> {
         d.bytes().map(|xs| xs.to_vec().into())
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl Encode for ByteVec {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
         e.bytes(self)?.ok()
@@ -202,14 +269,28 @@ impl<'a, 'b: 'a> DecodeBytes<'b> for &'a [u8] {
     }
 }
 
-#[cfg(all(feature = "std", feature = "derive"))]
+#[cfg(all(feature = "derive"))]
+impl<const N: usize> EncodeBytes for [u8; N] {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+        e.bytes(&self[..])?.ok()
+    }
+}
+
+#[cfg(all(feature = "derive"))]
+impl<'b, const N: usize> DecodeBytes<'b> for [u8; N] {
+    fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
+        ByteArray::decode(d).map(ByteArray::into)
+    }
+}
+
+#[cfg(all(feature = "alloc", feature = "derive"))]
 impl EncodeBytes for Vec<u8> {
     fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
         e.bytes(self.as_slice())?.ok()
     }
 }
 
-#[cfg(all(feature = "std", feature = "derive"))]
+#[cfg(all(feature = "alloc", feature = "derive"))]
 impl<'b> DecodeBytes<'b> for Vec<u8> {
     fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
         d.bytes().map(Vec::from)
@@ -230,14 +311,28 @@ impl<'a, 'b: 'a> DecodeBytes<'b> for &'a ByteSlice {
     }
 }
 
-#[cfg(all(feature = "std", feature = "derive"))]
+#[cfg(all(feature = "derive"))]
+impl<const N: usize> EncodeBytes for ByteArray<N> {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+        Self::encode(self, e)
+    }
+}
+
+#[cfg(all(feature = "derive"))]
+impl<'b, const N: usize> DecodeBytes<'b> for ByteArray<N> {
+    fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
+        Self::decode(d)
+    }
+}
+
+#[cfg(all(feature = "alloc", feature = "derive"))]
 impl EncodeBytes for ByteVec {
     fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
         Self::encode(self, e)
     }
 }
 
-#[cfg(all(feature = "std", feature = "derive"))]
+#[cfg(all(feature = "alloc", feature = "derive"))]
 impl<'b> DecodeBytes<'b> for ByteVec {
     fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
         Self::decode(d)

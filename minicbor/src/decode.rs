@@ -21,10 +21,10 @@ pub trait Decode<'b>: Sized {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error>;
 }
 
-#[cfg(feature = "std")]
-impl<'b, T: Decode<'b>> Decode<'b> for Box<T> {
+#[cfg(feature = "alloc")]
+impl<'b, T: Decode<'b>> Decode<'b> for alloc::boxed::Box<T> {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        T::decode(d).map(Box::new)
+        T::decode(d).map(alloc::boxed::Box::new)
     }
 }
 
@@ -34,21 +34,21 @@ impl<'a, 'b: 'a> Decode<'b> for &'a str {
     }
 }
 
-#[cfg(feature = "std")]
-impl<'b, T> Decode<'b> for std::borrow::Cow<'_, T>
+#[cfg(feature = "alloc")]
+impl<'b, T> Decode<'b> for alloc::borrow::Cow<'_, T>
 where
-    T: std::borrow::ToOwned + ?Sized,
+    T: alloc::borrow::ToOwned + ?Sized,
     T::Owned: Decode<'b>
 {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        d.decode().map(std::borrow::Cow::Owned)
+        d.decode().map(alloc::borrow::Cow::Owned)
     }
 }
 
-#[cfg(feature = "std")]
-impl<'b> Decode<'b> for String {
+#[cfg(feature = "alloc")]
+impl<'b> Decode<'b> for alloc::string::String {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        d.str().map(String::from)
+        d.str().map(alloc::string::String::from)
     }
 }
 
@@ -62,14 +62,31 @@ impl<'b, T: Decode<'b>> Decode<'b> for Option<T> {
     }
 }
 
-#[cfg(feature = "std")]
-impl<'b, T> Decode<'b> for std::collections::BinaryHeap<T>
+impl<'b, T, E> Decode<'b> for Result<T, E>
+where
+    T: Decode<'b>,
+    E: Decode<'b>
+{
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        if Some(2) != d.array()? {
+            return Err(Error::Message("expected enum (2-element array)"))
+        }
+        match d.u32()? {
+            0 => T::decode(d).map(Ok),
+            1 => E::decode(d).map(Err),
+            n => Err(Error::UnknownVariant(n))
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'b, T> Decode<'b> for alloc::collections::BinaryHeap<T>
 where
     T: Decode<'b> + Ord
 {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
         let iter: ArrayIter<T> = d.array_iter()?;
-        let mut v = std::collections::BinaryHeap::new();
+        let mut v = alloc::collections::BinaryHeap::new();
         for x in iter {
             v.push(x?)
         }
@@ -92,14 +109,14 @@ where
     }
 }
 
-#[cfg(feature = "std")]
-impl<'b, T> Decode<'b> for std::collections::BTreeSet<T>
+#[cfg(feature = "alloc")]
+impl<'b, T> Decode<'b> for alloc::collections::BTreeSet<T>
 where
     T: Decode<'b> + Ord
 {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
         let iter: ArrayIter<T> = d.array_iter()?;
-        let mut v = std::collections::BTreeSet::new();
+        let mut v = alloc::collections::BTreeSet::new();
         for x in iter {
             v.insert(x?);
         }
@@ -124,14 +141,14 @@ where
     }
 }
 
-#[cfg(feature = "std")]
-impl<'b, K, V> Decode<'b> for std::collections::BTreeMap<K, V>
+#[cfg(feature = "alloc")]
+impl<'b, K, V> Decode<'b> for alloc::collections::BTreeMap<K, V>
 where
     K: Decode<'b> + Eq + Ord,
     V: Decode<'b>
 {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        let mut m = std::collections::BTreeMap::new();
+        let mut m = alloc::collections::BTreeMap::new();
         let iter: MapIter<K, V> = d.map_iter()?;
         for x in iter {
             let (k, v) = x?;
@@ -142,13 +159,19 @@ where
 }
 
 impl<'b, T> Decode<'b> for core::marker::PhantomData<T> {
-    fn decode(_: &mut Decoder<'b>) -> Result<Self, Error> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        if Some(0) != d.array()? {
+            return Err(Error::Message("expected phantom data, i.e. an empty array"))
+        }
         Ok(core::marker::PhantomData)
     }
 }
 
 impl<'b> Decode<'b> for () {
-    fn decode(_: &mut Decoder<'b>) -> Result<Self, Error> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        if Some(0) != d.array()? {
+            return Err(Error::Message("expected unit, i.e. an empty array"))
+        }
         Ok(())
     }
 }
@@ -200,7 +223,7 @@ macro_rules! decode_nonzero {
         $(
             impl<'b> Decode<'b> for $t {
                 fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-                    Ok(<$t>::new(Decode::decode(d)?).ok_or(Error::Message($msg))?)
+                    <$t>::new(Decode::decode(d)?).ok_or(Error::Message($msg))
                 }
             }
         )*
@@ -218,7 +241,7 @@ decode_nonzero! {
     core::num::NonZeroI64, "unexpected 0 when decoding a `NonZeroI64`"
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 macro_rules! decode_sequential {
     ($($t:ty, $push:ident)*) => {
         $(
@@ -236,11 +259,11 @@ macro_rules! decode_sequential {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 decode_sequential! {
-    Vec<T>, push
-    std::collections::VecDeque<T>, push_back
-    std::collections::LinkedList<T>, push_back
+    alloc::vec::Vec<T>, push
+    alloc::collections::VecDeque<T>, push_back
+    alloc::collections::LinkedList<T>, push_back
 }
 
 macro_rules! decode_arrays {

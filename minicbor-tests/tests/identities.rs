@@ -1,5 +1,6 @@
 use minicbor::{Encode, Decode, Decoder, data::Type};
 use quickcheck::quickcheck;
+use std::marker::PhantomData;
 
 fn identity<T: Encode + Eq + for<'a> Decode<'a>>(arg: T) -> bool {
     let vec = minicbor::to_vec(&arg).unwrap();
@@ -109,6 +110,42 @@ fn char() {
 }
 
 #[test]
+fn option() {
+    quickcheck(identity as fn(Option<char>) -> bool)
+}
+
+#[test]
+fn option_unit() {
+    quickcheck(identity as fn(Option<()>) -> bool)
+}
+
+#[test]
+fn phantom_data() {
+    let p: PhantomData<fn()> = PhantomData;
+    assert!(identity(p))
+}
+
+#[test]
+fn result() {
+    quickcheck(identity as fn(Result<u64, String>) -> bool)
+}
+
+#[test]
+fn result_unit_ok() {
+    quickcheck(identity as fn(Result<(), String>) -> bool)
+}
+
+#[test]
+fn result_unit_err() {
+    quickcheck(identity as fn(Result<u64, ()>) -> bool)
+}
+
+#[test]
+fn result_option() {
+    quickcheck(identity as fn(Result<Option<()>, String>) -> bool)
+}
+
+#[test]
 fn string() {
     quickcheck(identity as fn(String) -> bool)
 }
@@ -131,6 +168,17 @@ fn byte_slice() {
     }
 
     quickcheck(property as fn(Vec<u8>) -> bool)
+}
+
+#[test]
+fn byte_array() {
+    use minicbor::bytes::ByteArray;
+
+    let arg = ByteArray::from([1,2,3,4,5,6,7,8]);
+    let vec = minicbor::to_vec(&arg).unwrap();
+    assert_eq!(Some(Type::Bytes), Decoder::new(&vec).datatype().ok());
+    let val: ByteArray<8> = minicbor::decode(&vec).unwrap();
+    assert_eq!(arg, val)
 }
 
 #[test]

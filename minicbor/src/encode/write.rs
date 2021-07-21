@@ -21,6 +21,15 @@ impl<W: std::io::Write> Write for W {
 }
 
 #[cfg(not(feature = "std"))]
+impl<W: Write + ?Sized> Write for &mut W {
+    type Error = W::Error;
+
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
+        (**self).write_all(buf)
+    }
+}
+
+#[cfg(not(feature = "std"))]
 impl Write for &mut [u8] {
     type Error = EndOfSlice;
 
@@ -32,6 +41,16 @@ impl Write for &mut [u8] {
         let (prefix, suffix) = this.split_at_mut(buf.len());
         prefix.copy_from_slice(buf);
         *self = suffix;
+        Ok(())
+    }
+}
+
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+impl Write for alloc::vec::Vec<u8> {
+    type Error = core::convert::Infallible;
+
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
+        self.extend_from_slice(buf);
         Ok(())
     }
 }

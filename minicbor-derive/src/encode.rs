@@ -61,7 +61,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     Ok(quote! {
         impl #impl_generics minicbor::Encode for #name #typ_generics #where_clause {
-            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>) -> Result<(), minicbor::encode::Error<__W777::Error>>
+            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
                 __W777: minicbor::encode::Write
             {
@@ -187,7 +187,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     Ok(quote! {
         impl #impl_generics minicbor::Encode for #name #typ_generics #where_clause {
-            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>) -> Result<(), minicbor::encode::Error<__W777::Error>>
+            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
                 __W777: minicbor::encode::Write
             {
@@ -555,7 +555,7 @@ fn encode_fields
 
     match encoding {
         Encoding::Array => Ok(quote! {
-            let mut __max_index777: Option<u32> = #max_index;
+            let mut __max_index777: core::option::Option<u32> = #max_index;
 
             #(#tests)*
 
@@ -657,7 +657,7 @@ fn make_transparent_impl
 
     Ok(quote! {
         impl #impl_generics minicbor::Encode for #name #typ_generics #where_clause {
-            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>) -> Result<(), minicbor::encode::Error<__W777::Error>>
+            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
                 __W777: minicbor::encode::Write
             {

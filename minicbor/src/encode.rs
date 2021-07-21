@@ -34,8 +34,8 @@ impl<T: Encode + ?Sized> Encode for &mut T {
     }
 }
 
-#[cfg(feature = "std")]
-impl<T: Encode + ?Sized> Encode for Box<T> {
+#[cfg(feature = "alloc")]
+impl<T: Encode + ?Sized> Encode for alloc::boxed::Box<T> {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
         (**self).encode(e)
     }
@@ -58,17 +58,27 @@ impl<T: Encode> Encode for Option<T> {
     }
 }
 
-#[cfg(feature = "std")]
-impl Encode for String {
+impl<T: Encode, E: Encode> Encode for Result<T, E> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(2)?;
+        match self {
+            Ok(v)  => e.u32(0)?.encode(v)?.ok(),
+            Err(v) => e.u32(1)?.encode(v)?.ok()
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl Encode for alloc::string::String {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
         e.str(self)?.ok()
     }
 }
 
-#[cfg(feature = "std")]
-impl<T> Encode for std::borrow::Cow<'_, T>
+#[cfg(feature = "alloc")]
+impl<T> Encode for alloc::borrow::Cow<'_, T>
 where
-    T: Encode + std::borrow::ToOwned + ?Sized
+    T: Encode + alloc::borrow::ToOwned + ?Sized
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
         self.as_ref().encode(e)
@@ -92,8 +102,8 @@ where
     }
 }
 
-#[cfg(feature = "std")]
-impl<K, V> Encode for std::collections::BTreeMap<K, V>
+#[cfg(feature = "alloc")]
+impl<K, V> Encode for alloc::collections::BTreeMap<K, V>
 where
     K: Encode + Eq + Ord,
     V: Encode
@@ -109,14 +119,14 @@ where
 }
 
 impl<T> Encode for core::marker::PhantomData<T> {
-    fn encode<W: Write>(&self, _: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        Ok(())
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(0)?.ok()
     }
 }
 
 impl Encode for () {
-    fn encode<W: Write>(&self, _: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        Ok(())
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(0)?.ok()
     }
 }
 
@@ -204,14 +214,18 @@ macro_rules! encode_sequential {
 
 encode_sequential!([T]);
 
+#[cfg(feature = "alloc")]
+encode_sequential! {
+    alloc::vec::Vec<T>
+    alloc::collections::VecDeque<T>
+    alloc::collections::LinkedList<T>
+    alloc::collections::BinaryHeap<T>
+    alloc::collections::BTreeSet<T>
+}
+
 #[cfg(feature = "std")]
 encode_sequential! {
-    Vec<T>
-    std::collections::VecDeque<T>
-    std::collections::LinkedList<T>
-    std::collections::BinaryHeap<T>
     std::collections::HashSet<T>
-    std::collections::BTreeSet<T>
 }
 
 macro_rules! encode_arrays {
