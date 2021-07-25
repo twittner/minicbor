@@ -1,38 +1,57 @@
 use minicbor::{Encode, Decode};
+use minicbor::bytes::{ByteArray, ByteSlice, ByteVec};
 use std::borrow::Cow;
 
 #[derive(Encode, Decode)]
-struct ByteSlice<'a> {
+struct Slice<'a> {
     #[n(0)]
     #[cbor(with = "minicbor::bytes")]
     field: &'a [u8]
 }
 
 #[derive(Encode, Decode)]
-struct OptByteSlice<'a> {
+struct OptSlice<'a> {
     #[n(0)]
     #[cbor(with = "minicbor::bytes")]
     field: Option<&'a [u8]>
 }
 
 #[derive(Encode, Decode)]
-struct ByteVec {
+struct CowSlice<'a> {
+    #[n(0)]
+    field: Cow<'a, ByteSlice>
+}
+
+#[derive(Encode, Decode)]
+struct Vector {
     #[n(0)]
     #[cbor(with = "minicbor::bytes")]
     field: Vec<u8>
 }
 
 #[derive(Encode, Decode)]
-struct ByteArray {
+struct CowVector<'a> {
+    #[n(0)]
+    field: Cow<'a, ByteVec>
+}
+
+#[derive(Encode, Decode)]
+struct Array {
     #[n(0)]
     #[cbor(with = "minicbor::bytes")]
     field: [u8; 64]
 }
 
 #[derive(Encode, Decode)]
-struct GenericByteArray<const N: usize> {
+struct GenericArray<const N: usize> {
     #[n(0)]
     #[cbor(with = "minicbor::bytes")]
     field: [u8; N]
+}
+
+#[derive(Encode, Decode)]
+struct GenericCowArray<'a, const N: usize> {
+    #[n(0)]
+    field: Cow<'a, ByteArray<N>>
 }
 
