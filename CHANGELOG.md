@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.9.1`
+
+- Adds a few more trait impls to `ByteArray` and `ByteVec`. See commit b17fe67.
+
 ## `0.9.0`
 
 - ⚠️ **Breaking** ⚠️: The encoding of `()` and `PhantomData` has changed. See commit b6b1f907.
