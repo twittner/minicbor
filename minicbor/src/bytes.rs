@@ -110,6 +110,18 @@ impl core::borrow::BorrowMut<ByteSlice> for ByteVec {
     }
 }
 
+impl<const N: usize> core::borrow::Borrow<ByteSlice> for ByteArray<N> {
+    fn borrow(&self) -> &ByteSlice {
+        self.0[..].into()
+    }
+}
+
+impl<const N: usize> core::borrow::BorrowMut<ByteSlice> for ByteArray<N> {
+    fn borrow_mut(&mut self) -> &mut ByteSlice {
+        (&mut self.0[..]).into()
+    }
+}
+
 #[cfg(feature = "alloc")]
 impl alloc::borrow::ToOwned for ByteSlice {
     type Owned = ByteVec;
@@ -124,7 +136,7 @@ impl alloc::borrow::ToOwned for ByteSlice {
 /// Used to implement `Encode` and `Decode` which translate to
 /// CBOR bytes instead of arrays for `u8`s.
 #[repr(transparent)]
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct ByteArray<const N: usize>([u8; N]);
 
 impl<const N: usize> From<[u8; N]> for ByteArray<N> {
@@ -187,7 +199,7 @@ impl<const N: usize> Encode for ByteArray<N> {
 /// Used to implement `Encode` and `Decode` which translate to
 /// CBOR bytes instead of arrays for `u8`s.
 #[cfg(feature = "alloc")]
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct ByteVec(Vec<u8>);
 
 #[cfg(feature = "alloc")]
