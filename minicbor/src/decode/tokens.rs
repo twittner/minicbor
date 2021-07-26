@@ -98,8 +98,18 @@ impl<'b> Tokenizer<'b> {
             Type::String       => self.decoder.str().map(Token::String),
             Type::Tag          => self.decoder.tag().map(Token::Tag),
             Type::Simple       => self.decoder.simple().map(Token::Simple),
-            Type::Array        => self.decoder.array().map(|n| Token::Array(n.expect("array len"))),
-            Type::Map          => self.decoder.map().map(|n| Token::Map(n.expect("map len"))),
+            Type::Array        =>
+                if let Some(n) = self.decoder.array()? {
+                    Ok(Token::Array(n))
+                } else {
+                    Err(Error::TypeMismatch(Type::Array, "missing array length"))
+                }
+            Type::Map          =>
+                if let Some(n) = self.decoder.map()? {
+                    Ok(Token::Map(n))
+                } else {
+                    Err(Error::TypeMismatch(Type::Array, "missing map length"))
+                }
             Type::BytesIndef   => { self.skip_byte(); Ok(Token::BeginBytes)  }
             Type::StringIndef  => { self.skip_byte(); Ok(Token::BeginString) }
             Type::ArrayIndef   => { self.skip_byte(); Ok(Token::BeginArray)  }

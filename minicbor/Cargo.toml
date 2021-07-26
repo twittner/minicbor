@@ -14,9 +14,10 @@ categories    = ["encoding"]
 all-features = true
 
 [features]
-alloc  = []
-std    = ["alloc"]
-derive = ["minicbor-derive"]
+alloc    = []
+derive   = ["minicbor-derive"]
+skip-any = ["alloc"]
+std      = ["alloc"]
 
 [dependencies]
 minicbor-derive = { version = "0.6.4", path = "../minicbor-derive", optional = true }

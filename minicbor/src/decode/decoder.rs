@@ -379,11 +379,17 @@ impl<'b> Decoder<'b> {
     }
 
     /// Skip over the current CBOR value.
+    ///
+    /// **NB**: If the feature `"skip-any"` is given (which implies
+    /// `"alloc"`), arrays and maps of indefinite length can be skipped,
+    /// otherwise attempting to skip over these types will return an error.
+    /// On the other hand, `"skip-any"` requires an allocating internal
+    /// control stack.
+    #[cfg(not(feature = "skip-any"))]
     pub fn skip(&mut self) -> Result<(), Error> {
-        let mut nrounds = 1u64; // number of iterations over array and map elements
-        let mut irounds = 0u64; // number of indefinite iterations
+        let mut items = 1u64; // remaining number of CBOR items to skip
 
-        while nrounds > 0 || irounds > 0 {
+        while items > 0 {
             match self.current()? {
                 UNSIGNED ..= 0x1b => { self.u64()?; }
                 SIGNED   ..= 0x3b => { self.i64()?; }
@@ -391,30 +397,89 @@ impl<'b> Decoder<'b> {
                 TEXT     ..= 0x7f => { for _ in self.str_iter()? {} }
                 ARRAY    ..= 0x9f =>
                     if let Some(n) = self.array()? {
-                        nrounds = nrounds.saturating_add(n)
+                        items = items.saturating_add(n)
                     } else {
-                        irounds = irounds.saturating_add(1)
+                        return Err(Error::TypeMismatch(Type::ArrayIndef, "not supported"))
                     }
                 MAP ..= 0xbf =>
                     if let Some(n) = self.map()? {
-                        nrounds = nrounds.saturating_add(n.saturating_mul(2))
+                        items = items.saturating_add(n.saturating_mul(2))
                     } else {
-                        irounds = irounds.saturating_add(1)
+                        return Err(Error::TypeMismatch(Type::MapIndef, "not supported"))
                     }
                 TAGGED ..= 0xdb => {
                     self.read().and_then(|n| self.unsigned(info_of(n)))?;
-                    nrounds = nrounds.saturating_add(1)
+                    continue
                 }
                 SIMPLE ..= 0xfb => {
                     self.read().and_then(|n| self.unsigned(info_of(n)))?;
                 }
                 BREAK => {
                     self.read()?;
-                    irounds = irounds.saturating_sub(1)
+                }
+                other => return Err(Error::TypeMismatch(Type::read(other), "not supported"))
+            }
+            items = items.saturating_sub(1)
+        }
+
+        Ok(())
+    }
+
+    /// Skip over the current CBOR value.
+    ///
+    /// **NB**: If the feature `"skip-any"` is given (which implies
+    /// `"alloc"`), arrays and maps of indefinite length can be skipped,
+    /// otherwise attempting to skip over these types will return an error.
+    /// On the other hand, `"skip-any"` requires an allocating internal
+    /// control stack.
+    #[cfg(feature = "skip-any")]
+    pub fn skip(&mut self) -> Result<(), Error> {
+        enum E {
+            A(Option<u64>),
+            M(Option<u64>)
+        }
+
+        let mut stack: Vec<E> = alloc::vec::Vec::new();
+
+        loop {
+            match self.current()? {
+                UNSIGNED ..= 0x1b => { self.u64()?; }
+                SIGNED   ..= 0x3b => { self.i64()?; }
+                BYTES    ..= 0x5f => { for _ in self.bytes_iter()? {} }
+                TEXT     ..= 0x7f => { for _ in self.str_iter()? {} }
+                ARRAY    ..= 0x9f =>
+                    match self.array()? {
+                        Some(0) => {}
+                        length  => { stack.push(E::A(length)); }
+                    }
+                MAP ..= 0xbf =>
+                    match self.map()? {
+                        Some(0) => {}
+                        length  => { stack.push(E::M(length.map(|n| n.saturating_mul(2)))); }
+                    }
+                TAGGED ..= 0xdb => {
+                    self.read().and_then(|n| self.unsigned(info_of(n)))?;
+                    continue
+                }
+                SIMPLE ..= 0xfb => {
+                    self.read().and_then(|n| self.unsigned(info_of(n)))?;
+                }
+                BREAK => {
+                    self.read()?;
+                    if let Some(E::A(None) | E::M(None)) = stack.last() {
+                        stack.pop();
+                    }
                 }
                 other => return Err(Error::TypeMismatch(Type::read(other), "unknown type"))
             }
-            nrounds = nrounds.saturating_sub(1)
+            while let Some(E::A(Some(0)) | E::M(Some(0))) = stack.last() {
+                 stack.pop();
+            }
+            match stack.last_mut() {
+                Some(E::A(Some(n)) | E::M(Some(n))) => { *n -= 1 }
+                Some(E::A(None)    | E::M(None))    => {}
+                None                                => break
+            }
         }
 
         Ok(())
