@@ -27,16 +27,22 @@
 //!
 //! [1]: https://twittner.gitlab.io/minicbor/minicbor_io/
 //!
-//! # Features
+//! # Feature flags
 //!
-//! The following optional features are supported:
+//! The following feature flags are supported:
 //!
-//! - `alloc`: Enables most collection types in a `no_std` environment.
-//! - `derive`: Allows deriving `Encode` and `Decode` traits.
-//! - `skip-any`: Implies `alloc` and allows [`Decoder::skip`] to skip over any
-//!   CBOR item, otherwise indefinite arrays and maps are not supported.
-//! - `std`: Implies `alloc` and enables more functionality that depends on the
-//!   `std` crate, e.g. `std::io::Error`s.
+//! - `"alloc"`: Enables most collection types in a `no_std` environment.
+//!
+//! - `"std"`: Implies `"alloc"` and enables more functionality that depends
+//!   on the `std` crate, e.g. `std::io::Error`s.
+//!
+//! - `"derive"`: Implies `"alloc"` and allows deriving [`Encode`] and
+//!   [`Decode`] traits.
+//!
+//! - `"limited-derive"`: Allows deriving [`Encode]` and [`Decode`] traits,
+//!   but supports only a subset of types and CBOR items. In particular
+//!   using `Decoder::skip` with arrays or maps of indefinite length is not
+//!   supported.
 //!
 //! # Example: generic encoding and decoding
 //!

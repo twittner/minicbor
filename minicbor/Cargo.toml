@@ -14,17 +14,20 @@ categories    = ["encoding"]
 all-features = true
 
 [features]
-alloc    = []
-derive   = ["minicbor-derive"]
-skip-any = ["alloc"]
-std      = ["alloc"]
+alloc          = []
+std            = ["alloc"]
+derive         = ["minicbor-derive", "alloc"]
+limited-derive = ["minicbor-derive"]
+
+# internal feature flags used for testing:
+__test-partial-skip = []
 
 [dependencies]
 minicbor-derive = { version = "0.6.4", path = "../minicbor-derive", optional = true }
 half            = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
-minicbor = { path = ".", features = ["std"] }
+minicbor = { path = ".", features = ["std", "half"] }
 
 [[bin]]
 name = "cbor-display"

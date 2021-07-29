@@ -379,54 +379,7 @@ impl<'b> Decoder<'b> {
     }
 
     /// Skip over the current CBOR value.
-    ///
-    /// **NB**: If the feature `"skip-any"` is given (which implies
-    /// `"alloc"`), arrays and maps of indefinite length can be skipped,
-    /// otherwise attempting to skip over these types will return an error.
-    /// On the other hand, `"skip-any"` requires an allocating internal
-    /// control stack.
-    #[cfg(not(feature = "skip-any"))]
-    pub fn skip(&mut self) -> Result<(), Error> {
-        let mut items = 1u64; // remaining number of CBOR items to skip
-
-        while items > 0 {
-            match self.current()? {
-                UNSIGNED ..= 0x1b => { self.u64()?; }
-                SIGNED   ..= 0x3b => { self.i64()?; }
-                BYTES    ..= 0x5f => { for _ in self.bytes_iter()? {} }
-                TEXT     ..= 0x7f => { for _ in self.str_iter()? {} }
-                ARRAY    ..= 0x9f =>
-                    if let Some(n) = self.array()? {
-                        items = items.saturating_add(n)
-                    } else {
-                        return Err(Error::TypeMismatch(Type::ArrayIndef, "not supported"))
-                    }
-                MAP ..= 0xbf =>
-                    if let Some(n) = self.map()? {
-                        items = items.saturating_add(n.saturating_mul(2))
-                    } else {
-                        return Err(Error::TypeMismatch(Type::MapIndef, "not supported"))
-                    }
-                TAGGED ..= 0xdb => {
-                    self.read().and_then(|n| self.unsigned(info_of(n)))?;
-                    continue
-                }
-                SIMPLE ..= 0xfb => {
-                    self.read().and_then(|n| self.unsigned(info_of(n)))?;
-                }
-                BREAK => {
-                    self.read()?;
-                }
-                other => return Err(Error::TypeMismatch(Type::read(other), "not supported"))
-            }
-            items = items.saturating_sub(1)
-        }
-
-        Ok(())
-    }
-
-    /// Skip over the current CBOR value.
-    #[cfg(feature = "skip-any")]
+    #[cfg(all(feature = "alloc", not(feature = "__test-partial-skip")))]
     pub fn skip(&mut self) -> Result<(), Error> {
         // Unless we encounter indefinite-length arrays or maps we only need to
         // count how many more CBOR items we need to skip, initially starting
@@ -510,6 +463,50 @@ impl<'b> Decoder<'b> {
             } else {
                 items -= 1
             }
+        }
+
+        Ok(())
+    }
+
+    /// Skip over the current CBOR value.
+    ///
+    /// **NB**: `Decoder::skip` does not support arrays or maps of
+    /// indefinite-length unless the feature-flag `"alloc"` is present,
+    #[cfg(any(not(feature = "alloc"), feature = "__test-partial-skip"))]
+    pub fn skip(&mut self) -> Result<(), Error> {
+        let mut items = 1u64; // remaining number of CBOR items to skip
+
+        while items > 0 {
+            match self.current()? {
+                UNSIGNED ..= 0x1b => { self.u64()?; }
+                SIGNED   ..= 0x3b => { self.i64()?; }
+                BYTES    ..= 0x5f => { for _ in self.bytes_iter()? {} }
+                TEXT     ..= 0x7f => { for _ in self.str_iter()? {} }
+                ARRAY    ..= 0x9f =>
+                    if let Some(n) = self.array()? {
+                        items = items.saturating_add(n)
+                    } else {
+                        return Err(Error::TypeMismatch(Type::ArrayIndef, "not supported"))
+                    }
+                MAP ..= 0xbf =>
+                    if let Some(n) = self.map()? {
+                        items = items.saturating_add(n.saturating_mul(2))
+                    } else {
+                        return Err(Error::TypeMismatch(Type::MapIndef, "not supported"))
+                    }
+                TAGGED ..= 0xdb => {
+                    self.read().and_then(|n| self.unsigned(info_of(n)))?;
+                    continue
+                }
+                SIMPLE ..= 0xfb => {
+                    self.read().and_then(|n| self.unsigned(info_of(n)))?;
+                }
+                BREAK => {
+                    self.read()?;
+                }
+                other => return Err(Error::TypeMismatch(Type::read(other), "not supported"))
+            }
+            items = items.saturating_sub(1)
         }
 
         Ok(())

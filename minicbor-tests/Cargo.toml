@@ -9,7 +9,7 @@ description = "minicbor test suite"
 repository  = "https://gitlab.com/twittner/minicbor"
 
 [features]
-skip-any = ["minicbor/skip-any"]
+test-partial-skip = ["minicbor/__test-partial-skip"]
 
 [dependencies]
 minicbor = { path = "../minicbor", features = ["std", "half", "derive"] }

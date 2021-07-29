@@ -211,10 +211,10 @@ impl<'b> Decode<'b> for Cbor {
 
 impl Arbitrary for Cbor {
     fn arbitrary(g: &mut Gen) -> Self {
-        if cfg!(feature = "skip-any") {
-            gen_cbor(g, true, 3)
-        } else {
+        if cfg!(feature = "test-partial-skip") {
             gen_cbor(g, false, 3)
+        } else {
+            gen_cbor(g, true, 3)
         }
     }
 }

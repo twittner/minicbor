@@ -6,15 +6,17 @@ test-stable:
   stage: test
   image: "rust:latest"
   script:
-    - cargo test --all
     - cargo test --all --all-features
+    - cargo test --all
+    - cargo test --all --features="test-partial-skip"
 
 test-nightly:
   stage: test
   image: "rustlang/rust:nightly"
   script:
-    - cargo test --all
     - cargo test --all --all-features
+    - cargo test --all
+    - cargo test --all --features="test-partial-skip"
 
 pages:
   stage: deploy
