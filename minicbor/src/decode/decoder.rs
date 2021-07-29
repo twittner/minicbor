@@ -426,22 +426,20 @@ impl<'b> Decoder<'b> {
     }
 
     /// Skip over the current CBOR value.
-    ///
-    /// **NB**: If the feature `"skip-any"` is given (which implies
-    /// `"alloc"`), arrays and maps of indefinite length can be skipped,
-    /// otherwise attempting to skip over these types will return an error.
-    /// On the other hand, `"skip-any"` requires an allocating internal
-    /// control stack.
     #[cfg(feature = "skip-any")]
     pub fn skip(&mut self) -> Result<(), Error> {
-        enum E {
-            A(Option<u64>),
-            M(Option<u64>)
-        }
+        // Unless we encounter indefinite-length arrays or maps we only need to
+        // count how many more CBOR items we need to skip, initially starting
+        // with 1.
+        //
+        // If we do need to handle indefinite items (other than bytes or strings),
+        // we switch to using a stack of length information, starting with the
+        // remaining number of items we still need to skip over at that point.
 
-        let mut stack: Vec<E> = alloc::vec::Vec::new();
+        let mut items = 1u64;
+        let mut stack: Vec<Option<u64>> = alloc::vec::Vec::new();
 
-        loop {
+        while items > 0 || !stack.is_empty() {
             match self.current()? {
                 UNSIGNED ..= 0x1b => { self.u64()?; }
                 SIGNED   ..= 0x3b => { self.i64()?; }
@@ -450,12 +448,38 @@ impl<'b> Decoder<'b> {
                 ARRAY    ..= 0x9f =>
                     match self.array()? {
                         Some(0) => {}
-                        length  => { stack.push(E::A(length)); }
+                        Some(n) =>
+                            if items == 0 {
+                                stack.push(Some(n))
+                            } else {
+                                items = items.saturating_add(n)
+                            }
+                        None =>
+                            if items == 0 {
+                                stack.push(None)
+                            } else {
+                                stack.push(Some(items - 1)); // decrement for the current item
+                                stack.push(None);
+                                items = 0 // we are using the stack now
+                            }
                     }
                 MAP ..= 0xbf =>
                     match self.map()? {
                         Some(0) => {}
-                        length  => { stack.push(E::M(length.map(|n| n.saturating_mul(2)))); }
+                        Some(n) =>
+                            if items == 0 {
+                                stack.push(Some(n.saturating_mul(2)))
+                            } else {
+                                items = items.saturating_add(n.saturating_mul(2))
+                            }
+                        None =>
+                            if items == 0 {
+                                stack.push(None)
+                            } else {
+                                stack.push(Some(items - 1)); // decrement for the current item
+                                stack.push(None);
+                                items = 0 // we are using the stack now
+                            }
                     }
                 TAGGED ..= 0xdb => {
                     self.read().and_then(|n| self.unsigned(info_of(n)))?;
@@ -466,19 +490,25 @@ impl<'b> Decoder<'b> {
                 }
                 BREAK => {
                     self.read()?;
-                    if let Some(E::A(None) | E::M(None)) = stack.last() {
-                        stack.pop();
+                    if items == 0 {
+                        if let Some(None) = stack.last() {
+                            stack.pop();
+                        }
                     }
                 }
                 other => return Err(Error::TypeMismatch(Type::read(other), "unknown type"))
             }
-            while let Some(E::A(Some(0)) | E::M(Some(0))) = stack.last() {
-                 stack.pop();
-            }
-            match stack.last_mut() {
-                Some(E::A(Some(n)) | E::M(Some(n))) => { *n -= 1 }
-                Some(E::A(None)    | E::M(None))    => {}
-                None                                => break
+            if items == 0 {
+                while let Some(Some(0)) = stack.last() {
+                     stack.pop();
+                }
+                match stack.last_mut() {
+                    Some(Some(n)) => { *n -= 1 }
+                    Some(None)    => {}
+                    None          => break
+                }
+            } else {
+                items -= 1
             }
         }
 
