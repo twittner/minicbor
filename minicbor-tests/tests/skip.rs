@@ -211,7 +211,7 @@ impl<'b> Decode<'b> for Cbor {
 
 impl Arbitrary for Cbor {
     fn arbitrary(g: &mut Gen) -> Self {
-        if cfg!(feature = "partial-skip-support") {
+        if cfg!(feature = "__test-partial-skip-support") {
             gen_cbor(g, false, 3)
         } else {
             gen_cbor(g, true, 3)
