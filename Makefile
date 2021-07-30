@@ -1,4 +1,4 @@
-.PHONY: build test doc clean
+.PHONY: build test doc clean bench
 
 build:
 	cargo rustc -p minicbor-tests-nostd -- -C link-arg=-nostartfiles
@@ -13,6 +13,9 @@ test:
 	cargo test --all --exclude minicbor-tests-nostd
 	cargo test --all --exclude minicbor-tests-nostd --features="std,half,derive"
 	cargo test --all --exclude minicbor-tests-nostd --all-features
+
+bench:
+	cargo bench -p minicbor-tests
 
 doc:
 	cargo doc -p minicbor --features="std,half,derive"
