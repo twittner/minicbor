@@ -379,7 +379,7 @@ impl<'b> Decoder<'b> {
     }
 
     /// Skip over the current CBOR value.
-    #[cfg(all(feature = "alloc", not(feature = "__test-partial-skip")))]
+    #[cfg(all(feature = "alloc", not(feature = "partial-skip-support")))]
     pub fn skip(&mut self) -> Result<(), Error> {
         // Unless we encounter indefinite-length arrays or maps we only need to
         // count how many more CBOR items we need to skip, initially starting
@@ -470,10 +470,16 @@ impl<'b> Decoder<'b> {
 
     /// Skip over the current CBOR value.
     ///
-    /// **NB**: `Decoder::skip` does not support arrays or maps of
-    /// indefinite-length unless the feature-flag `"alloc"` is present,
-    #[cfg(any(not(feature = "alloc"), feature = "__test-partial-skip"))]
+    /// **NB**: With feature-flag `"partial-skip-support"`, `Decoder::skip`
+    /// does not support arrays or maps of indefinite-length.
+    #[cfg(feature = "partial-skip-support")]
     pub fn skip(&mut self) -> Result<(), Error> {
+        self.skip_non_indef()
+    }
+
+    /// Skip over any CBOR item as long as it is not an indefinite-length
+    /// map or array.
+    pub(crate) fn skip_non_indef(&mut self) -> Result<(), Error> {
         let mut items = 1u64; // remaining number of CBOR items to skip
 
         while items > 0 {

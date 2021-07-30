@@ -39,10 +39,15 @@
 //! - `"derive"`: Implies `"alloc"` and allows deriving [`Encode`] and
 //!   [`Decode`] traits.
 //!
-//! - `"limited-derive"`: Allows deriving [`Encode]` and [`Decode`] traits,
-//!   but supports only a subset of types and CBOR items. In particular
-//!   using `Decoder::skip` with arrays or maps of indefinite length is not
-//!   supported.
+//! - `"partial-skip-support"`: Enables the method [`Decoder::skip`] to skip
+//!   over any CBOR item other than indefinite-length arrays or maps. Full
+//!   support for skipping over any CBOR item is enabled by `"alloc"` but
+//!   without`"alloc"` or `"partial-skip-support"` `Decoder::skip` is not
+//!   available at all.
+//!
+//! - `"partial-derive-support"`: Implies `"partial-skip-support"` and allows
+//!   deriving [`Encode`] and [`Decode`] traits, but does not support
+//!   indefinite-length CBOR maps and arrays.
 //!
 //! # Example: generic encoding and decoding
 //!

@@ -11,16 +11,14 @@ keywords      = ["cbor", "encoding", "binary"]
 categories    = ["encoding"]
 
 [package.metadata.docs.rs]
-all-features = true
+features = ["std", "derive", "half"]
 
 [features]
-alloc          = []
-std            = ["alloc"]
-derive         = ["minicbor-derive", "alloc"]
-limited-derive = ["minicbor-derive"]
-
-# internal feature flags used for testing:
-__test-partial-skip = []
+alloc   = []
+std     = ["alloc"]
+derive  = ["minicbor-derive", "alloc"]
+partial-skip-support   = []
+partial-derive-support = ["minicbor-derive", "partial-skip-support"]
 
 [dependencies]
 minicbor-derive = { version = "0.6.4", path = "../minicbor-derive", optional = true }
