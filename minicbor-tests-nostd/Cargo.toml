@@ -8,3 +8,6 @@ edition = "2018"
 [dependencies]
 minicbor = { path = "../minicbor" }
 
+[profile.dev]
+panic = "abort"
+
