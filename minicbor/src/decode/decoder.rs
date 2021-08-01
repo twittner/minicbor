@@ -498,12 +498,12 @@ impl<'b> Decoder<'b> {
         )
     )]
     pub fn skip(&mut self) -> Result<(), Error> {
-        self.skip_non_indef()
+        self.limited_skip()
     }
 
     /// Skip over any CBOR item as long as it is not an indefinite-length
     /// map or array inside of a regular array or map.
-    pub(crate) fn skip_non_indef(&mut self) -> Result<(), Error> {
+    pub(crate) fn limited_skip(&mut self) -> Result<(), Error> {
         let mut nrounds = 1u64; // number of iterations over array and map elements
         let mut irounds = 0u64; // number of indefinite iterations
 

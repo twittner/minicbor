@@ -55,7 +55,7 @@ impl<'b> Decode<'b> for alloc::string::String {
 impl<'b, T: Decode<'b>> Decode<'b> for Option<T> {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
         if crate::data::Type::Null == d.datatype()? {
-            d.skip_non_indef()?;
+            d.limited_skip()?;
             return Ok(None)
         }
         T::decode(d).map(Some)
@@ -338,7 +338,7 @@ macro_rules! decode_fields {
             Some(n) => for i in 0 .. n {
                 match i {
                     $($n => $x = Some(Decode::decode($d)?),)*
-                    _    => $d.skip_non_indef()?
+                    _    => $d.limited_skip()?
                 }
             }
             None => {
@@ -346,11 +346,11 @@ macro_rules! decode_fields {
                 while $d.datatype()? != crate::data::Type::Break {
                     match i {
                         $($n => $x = Some(Decode::decode($d)?),)*
-                        _    => $d.skip_non_indef()?
+                        _    => $d.limited_skip()?
                     }
                     i += 1
                 }
-                $d.skip_non_indef()?
+                $d.limited_skip()?
             }
         }
 
