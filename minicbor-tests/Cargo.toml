@@ -8,6 +8,9 @@ edition     = "2018"
 description = "minicbor test suite"
 repository  = "https://gitlab.com/twittner/minicbor"
 
+[features]
+__test-partial-skip-support = ["minicbor/__test-partial-skip-support"]
+
 [dependencies]
 minicbor = { path = "../minicbor", features = ["std", "half", "derive"] }
 

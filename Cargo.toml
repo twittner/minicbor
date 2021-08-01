@@ -1,5 +1,14 @@
 [workspace]
-members = ["minicbor", "minicbor-derive", "minicbor-io", "minicbor-tests"]
+members = [
+    "minicbor",
+    "minicbor-derive",
+    "minicbor-io",
+    "minicbor-tests",
+    "minicbor-tests-nostd"
+]
+
+[profile.dev]
+panic = "abort"
 
 [profile.bench]
 lto = true
