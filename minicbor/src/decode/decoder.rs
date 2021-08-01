@@ -379,9 +379,137 @@ impl<'b> Decoder<'b> {
     }
 
     /// Skip over the current CBOR value.
+    #[cfg(all(feature = "alloc", not(feature = "__test-partial-skip-support")))]
     pub fn skip(&mut self) -> Result<(), Error> {
+        // Unless we encounter indefinite-length arrays or maps inside of regular
+        // maps or arrays we only need to count how many more CBOR items we need
+        // to skip (initially starting with 1) or how many more break bytes we
+        // need to expect (initially starting with 0).
+        //
+        // If we do need to handle indefinite items (other than bytes or strings),
+        // inside of regular maps or arrays, we switch to using a stack of length
+        // information, starting with the remaining number of potential breaks we
+        // are still expecting and the number of items we still need to skip over
+        // at that point.
+
         let mut nrounds = 1u64; // number of iterations over array and map elements
         let mut irounds = 0u64; // number of indefinite iterations
+        let mut stack: Vec<Option<u64>> = alloc::vec::Vec::new();
+
+        while nrounds > 0 || irounds > 0 || !stack.is_empty() {
+            match self.current()? {
+                UNSIGNED ..= 0x1b => { self.u64()?; }
+                SIGNED   ..= 0x3b => { self.i64()?; }
+                BYTES    ..= 0x5f => { for _ in self.bytes_iter()? {} }
+                TEXT     ..= 0x7f => { for _ in self.str_iter()? {} }
+                ARRAY    ..= 0x9f =>
+                    match self.array()? {
+                        Some(0) => {}
+                        Some(n) =>
+                            if nrounds == 0 && irounds == 0 {
+                                stack.push(Some(n))
+                            } else {
+                                nrounds = nrounds.saturating_add(n)
+                            }
+                        None =>
+                            if nrounds == 0 && irounds == 0 {
+                                stack.push(None)
+                            } else if nrounds < 2 {
+                                irounds = irounds.saturating_add(1)
+                            } else {
+                                for _ in 0 .. irounds {
+                                    stack.push(None)
+                                }
+                                stack.push(Some(nrounds - 1));
+                                stack.push(None);
+                                nrounds = 0;
+                                irounds = 0
+                            }
+                    }
+                MAP ..= 0xbf =>
+                    match self.map()? {
+                        Some(0) => {}
+                        Some(n) =>
+                            if nrounds == 0 && irounds == 0 {
+                                stack.push(Some(n.saturating_mul(2)))
+                            } else {
+                                nrounds = nrounds.saturating_add(n.saturating_mul(2))
+                            }
+                        None =>
+                            if nrounds == 0 && irounds == 0 {
+                                stack.push(None)
+                            } else if nrounds < 2 {
+                                irounds = irounds.saturating_add(1)
+                            } else {
+                                for _ in 0 .. irounds {
+                                    stack.push(None)
+                                }
+                                stack.push(Some(nrounds - 1));
+                                stack.push(None);
+                                nrounds = 0;
+                                irounds = 0
+                            }
+                    }
+                TAGGED ..= 0xdb => {
+                    self.read().and_then(|n| self.unsigned(info_of(n)))?;
+                    continue
+                }
+                SIMPLE ..= 0xfb => {
+                    self.read().and_then(|n| self.unsigned(info_of(n)))?;
+                }
+                BREAK => {
+                    self.read()?;
+                    if nrounds == 0 && irounds == 0 {
+                        if let Some(None) = stack.last() {
+                            stack.pop();
+                        }
+                    } else {
+                        irounds = irounds.saturating_sub(1)
+                    }
+                }
+                other => return Err(Error::TypeMismatch(Type::read(other), "unknown type"))
+            }
+            if nrounds == 0 && irounds == 0 {
+                while let Some(Some(0)) = stack.last() {
+                     stack.pop();
+                }
+                match stack.last_mut() {
+                    Some(Some(n)) => { *n -= 1 }
+                    Some(None)    => {}
+                    None          => break
+                }
+            } else {
+                nrounds = nrounds.saturating_sub(1)
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Skip over the current CBOR value.
+    ///
+    /// **NB**: With feature-flag `"partial-skip-support"`, `Decoder::skip`
+    /// does not support arrays or maps of indefinite-length inside of
+    /// regular maps or arrays.
+    #[cfg(
+        any(
+            all(not(feature = "alloc"), feature = "partial-skip-support"),
+            feature = "__test-partial-skip-support"
+        )
+    )]
+    pub fn skip(&mut self) -> Result<(), Error> {
+        self.limited_skip()
+    }
+
+    /// Skip over any CBOR item as long as it is not an indefinite-length
+    /// map or array inside of a regular array or map.
+    pub(crate) fn limited_skip(&mut self) -> Result<(), Error> {
+        let mut nrounds = 1u64; // number of iterations over array and map elements
+        let mut irounds = 0u64; // number of indefinite iterations
+
+        let error_msg =
+            "arrays and maps of indefinite length inside of \
+            regular arrays or maps require feature flag `alloc`";
 
         while nrounds > 0 || irounds > 0 {
             match self.current()? {
@@ -392,18 +520,22 @@ impl<'b> Decoder<'b> {
                 ARRAY    ..= 0x9f =>
                     if let Some(n) = self.array()? {
                         nrounds = nrounds.saturating_add(n)
-                    } else {
+                    } else if nrounds < 2 {
                         irounds = irounds.saturating_add(1)
+                    } else {
+                        return Err(Error::Message(error_msg))
                     }
                 MAP ..= 0xbf =>
                     if let Some(n) = self.map()? {
                         nrounds = nrounds.saturating_add(n.saturating_mul(2))
-                    } else {
+                    } else if nrounds < 2 {
                         irounds = irounds.saturating_add(1)
+                    } else {
+                        return Err(Error::Message(error_msg))
                     }
                 TAGGED ..= 0xdb => {
                     self.read().and_then(|n| self.unsigned(info_of(n)))?;
-                    nrounds = nrounds.saturating_add(1)
+                    continue
                 }
                 SIMPLE ..= 0xfb => {
                     self.read().and_then(|n| self.unsigned(info_of(n)))?;
@@ -412,7 +544,7 @@ impl<'b> Decoder<'b> {
                     self.read()?;
                     irounds = irounds.saturating_sub(1)
                 }
-                other => return Err(Error::TypeMismatch(Type::read(other), "unknown type"))
+                other => return Err(Error::TypeMismatch(Type::read(other), "not supported"))
             }
             nrounds = nrounds.saturating_sub(1)
         }
