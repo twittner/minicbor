@@ -1,4 +1,7 @@
-.PHONY: build test doc clean bench
+.PHONY: check build test doc clean bench
+
+check:
+	cargo check --all --exclude minicbor-tests-nostd
 
 build:
 	cargo rustc -p minicbor-tests-nostd -- -C link-arg=-nostartfiles
