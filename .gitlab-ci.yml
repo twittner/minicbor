@@ -1,24 +1,37 @@
 stages:
+  - build
   - test
   - deploy
+
+build-stable:
+  stage: build
+  image: "rust:latest"
+  script:
+    - make build
+
+build-nightly:
+  stage: build
+  image: "rustlang/rust:nightly"
+  script:
+    - make build
 
 test-stable:
   stage: test
   image: "rust:latest"
   script:
-    - cargo test --all --all-features
+    - make test
 
 test-nightly:
   stage: test
   image: "rustlang/rust:nightly"
   script:
-    - cargo test --all --all-features
+    - make test
 
 pages:
   stage: deploy
   image: "rustlang/rust:nightly"
   script:
-    - cargo doc --all-features
+    - make doc
     - mv target/doc public
   artifacts:
     paths:

@@ -1,6 +1,6 @@
 [package]
 name          = "minicbor"
-version       = "0.9.1"
+version       = "0.10.0"
 authors       = ["Toralf Wittner <tw@dtex.org>"]
 license       = "BlueOak-1.0.0"
 edition       = "2018"
@@ -11,19 +11,23 @@ keywords      = ["cbor", "encoding", "binary"]
 categories    = ["encoding"]
 
 [package.metadata.docs.rs]
-all-features = true
+features = ["std", "derive", "half"]
 
 [features]
-alloc  = []
-std    = ["alloc"]
-derive = ["minicbor-derive"]
+alloc   = []
+std     = ["alloc"]
+derive  = ["minicbor-derive", "alloc"]
+partial-skip-support   = []
+partial-derive-support = ["minicbor-derive", "partial-skip-support"]
+# Internal feature flags used for testing only:
+__test-partial-skip-support = []
 
 [dependencies]
 minicbor-derive = { version = "0.6.4", path = "../minicbor-derive", optional = true }
 half            = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
-minicbor = { path = ".", features = ["std"] }
+minicbor = { path = ".", features = ["std", "half"] }
 
 [[bin]]
 name = "cbor-display"
