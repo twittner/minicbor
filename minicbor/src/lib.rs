@@ -34,7 +34,7 @@
 //! - `"alloc"`: Enables most collection types in a `no_std` environment.
 //!
 //! - `"std"`: Implies `"alloc"` and enables more functionality that depends
-//!   on the `std` crate, e.g. `std::io::Error`s.
+//!   on the `std` crate.
 //!
 //! - `"derive"`: Implies `"alloc"` and allows deriving [`Encode`] and
 //!   [`Decode`] traits.
