@@ -6,6 +6,15 @@
 
 # minicbor
 
+## `0.10.0`
+
+- ⚠️ **Breaking** ⚠️: By default `Decoder::skip` is not available anymore. It can be enabled with
+  feature flag `"alloc"` (implied by `"std"`) or `"partial-skip-support"`. The latter variant
+  corresponds to the implementation of minicbor <= 0.9.1 but does not support skipping over
+  indefinite-length arrays or maps inside of regular arrays or maps. The variant enabled by
+  `"alloc"` supports skipping over arbitrary CBOR items. For more information see
+  [feature flags][3] and issue #9.
+
 ## `0.9.1`
 
 - Adds a few more trait impls to `ByteArray` and `ByteVec`. See commit b17fe67.
@@ -19,11 +28,11 @@
   environment. See merge request !9 for details.
 - Added `ByteArray` to support compact encoding of `u8`-arrays, similarly to the already existing
   `ByteSlice` and `ByteVec` types added in `minicbor-0.6.0`. See merge request !10 for details.
-- Depend on `minicbor-derive-0.6.4`.
+- Depends on `minicbor-derive-0.6.4`.
 
 ## `0.8.1`
 
-- Depend on `minicbor-derive-0.6.3`.
+- Depends on `minicbor-derive-0.6.3`.
 
 ## `0.8.0`
 
@@ -107,17 +116,21 @@
 
 # minicbor-io
 
+## `0.5.0`
+
+- Depends on `minicbor-0.10.0`.
+
 ## `0.4.0`
 
-- Depend on `minicbor-0.9.0`.
+- Depends on `minicbor-0.9.0`.
 
 ## `0.3.1`
 
-- Depend on `minicbor-0.8.1`.
+- Depends on `minicbor-0.8.1`.
 
 ## `0.3.0`
 
-- Depend on `minicbor-0.8.0`.
+- Depends on `minicbor-0.8.0`.
 
 ## `0.2.3`
 
@@ -148,5 +161,5 @@
 
 [1]: https://twittner.gitlab.io/minicbor/minicbor_derive/index.html#index_only
 [2]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
-
+[3]: https://twittner.gitlab.io/minicbor/minicbor/index.html#feature-flags
 
