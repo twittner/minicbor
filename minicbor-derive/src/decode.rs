@@ -40,8 +40,10 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         .collect();
 
     let mut lifetime = gen_lifetime()?;
-    for lt in lifetimes_to_constrain(fields.indices.iter().zip(fields.types.iter())) {
-        lifetime.bounds.push(lt.clone())
+    for l in lifetimes_to_constrain(fields.indices.iter().zip(fields.types.iter())) {
+        if !lifetime.bounds.iter().any(|b| *b == l) {
+            lifetime.bounds.push(l.clone())
+        }
     }
 
     // Collect type parameters which should not have a `Decode` bound added,
@@ -145,7 +147,9 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             }
         } else {
             for l in lifetimes_to_constrain(fields.indices.iter().zip(fields.types.iter())) {
-                lifetime.bounds.push(l.clone())
+                if !lifetime.bounds.iter().any(|b| *b == l) {
+                    lifetime.bounds.push(l.clone())
+                }
             }
             let decode_fns: Vec<Option<CustomCodec>> = fields.attrs.iter()
                 .map(|a| a.codec().cloned().filter(CustomCodec::is_decode))
