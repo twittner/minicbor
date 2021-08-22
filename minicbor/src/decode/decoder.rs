@@ -394,7 +394,7 @@ impl<'b> Decoder<'b> {
 
         let mut nrounds = 1u64; // number of iterations over array and map elements
         let mut irounds = 0u64; // number of indefinite iterations
-        let mut stack: Vec<Option<u64>> = alloc::vec::Vec::new();
+        let mut stack: alloc::vec::Vec<Option<u64>> = alloc::vec::Vec::new();
 
         while nrounds > 0 || irounds > 0 || !stack.is_empty() {
             match self.current()? {
