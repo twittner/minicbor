@@ -83,25 +83,118 @@
 //!
 //! [1]: https://developers.google.com/protocol-buffers/
 //!
-//! # Attributes and borrowing
+//! # Supported attributes
+//!
+//! - [`#[n(...)]` and `#[cbor(n(...))]`](#n-and-b-or-cborn-and-cborb)
+//! - [`#[b(...)]` and `#[cbor(b(...))]`](#n-and-b-or-cborn-and-cborb)
+//! - [`#[cbor(array)]`](#cborarray)
+//! - [`#[cbor(map)]`](#cbormap)
+//! - [`#[cbor(index_only)]`](#cborindex_only)
+//! - [`#[cbor(transparent)]`](#cbortransparent)
+//! - [`#[cbor(decode_with)]`](#cbordecode_with--path)
+//! - [`#[cbor(encode_with)]`](#cborencode_with--path)
+//! - [`#[cbor(with)]`](#cborwith--path)
+//! - [`#[cbor(decode_bound)]`](#cbordecode_bound--)
+//! - [`#[cbor(encode_bound)]`](#cborencode_bound--)
+//! - [`#[cbor(bound)]`](#cborbound)
+//!
+//! ## `#[n(...)]` and `#[b(...)]` (or `#[cbor(n(...))]` and `#[cbor(b(...))]`)
 //!
 //! Each field and variant needs to be annotated with an index number, which is
-//! used instead of the name, using either **`n`** or **`b`** as attribute names.
-//! For the encoding it makes no difference which one to choose. For decoding,
-//! `b` indicates that the value borrows from the decoding input, whereas `n`
-//! produces non-borrowed values (except for implicit borrows).
+//! used instead of the name. For the encoding it makes no difference which one
+//! to choose. For decoding, `b` indicates that the value borrows from the
+//! decoding input, whereas `n` produces non-borrowed values (but see section
+//! [Implicit borrowing](#implicit-borrowing) below). This means that if a type
+//! is annotated with `#[b(...)]`, all its lifetimes will be constrained to the
+//! input lifetime (`'bytes`). Further, if the type is a `std::borrow::Cow<'_, str>`
+//! or `std::borrow::Cow<'_, minicbor::bytes::ByteSlice>`, the generated code
+//! will decode the `str` or `ByteSlice` and construct a `Cow::Borrowed` variant,
+//! contrary to the regular `Cow` impl of `Decode` which produces owned values.
 //!
-//! ## Encoding format
+//! ## `#[cbor(array)]`
 //!
-//! The actual CBOR encoding to use can be selected by attaching either the
-//! **`#[cbor(array)]`** or **`#[cbor(map)]`** attribute to structs, enums or
-//! enum variants. By default `#[cbor(array)]` is implied. The attribute
-//! attached to an enum applies to all its variants but can be overriden per
-//! variant with another such attribute.
+//! Uses a CBOR array to encode the annotated struct, enum or enum variant.
+//! When used with an enum it applies to all its variants but can be overriden
+//! per variant. See section [CBOR encoding](#cbor-encoding) for details.
 //!
-//! ## Implicit borrowing
+//! If neither `#[cbor(array)]` nor `#[cbor(map)]` are specified, `#[cbor(array)]`
+//! is used by default.
 //!
-//! The following types implicitly borrow from the decoding input, which means
+//! ## `#[cbor(map)]`
+//!
+//! Use a CBOR map to encode the annotated struct, enum or enum variant.
+//! When used with an enum it applies to all its variants but can be overriden
+//! per variant. See section [CBOR encoding](#cbor-encoding) for details.
+//!
+//! If neither `#[cbor(array)]` nor `#[cbor(map)]` are specified, `#[cbor(array)]`
+//! is used by default.
+//!
+//! ## `#[cbor(index_only)]`
+//!
+//! Enumerations which do not contain fields may have this attribute attached to
+//! them. This changes the encoding to encode only the variant index (cf. section
+//! [CBOR encoding](#cbor-encoding) for details).
+//!
+//! ## `#[cbor(transparent)]`
+//!
+//! This attribute can be attached to structs with exactly one field (aka newtypes).
+//! If present, the generated `Encode` and `Decode` impls will just forward the
+//! respective `encode` and `decode` calls to the inner type, i.e. the resulting
+//! CBOR representation will be identical to the one of the inner type.
+//!
+//! ## `#[cbor(decode_with = "<path>")]`
+//!
+//! When applied to a field of type `T`, the function denoted by `<path>` will be
+//! used to decode `T`. The function needs to be equivalent to the following type:
+//!
+//! ```no_run
+//! use minicbor::decode::{Decoder, Error};
+//!
+//! fn decode<'b, T: 'b>(d: &mut Decoder<'b>) -> Result<T, Error> {
+//!     todo!()
+//! }
+//! ```
+//!
+//! ## `#[cbor(encode_with = "<path>")]`
+//!
+//! When applied to a field of type `T`, the function denoted by `<path>` will be
+//! used to encode `T`. The function needs to be equivalent to the following type:
+//!
+//! ```no_run
+//! use minicbor::encode::{Encoder, Error, Write};
+//!
+//! fn encode<T, W: Write>(v: &T, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+//!     todo!()
+//! }
+//! ```
+//!
+//! ## `#[cbor(with = "<path>")]`
+//!
+//! Combines [`#[cbor(decode_with = "...")]`](#cbordecode_with--path) and
+//! [`#[cbor(encode_with = "...")]`](#cborencode_with--path). Here, `<path>` denotes
+//! a module that contains functions named `encode` and `decode` that satisfy the
+//! respective type signatures mentioned in `encode_with` and `decode_with`.
+//!
+//! ## `#[cbor(decode_bound = "...")]`
+//!
+//! When applied to a generic field, this attribute overrides any implicit type
+//! parameter bounds generated by `minicbor-derive` for the derived `Decode` impl.
+//!
+//! ## `#[cbor(encode_bound = "...")]`
+//!
+//! When applied to a generic field, this attribute overrides any implicit type
+//! parameter bounds generated by `minicbor-derive` for the derived `Encode` impl.
+//!
+//! ## `#[cbor(bound)]`
+//!
+//! Combines [`#[cbor(encode_bound = "...")]`](#cborencode_bound--) and
+//! [`#[cbor(decode_bound = "...")]`](#cbordecode_bound--), i.e. the bound applies
+//! to the derived `Encode` and `Decode` impl.
+//!
+//! # Implicit borrowing
+//!
+//! Apart from the explicit borrowing with [`#[b(...)]`](#n-and-b-or-cborn-and-cborb),
+//! the following types implicitly borrow from the decoding input, which means
 //! their lifetimes are constrained by the input lifetime:
 //!
 //! - `&'_ str`
@@ -109,22 +202,22 @@
 //! - `Option<&'_ str>`
 //! - `Option<&'_ minicbor::bytes::ByteSlice>`
 //!
-//! ### What about `&[u8]`?
+//! ## What about `&[u8]`?
 //!
 //! `&[u8]` is a special case of `&[T]`. The lack of trait impl specialisation
 //! in Rust makes it difficult to provide optimised support for byte slices.
 //! The generic `[T]` impl of `Encode` produces an array of `T`s. To specifically
-//! encode to and decode from CBOR bytes, the types `ByteSlice` and `ByteVec` are
-//! provided by minicbor. In addition, the attributes `encode_with`, `decode_with`
-//! and `with` can be used with `&[u8]` when deriving, e.g.
+//! encode to and decode from CBOR bytes, the types `ByteSlice`, `ByteArray` and
+//! `ByteVec` are provided by `minicbor`. In addition, the attributes
+//! `encode_with`, `decode_with` and `with` can be used with `&[u8]` when deriving,
+//! e.g.
 //!
 //! ```
 //! use minicbor::{Encode, Decode};
 //!
 //! #[derive(Encode, Decode)]
 //! struct Foo<'a> {
-//!     #[n(0)]
-//!     #[cbor(with = "minicbor::bytes")]
+//!     #[cbor(n(0), with = "minicbor::bytes")]
 //!     field0: &'a [u8],
 //!
 //!     #[n(1)]
@@ -132,56 +225,16 @@
 //!     #[cbor(decode_with = "minicbor::bytes::decode")]
 //!     field1: &'a [u8],
 //!
-//!     #[n(2)]
-//!     #[cbor(with = "minicbor::bytes")]
+//!     #[cbor(n(2), with = "minicbor::bytes")]
 //!     field2: Option<&'a [u8]>,
 //!
-//!     #[n(3)]
-//!     #[cbor(with = "minicbor::bytes")]
-//!     field3: Vec<u8>
+//!     #[cbor(n(3), with = "minicbor::bytes")]
+//!     field3: Vec<u8>,
+//!
+//!     #[cbor(n(4), with = "minicbor::bytes")]
+//!     field4: [u8; 16]
 //! }
 //! ```
-//!
-//! ## Explicit borrowing
-//!
-//! If a type is annotated with **`#[b(...)]`**, all its lifetimes will be
-//! constrained to the input lifetime.
-//!
-//! If the type is a `std::borrow::Cow<'_, str>` or
-//! `std::borrow::Cow<'_, minicbor::bytes::ByteSlice>` type, the generated code
-//! will decode the inner type and construct a `Cow::Borrowed` variant, contrary
-//! to the `Cow` impl of `Decode` which produces owned values.
-//!
-//! ## Other attributes
-//!
-//! ### `encode_with`, `decode_with` and `with`
-//!
-//! Fields in structs and enum variants may be annotated with
-//! **`#[cbor(encode_with = "path")]`**, **`#[cbor(decode_with = "path")]`** or
-//! **`#[cbor(with = "module-path")]`** where `path` is the full path to a
-//! function which is used instead of `Encode::encode` to encode the field or
-//! `Decode::decode` to decode the field respectively. The types of these
-//! functions must be equivalent to `Encode::encode` or `Decode::decode`.
-//! The `with` attribute combines the other two with `module-path` denoting the
-//! full path to a module with two functions `encode` and `decode` as members,
-//! which are used for encoding and decoding of the field. These three
-//! attributes can either override an existing `Encode` or `Decode` impl or be
-//! used for types which do not implement those traits at all.
-//!
-//! ### `transparent`
-//!
-//! A **`#[cbor(transparent)]`** attribute can be attached to structs with
-//! exactly one field (aka newtypes). If present, the generated `Encode` and
-//! `Decode` impls will just forward the `encode`/`decode` calls to the inner
-//! type, i.e. the resulting CBOR representation will be identical to the one
-//! of the inner type.
-//!
-//! ## `index_only`
-//!
-//! Enumerations which do not contain fields may have the
-//! **`#[cbor(index_only)]`** attribute attached to them. This changes the
-//! encoding to encode only the variant index (cf. section
-//! [CBOR encoding](#cbor-encoding) for details).
 //!
 //! # CBOR encoding
 //!
@@ -192,9 +245,9 @@
 //!
 //! ### Array encoding
 //!
-//! By default or if a struct has the **`#[cbor(array)]`** attribute, it will
-//! be represented as a CBOR array. Its index numbers are represened by the
-//! position of the field value in this array. Any gaps between index numbers
+//! By default or if a struct has the [`#[cbor(array)]`](#cborarray) attribute,
+//! it will be represented as a CBOR array. Its index numbers are represened by
+//! the position of the field value in this array. Any gaps between index numbers
 //! are filled with CBOR NULL values and `Option`s which are `None` likewise
 //! end up as NULLs in this array.
 //!
@@ -209,9 +262,9 @@
 //!
 //! ### Map encoding
 //!
-//! If a struct has the **`#[cbor(map)]`** attribute, then it will be
-//! represented as a CBOR map with keys corresponding to the numeric index
-//! value:
+//! If a struct has the [`#[cbor(map)]`](#cbormap) attribute attached, then it
+//! will be represented as a CBOR map with keys corresponding to the numeric
+//! index value:
 //!
 //! ```text
 //! <<struct-as-map encoding>> =
@@ -226,11 +279,11 @@
 //!
 //! ## Enums
 //!
-//! Unless the `#[cbor(index_only)]` attribute is used for enums without any
-//! fields, each enum variant is encoded as a two-element array. The first
-//! element is the variant index and the second the actual variant value.
-//! Otherwise, if enums do not have fields and the `index_only` attribute is
-//! present, only the variant index is encoded:
+//! Unless the [`#[cbor(index_only)]`](#cborindex_only) attribute is used for
+//! enums without any fields, each enum variant is encoded as a two-element
+//! array. The first element is the variant index and the second the actual
+//! variant value. Otherwise, if enums do not have fields and the `index_only`
+//! attribute is present, only the variant index is encoded:
 //!
 //! ```text
 //! <<enum encoding>> =
@@ -257,17 +310,21 @@
 //!
 //! When selecting the encoding, future changes to the type should be considered
 //! as they may turn a dense type into a sparse one over time. This also applies
-//! to [`index_only`](#index_only) which should be used only with enums which
-//! are not expected to ever have fields in their variants.
+//! to [`#[cbor(index_only)]`](#cborindex_only) which should be used only with
+//! enums which are not expected to ever have fields in their variants.
+
+#![allow(clippy::many_single_char_names)]
 
 extern crate proc_macro;
 
 mod decode;
 mod encode;
 
-use quote::{ToTokens, TokenStreamExt};
-use proc_macro2::Span;
-use syn::spanned::Spanned;
+pub(crate) mod attrs;
+pub(crate) mod fields;
+pub(crate) mod lifetimes;
+pub(crate) mod variants;
+
 use std::collections::HashSet;
 
 /// Derive the `minicbor::Decode` trait for a struct or enum.
@@ -284,6 +341,12 @@ pub fn derive_decode(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 #[proc_macro_derive(Encode, attributes(n, b, cbor))]
 pub fn derive_encode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     encode::derive_from(input)
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum Mode {
+    Encode,
+    Decode
 }
 
 // Helpers ////////////////////////////////////////////////////////////////////
@@ -359,317 +422,6 @@ fn is_byte_slice(ty: &syn::Type) -> bool {
     }
 }
 
-/// Get the lifetime of the given type if it is an `Option` whose inner type matches the predicate.
-fn option_lifetime(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> Option<syn::Lifetime> {
-    if let syn::Type::Path(t) = ty {
-        if let Some(s) = t.path.segments.last() {
-            if s.ident == "Option" {
-                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
-                    if b.args.len() == 1 {
-                        if let syn::GenericArgument::Type(syn::Type::Reference(ty)) = &b.args[0] {
-                            if pred(&*ty.elem) {
-                                return ty.lifetime.clone()
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
-/// Get all lifetimes of a type.
-fn get_lifetimes(ty: &syn::Type, set: &mut HashSet<syn::Lifetime>) {
-    match ty {
-        syn::Type::Array(t) => get_lifetimes(&t.elem, set),
-        syn::Type::Slice(t) => get_lifetimes(&t.elem, set),
-        syn::Type::Paren(t) => get_lifetimes(&t.elem, set),
-        syn::Type::Group(t) => get_lifetimes(&t.elem, set),
-        syn::Type::Ptr(t)   => get_lifetimes(&t.elem, set),
-        syn::Type::Reference(t) => {
-            if let Some(l) = &t.lifetime {
-                set.insert(l.clone());
-            }
-            get_lifetimes(&t.elem, set)
-        }
-        syn::Type::Tuple(t) => {
-            for t in &t.elems {
-                get_lifetimes(t, set)
-            }
-        }
-        syn::Type::Path(t) => {
-            for s in &t.path.segments {
-                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
-                    for a in &b.args {
-                        match a {
-                            syn::GenericArgument::Type(t)     => get_lifetimes(t, set),
-                            syn::GenericArgument::Binding(b)  => get_lifetimes(&b.ty, set),
-                            syn::GenericArgument::Lifetime(l) => { set.insert(l.clone()); }
-                            _                                 => {}
-                        }
-                    }
-                }
-            }
-        }
-        _ => {}
-    }
-}
-
-/// Get the lifetime of a reference if its type matches the predicate.
-fn tyref_lifetime(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> Option<syn::Lifetime> {
-    if let syn::Type::Reference(p) = ty {
-        if pred(&*p.elem) {
-            return p.lifetime.clone()
-        }
-    }
-    None
-}
-
-/// Get the set of lifetimes which need to be constrained to the decoding input lifetime.
-fn lifetimes_to_constrain<'a, I>(types: I) -> HashSet<syn::Lifetime>
-where
-    I: Iterator<Item = (&'a Idx, &'a syn::Type)>
-{
-    let mut set = HashSet::new();
-    for (i, t) in types {
-        if let Some(l) = tyref_lifetime(t, is_str) {
-            set.insert(l);
-            continue
-        }
-        if let Some(l) = tyref_lifetime(t, is_byte_slice) {
-            set.insert(l);
-            continue
-        }
-        if let Some(l) = option_lifetime(t, is_str) {
-            set.insert(l);
-            continue
-        }
-        if let Some(l) = option_lifetime(t, is_byte_slice) {
-            set.insert(l);
-            continue
-        }
-        if i.is_b() {
-            get_lifetimes(t, &mut set)
-        }
-    }
-    set
-}
-
-/// The index attribute.
-#[derive(Debug, Clone, Copy)]
-enum Idx {
-    /// A regular, non-borrowing index.
-    N(u32),
-    /// An index which indicates that the value borrows from the decoding input.
-    B(u32)
-}
-
-impl ToTokens for Idx {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        tokens.append(proc_macro2::Literal::u32_unsuffixed(self.val()))
-    }
-}
-
-impl Idx {
-    /// Test if `Idx` is the `B` variant.
-    fn is_b(self) -> bool {
-        matches!(self, Idx::B(_))
-    }
-
-    /// Get the numeric index value.
-    fn val(self) -> u32 {
-        match self {
-            Idx::N(i) => i,
-            Idx::B(i) => i
-        }
-    }
-}
-
-/// Get the index number from the list of attributes.
-///
-/// The first attribute `n` will be used and its argument must be an
-/// unsigned integer literal that fits into a `u32`.
-fn index_number(s: Span, attrs: &[syn::Attribute]) -> syn::Result<Idx> {
-    for a in attrs {
-        if a.path.is_ident("n") {
-            let lit: syn::LitInt = a.parse_args()?;
-            return lit.base10_digits().parse()
-                .map_err(|_| syn::Error::new(a.tokens.span(), "expected `u32` value"))
-                .map(Idx::N)
-        }
-        if a.path.is_ident("b") {
-            let lit: syn::LitInt = a.parse_args()?;
-            return lit.base10_digits().parse()
-                .map_err(|_| syn::Error::new(a.tokens.span(), "expected `u32` value"))
-                .map(Idx::B)
-        }
-    }
-    Err(syn::Error::new(s, "missing `#[n(...)]` or `#[b(...)]` attribute"))
-}
-
-/// Check that there are no duplicate elements in `iter`.
-fn check_uniq<I>(s: Span, iter: I) -> syn::Result<()>
-where
-    I: IntoIterator<Item = Idx>
-{
-    let mut set = HashSet::new();
-    let mut ctr = 0;
-    for u in iter {
-        set.insert(u.val());
-        ctr += 1;
-    }
-    if ctr != set.len() {
-        return Err(syn::Error::new(s, "duplicate index numbers"))
-    }
-    Ok(())
-}
-
-/// Get the index number of every field.
-fn field_indices<'a, I>(iter: I) -> syn::Result<Vec<Idx>>
-where
-    I: Iterator<Item = &'a syn::Field>
-{
-    iter.map(|f| index_number(f.span(), &f.attrs)).collect()
-}
-
-/// Get the index number of every variant.
-fn variant_indices<'a, I>(iter: I) -> syn::Result<Vec<Idx>>
-where
-    I: Iterator<Item = &'a syn::Variant>
-{
-    iter.map(|v| index_number(v.span(), &v.attrs)).collect()
-}
-
-/// The encoding to use for structs and enum variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Encoding {
-    Array,
-    Map
-}
-
-impl Default for Encoding {
-    fn default() -> Self {
-        Encoding::Array
-    }
-}
-
-/// Determine attribute value of the `#[cbor(map|array)]` attribute.
-fn encoding(a: &syn::Attribute) -> Option<Encoding> {
-    match a.parse_meta().ok()? {
-        syn::Meta::List(ml) if ml.path.is_ident("cbor") => {
-            for nested in &ml.nested {
-                if let syn::NestedMeta::Meta(syn::Meta::Path(arg)) = nested {
-                    if arg.is_ident("map") {
-                        return Some(Encoding::Map)
-                    }
-                    if arg.is_ident("array") {
-                        return Some(Encoding::Array)
-                    }
-                }
-            }
-        }
-        _ => {}
-    }
-    None
-}
-
-/// Custom encode/decode functions.
-enum CustomCodec {
-    /// Custom encode function.
-    ///
-    /// Assumed to be of a type equivalent to:
-    ///
-    ///   `fn<T, W: Write>(&T, &mut Encoder<W>) -> Result<(), Error<W::Error>>`
-    ///
-    /// Declared with `#[cbor(encode_with = "...")]`.
-    Encode(syn::ExprPath),
-    /// Custom decode function.
-    ///
-    /// Assumed to be of a type equivalent to:
-    ///
-    ///   `fn<T>(&mut Decoder<'_>) -> Result<T, Error>`
-    ///
-    /// Declared with `#[cbor(decode_with = "...")]`.
-    Decode(syn::ExprPath),
-    /// A module which contains custom encode/decode functions.
-    ///
-    /// The module is assumed to contain two functions named `encode` and
-    /// `decode` whose types match those declared with
-    /// `#[cbor(encode_with = "...")]` or `#[cbor(decode_with = "...")]`
-    /// respectively. Declared with `#[cbor(with = "...")]`.
-    Both(syn::ExprPath)
-}
-
-impl CustomCodec {
-    /// Is this a custom codec from `encode_with` or `with`?
-    fn is_encode(&self) -> bool {
-        matches!(self, CustomCodec::Encode(_) | CustomCodec::Both(_))
-    }
-
-    /// Is this a custom codec from `decode_with` or `with`?
-    fn is_decode(&self) -> bool {
-        matches!(self, CustomCodec::Decode(_) | CustomCodec::Both(_))
-    }
-
-    /// Extract the encode function unless this `CustomCodec` does not declare one.
-    fn to_encode_path(&self) -> Option<syn::ExprPath> {
-        match self {
-            CustomCodec::Encode(p) => Some(p.clone()),
-            CustomCodec::Decode(_) => None,
-            CustomCodec::Both(p) => {
-                let mut p = p.clone();
-                let ident = syn::Ident::new("encode", proc_macro2::Span::call_site());
-                p.path.segments.push(ident.into());
-                Some(p)
-            }
-        }
-    }
-
-    /// Extract the decode function unless this `CustomCodec` does not declare one.
-    fn to_decode_path(&self) -> Option<syn::ExprPath> {
-        match self {
-            CustomCodec::Encode(_) => None,
-            CustomCodec::Decode(p) => Some(p.clone()),
-            CustomCodec::Both(p) => {
-                let mut p = p.clone();
-                let ident = syn::Ident::new("decode", proc_macro2::Span::call_site());
-                p.path.segments.push(ident.into());
-                Some(p)
-            }
-        }
-    }
-}
-
-/// Determine the attribute value of the `#[cbor(encode_with|decode_with|with)]` attribute.
-fn custom_codec(a: &syn::Attribute) -> syn::Result<Option<CustomCodec>> {
-    if let syn::Meta::List(ml) = a.parse_meta()? {
-        if !ml.path.is_ident("cbor") {
-            return Ok(None)
-        }
-        for nested in &ml.nested {
-            if let syn::NestedMeta::Meta(syn::Meta::NameValue(arg)) = nested {
-                if arg.path.is_ident("encode_with") {
-                    if let syn::Lit::Str(path) = &arg.lit {
-                        return Ok(Some(CustomCodec::Encode(syn::parse_str(&path.value())?)))
-                    }
-                }
-                if arg.path.is_ident("decode_with") {
-                    if let syn::Lit::Str(path) = &arg.lit {
-                        return Ok(Some(CustomCodec::Decode(syn::parse_str(&path.value())?)))
-                    }
-                }
-                if arg.path.is_ident("with") {
-                    if let syn::Lit::Str(path) = &arg.lit {
-                        return Ok(Some(CustomCodec::Both(syn::parse_str(&path.value())?)))
-                    }
-                }
-            }
-        }
-    }
-    Ok(None)
-}
-
 /// Traverse all field types and collect all type parameters along the way.
 fn collect_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashSet<syn::TypeParam>
 where
@@ -717,38 +469,30 @@ where
     c.found
 }
 
-/// Check if the attribute matches the given identifier.
-fn is_cbor_attr(a: &syn::Attribute, ident: &str, key_val: bool) -> syn::Result<bool> {
-    match a.parse_meta()? {
-        syn::Meta::List(ml) if ml.path.is_ident("cbor") => {
-            for nested in &ml.nested {
-                match nested {
-                    syn::NestedMeta::Meta(syn::Meta::Path(arg)) if !key_val=>
-                        if arg.is_ident(ident) {
-                            return Ok(true)
-                        }
-                    syn::NestedMeta::Meta(syn::Meta::NameValue(arg)) if key_val =>
-                        if arg.path.is_ident(ident) {
-                            return Ok(true)
-                        }
-                    _ => {}
-                }
-            }
+fn add_bound_to_type_params<'a, I>
+    ( bound: syn::TypeParamBound
+    , params: I
+    , blacklist: &HashSet<syn::TypeParam>
+    , attrs: &[attrs::Attributes]
+    , mode: Mode
+    )
+where
+    I: IntoIterator<Item = &'a mut syn::TypeParam>
+{
+    let find_type_param = |t: &syn::TypeParam| attrs.iter()
+        .find_map(|a| {
+            a.type_params().and_then(|p| match mode {
+                Mode::Encode => p.get_encode(&t.ident),
+                Mode::Decode => p.get_decode(&t.ident)
+            })
+        });
+
+    for p in params {
+        if let Some(t) = find_type_param(p) {
+            p.bounds.extend(t.bounds.iter().cloned())
+        } else if !blacklist.contains(p) {
+            p.bounds.push(bound.clone())
         }
-        _ => {}
     }
-    Ok(false)
 }
 
-/// Find any of the attributes that matches the given identifier.
-fn find_cbor_attr<'a, I>(attrs: I, ident: &str, kv: bool) -> syn::Result<Option<&'a syn::Attribute>>
-where
-    I: Iterator<Item = &'a syn::Attribute>
-{
-    for a in attrs {
-        if is_cbor_attr(a, ident, kv)? {
-            return Ok(Some(a))
-        }
-    }
-    Ok(None)
-}

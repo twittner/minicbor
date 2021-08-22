@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.11.0`
+
+- Depends on `minicbor-derive-0.7.0`.
+
 ## `0.10.1`
 
 - Small bugfix release (see commit 68963dc for details).
@@ -81,6 +85,12 @@
 
 # minicbor-derive
 
+## `0.7.0`
+
+- Major internal refactoring to make attribute parsing more flexible and robust.
+- Adds as new attributes `encode_bound`, `decode_bound` and `bound` to allow overriding the
+  generated type parameter bounds.
+
 ## `0.6.4`
 
 - Improve hygiene (see merge request !7).
@@ -119,6 +129,10 @@
   which do not implement these traits.
 
 # minicbor-io
+
+## `0.6.0`
+
+- Depends on `minicbor-0.11.0`.
 
 ## `0.5.0`
 
