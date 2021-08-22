@@ -37,7 +37,7 @@ impl Fields {
             for (i, f) in fields.into_iter().enumerate() {
                 let attr = Attributes::try_from_iter(Level::Field, &f.attrs)?;
                 let idex = attr.index().ok_or_else(|| {
-                    syn::Error::new(f.span(), "missing `#[n(...)]` or `#[b(...)]` attribute")
+                    syn::Error::new(f.ident.span(), "missing `#[n(...)]` or `#[b(...)]` attribute")
                 })?;
                 let (idnt, is_name) = match &f.ident {
                     Some(n) => (n.clone(), true),

@@ -94,13 +94,13 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
-    let variants      = Variants::try_from(data.enum_token.span(), data.variants.iter())?;
+    let variants      = Variants::try_from(name.span(), data.variants.iter())?;
 
     let mut blacklist = HashSet::new();
     let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
-        let fields = Fields::try_from(var.span(), var.fields.iter())?;
+        let fields = Fields::try_from(var.ident.span(), var.fields.iter())?;
         let encode_fns: Vec<Option<CustomCodec>> = fields.attrs.iter()
             .map(|a| a.codec().cloned().filter(CustomCodec::is_encode))
             .collect();
@@ -580,7 +580,7 @@ fn make_transparent_impl
 {
     if attrs.codec().map(CustomCodec::is_encode).unwrap_or(false) {
         let msg = "`encode_with` or `with` not allowed with #[cbor(transparent)]";
-        return Err(syn::Error::new(field.span(), msg))
+        return Err(syn::Error::new(field.ident.span(), msg))
     }
 
     let ident =

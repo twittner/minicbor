@@ -68,7 +68,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     // If transparent, just forward the decode call to the inner type.
     if attrs.transparent() {
         if fields.len() != 1 {
-            let msg = "`transparent` requires a struct with one field";
+            let msg = "#[cbor(transparent)] requires a struct with one field";
             return Err(syn::Error::new(inp.ident.span(), msg))
         }
         let f = data.fields.iter().next().expect("struct has 1 field");
@@ -126,14 +126,14 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
-    let variants      = Variants::try_from(data.enum_token.span(), data.variants.iter())?;
+    let variants      = Variants::try_from(name.span(), data.variants.iter())?;
 
     let mut blacklist = HashSet::new();
     let mut field_attrs = Vec::new();
     let mut lifetime = gen_lifetime()?;
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
-        let fields = Fields::try_from(var.span(), var.fields.iter())?;
+        let fields = Fields::try_from(var.ident.span(), var.fields.iter())?;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let con = &var.ident;
         let row = if let syn::Fields::Unit = &var.fields {
@@ -348,7 +348,7 @@ fn make_transparent_impl
 {
     if attrs.codec().map(CustomCodec::is_decode).unwrap_or(false) {
         let msg = "`decode_with` or `with` not allowed with #[cbor(transparent)]";
-        return Err(syn::Error::new(field.span(), msg))
+        return Err(syn::Error::new(field.ident.span(), msg))
     }
 
     let call =

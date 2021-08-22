@@ -1,7 +1,6 @@
 use crate::attrs::{Attributes, Idx, Level};
 use crate::attrs::idx;
 use proc_macro2::Span;
-use syn::spanned::Spanned;
 
 #[derive(Debug, Clone)]
 pub struct Variants {
@@ -22,7 +21,7 @@ impl Variants {
         for v in iter.into_iter() {
             let attr = Attributes::try_from_iter(Level::Variant, &v.attrs)?;
             let idex = attr.index().ok_or_else(|| {
-                syn::Error::new(v.span(), "missing `#[n(...)]` or `#[b(...)]` attribute")
+                syn::Error::new(v.ident.span(), "missing `#[n(...)]` or `#[b(...)]` attribute")
             })?;
             indices.push(idex);
             attrs.push(attr);
