@@ -579,8 +579,9 @@ fn make_transparent_impl
     ) -> syn::Result<proc_macro2::TokenStream>
 {
     if attrs.codec().map(CustomCodec::is_encode).unwrap_or(false) {
-        let msg = "`encode_with` or `with` not allowed with #[cbor(transparent)]";
-        return Err(syn::Error::new(field.ident.span(), msg))
+        let msg  = "`encode_with` or `with` not allowed with #[cbor(transparent)]";
+        let span = field.ident.as_ref().map(|i| i.span()).unwrap_or_else(|| field.span());
+        return Err(syn::Error::new(span, msg))
     }
 
     let ident =
