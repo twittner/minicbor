@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.10.1`
+
+- Small bugfix release (see commit 68963dc for details).
+
 ## `0.10.0`
 
 - ⚠️ **Breaking** ⚠️: By default `Decoder::skip` is not available anymore. It can be enabled with
