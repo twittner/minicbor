@@ -2,6 +2,7 @@ use crate::attrs::{Attributes, Idx, Level};
 use crate::attrs::idx;
 use proc_macro2::Span;
 use syn::{Ident, Type};
+use syn::spanned::Spanned;
 
 #[derive(Debug, Clone)]
 pub struct Fields {
@@ -36,7 +37,7 @@ impl Fields {
             for (i, f) in fields.into_iter().enumerate() {
                 let attr = Attributes::try_from_iter(Level::Field, &f.attrs)?;
                 let idex = attr.index().ok_or_else(|| {
-                    let s = f.ident.as_ref().map(|i| i.span()).unwrap_or(span);
+                    let s = f.ident.as_ref().map(|i| i.span()).unwrap_or_else(|| f.ty.span());
                     syn::Error::new(s, "missing `#[n(...)]` or `#[b(...)]` attribute")
                 })?;
                 let (idnt, is_name) = match &f.ident {

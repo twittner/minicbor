@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.11.1`
+
+- Depends on `minicbor-derive-0.7.1`.
+
 ## `0.11.0`
 
 - Depends on `minicbor-derive-0.7.0`.
@@ -84,6 +88,10 @@
   `Decoder::f16` method and depends on the feature `half`.
 
 # minicbor-derive
+
+## `0.7.1`
+
+- Small error reporting improvement (cf. 1b1cb41).
 
 ## `0.7.0`
 

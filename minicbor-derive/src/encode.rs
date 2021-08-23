@@ -580,7 +580,7 @@ fn make_transparent_impl
 {
     if attrs.codec().map(CustomCodec::is_encode).unwrap_or(false) {
         let msg  = "`encode_with` or `with` not allowed with #[cbor(transparent)]";
-        let span = field.ident.as_ref().map(|i| i.span()).unwrap_or_else(|| field.span());
+        let span = field.ident.as_ref().map(|i| i.span()).unwrap_or_else(|| field.ty.span());
         return Err(syn::Error::new(span, msg))
     }
 
