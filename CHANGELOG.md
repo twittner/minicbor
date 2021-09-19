@@ -6,6 +6,19 @@
 
 # minicbor
 
+## `0.11.2`
+
+- Improves `minicbor::display` to be more robust when applied to malformed CBOR values
+  (see commit c1294dd for details).
+- Adds several `Encode`/`Decode` impls:
+    - `core::num::Wrapping`
+    - `core::sync::atomic::{AtomicBool, AtomicI8, AtomicI16, AtomicI32, AtomicI64, AtomicIsize}`
+    - `core::sync::atomic::{AtomicU8, AtomicU16, AtomicU32, AtomicU64, AtomicUsize}`
+    - `core::cell::{Cell, RefCell}`
+    - `core::ops::{Bound, Range, RangeFrom, RangeInclusive, RangeTo, RangeToInclusive}`
+    - `std::path::{Path, PathBuf}`
+    - `std::time::SystemTime`
+
 ## `0.11.1`
 
 - Depends on `minicbor-derive-0.7.1`.
