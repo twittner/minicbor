@@ -235,6 +235,8 @@ encode_atomic! {
     core::sync::atomic::AtomicU8
     core::sync::atomic::AtomicU16
     core::sync::atomic::AtomicU32
+    core::sync::atomic::AtomicU64
+    core::sync::atomic::AtomicUsize
     core::sync::atomic::AtomicI8
     core::sync::atomic::AtomicI16
     core::sync::atomic::AtomicI32

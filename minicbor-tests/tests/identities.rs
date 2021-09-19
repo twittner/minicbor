@@ -349,3 +349,119 @@ fn array4() {
     quickcheck(property as fn(bool, bool, bool, bool) -> bool)
 }
 
+#[test]
+fn bound_u32() {
+    quickcheck(identity as fn(core::ops::Bound<u32>) -> bool)
+}
+
+#[test]
+fn bound_i32() {
+    quickcheck(identity as fn(core::ops::Bound<i32>) -> bool)
+}
+
+#[test]
+fn path_buf() {
+    quickcheck(identity as fn(std::path::PathBuf) -> bool)
+}
+
+#[test]
+fn path() {
+    fn property(arg: std::path::PathBuf) -> bool {
+        let vec = minicbor::to_vec(arg.as_path()).unwrap();
+        let val = minicbor::decode::<&std::path::Path>(&vec).unwrap();
+        arg == val
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn range() {
+    quickcheck(identity as fn(core::ops::Range<i32>) -> bool)
+}
+
+#[test]
+fn range_from() {
+    quickcheck(identity as fn(core::ops::RangeFrom<i32>) -> bool)
+}
+
+#[test]
+fn range_inclusive() {
+    quickcheck(identity as fn(core::ops::RangeInclusive<i32>) -> bool)
+}
+
+#[test]
+fn range_to() {
+    quickcheck(identity as fn(core::ops::RangeTo<i32>) -> bool)
+}
+
+#[test]
+fn range_to_inclusive() {
+    quickcheck(identity as fn(core::ops::RangeToInclusive<i32>) -> bool)
+}
+
+#[test]
+fn wrapping() {
+    quickcheck(identity as fn(core::num::Wrapping<i32>) -> bool)
+}
+
+#[test]
+fn cell() {
+    fn property(n: u32) -> bool {
+        identity(core::cell::Cell::new(n))
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn refcell() {
+    fn property(n: u32) -> bool {
+        identity(core::cell::RefCell::new(n))
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn system_time() {
+    fn property(t: std::time::SystemTime) -> bool {
+        if t < std::time::UNIX_EPOCH {
+            minicbor::to_vec(t).is_err()
+        } else {
+            identity(t)
+        }
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn atomic_u64() {
+    fn property(n: u64) -> bool {
+        let arg = core::sync::atomic::AtomicU64::new(n);
+        let vec = minicbor::to_vec(&arg).unwrap();
+        let val = minicbor::decode::<core::sync::atomic::AtomicU64>(&vec).unwrap();
+        n == val.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn atomic_i64() {
+    fn property(n: i64) -> bool {
+        let arg = core::sync::atomic::AtomicI64::new(n);
+        let vec = minicbor::to_vec(&arg).unwrap();
+        let val = minicbor::decode::<core::sync::atomic::AtomicI64>(&vec).unwrap();
+        n == val.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn atomic_bool() {
+    fn property(n: bool) -> bool {
+        let arg = core::sync::atomic::AtomicBool::new(n);
+        let vec = minicbor::to_vec(&arg).unwrap();
+        let val = minicbor::decode::<core::sync::atomic::AtomicBool>(&vec).unwrap();
+        n == val.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
