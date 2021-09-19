@@ -419,6 +419,12 @@ impl<'b, T: Decode<'b>> Decode<'b> for core::cell::Cell<T> {
     }
 }
 
+impl<'b, T: Decode<'b>> Decode<'b> for core::cell::RefCell<T> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        d.decode().map(core::cell::RefCell::new)
+    }
+}
+
 #[cfg(feature = "std")]
 impl<'a, 'b: 'a> Decode<'b> for &'a std::path::Path {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
@@ -506,3 +512,63 @@ impl<'b> Decode<'b> for std::net::SocketAddrV6 {
     }
 }
 
+impl<'b, T: Decode<'b>> Decode<'b> for core::ops::Range<T> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        decode_fields! { d |
+            0 start => T ; "Range::start"
+            1 end   => T ; "Range::end"
+        }
+        Ok(core::ops::Range { start, end })
+    }
+}
+
+impl<'b, T: Decode<'b>> Decode<'b> for core::ops::RangeFrom<T> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        decode_fields! { d |
+            0 start => T ; "RangeFrom::start"
+        }
+        Ok(core::ops::RangeFrom { start })
+    }
+}
+
+impl<'b, T: Decode<'b>> Decode<'b> for core::ops::RangeTo<T> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        decode_fields! { d |
+            0 end => T ; "RangeTo::end"
+        }
+        Ok(core::ops::RangeTo { end })
+    }
+}
+
+impl<'b, T: Decode<'b>> Decode<'b> for core::ops::RangeToInclusive<T> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        decode_fields! { d |
+            0 end => T ; "RangeToInclusive::end"
+        }
+        Ok(core::ops::RangeToInclusive { end })
+    }
+}
+
+impl<'b, T: Decode<'b>> Decode<'b> for core::ops::RangeInclusive<T> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        decode_fields! { d |
+            0 start => T ; "RangeInclusive::start"
+            1 end   => T ; "RangeInclusive::end"
+        }
+        Ok(core::ops::RangeInclusive::new(start, end))
+    }
+}
+
+impl<'b, T: Decode<'b>> Decode<'b> for core::ops::Bound<T> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        if Some(2) != d.array()? {
+            return Err(Error::Message("expected enum (2-element array)"))
+        }
+        match d.u32()? {
+            0 => d.decode().map(core::ops::Bound::Included),
+            1 => d.decode().map(core::ops::Bound::Excluded),
+            2 => d.limited_skip().map(|_| core::ops::Bound::Unbounded),
+            n => Err(Error::UnknownVariant(n))
+        }
+    }
+}

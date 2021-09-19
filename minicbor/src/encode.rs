@@ -346,6 +346,16 @@ impl<T: Encode + Copy> Encode for core::cell::Cell<T> {
     }
 }
 
+impl<T: Encode> Encode for core::cell::RefCell<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        if let Ok(v) = self.try_borrow() {
+            v.encode(e)
+        } else {
+            Err(Error::Message("could not borrow ref cell value"))
+        }
+    }
+}
+
 #[cfg(feature = "std")]
 impl Encode for std::path::Path {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
@@ -417,6 +427,59 @@ impl Encode for std::net::SocketAddrV6 {
             .encode(self.ip())?
             .encode(self.port())?
             .ok()
+    }
+}
+
+impl<T: Encode> Encode for core::ops::Range<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(2)?
+            .encode(&self.start)?
+            .encode(&self.end)?
+            .ok()
+    }
+}
+
+impl<T: Encode> Encode for core::ops::RangeFrom<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(1)?
+            .encode(&self.start)?
+            .ok()
+    }
+}
+
+impl<T: Encode> Encode for core::ops::RangeTo<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(1)?
+            .encode(&self.end)?
+            .ok()
+    }
+}
+
+impl<T: Encode> Encode for core::ops::RangeToInclusive<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(1)?
+            .encode(&self.end)?
+            .ok()
+    }
+}
+
+impl<T: Encode> Encode for core::ops::RangeInclusive<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(2)?
+            .encode(self.start())?
+            .encode(self.end())?
+            .ok()
+    }
+}
+
+impl<T: Encode> Encode for core::ops::Bound<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(2)?;
+        match self {
+            core::ops::Bound::Included(v) => e.u32(0)?.encode(v)?.ok(),
+            core::ops::Bound::Excluded(v) => e.u32(1)?.encode(v)?.ok(),
+            core::ops::Bound::Unbounded   => e.u32(2)?.array(0)?.ok()
+        }
     }
 }
 
