@@ -4,7 +4,9 @@ use std::marker::PhantomData;
 
 fn identity<T: Encode + Eq + for<'a> Decode<'a>>(arg: T) -> bool {
     let vec = minicbor::to_vec(&arg).unwrap();
-    let val = minicbor::decode(&vec).unwrap();
+    let mut dec = minicbor::Decoder::new(&vec);
+    let val = dec.decode().unwrap();
+    assert_eq!(dec.position(), vec.len());
     arg == val
 }
 
@@ -73,7 +75,9 @@ fn f16() {
     fn property(arg: f32) -> bool {
         let mut e = minicbor::Encoder::new(Vec::new());
         e.f16(arg).unwrap();
-        let val = minicbor::Decoder::new(e.as_ref()).f16().unwrap();
+        let mut d = minicbor::Decoder::new(e.as_ref());
+        let val = d.f16().unwrap();
+        assert_eq!(d.position(), e.as_ref().len());
         half::f16::from_f32(arg).to_f32().to_bits() == val.to_bits()
     }
     quickcheck(property as fn(f32) -> bool)
@@ -83,7 +87,9 @@ fn f16() {
 fn f32() {
     fn property(arg: f32) -> bool {
         let vec = minicbor::to_vec(&arg).unwrap();
-        let val: f32 = minicbor::decode(&vec).unwrap();
+        let mut dec = minicbor::Decoder::new(&vec);
+        let val = dec.f32().unwrap();
+        assert_eq!(dec.position(), vec.len());
         arg.to_bits() == val.to_bits()
     }
     quickcheck(property as fn(f32) -> bool)
@@ -93,7 +99,9 @@ fn f32() {
 fn f64() {
     fn property(arg: f64) -> bool {
         let vec = minicbor::to_vec(&arg).unwrap();
-        let val: f64 = minicbor::decode(&vec).unwrap();
+        let mut dec = minicbor::Decoder::new(&vec);
+        let val = dec.f64().unwrap();
+        assert_eq!(dec.position(), vec.len());
         arg.to_bits() == val.to_bits()
     }
     quickcheck(property as fn(f64) -> bool)
@@ -162,8 +170,11 @@ fn byte_slice() {
     fn property(arg: Vec<u8>) -> bool {
         let arg: &ByteSlice = arg.as_slice().into();
         let vec = minicbor::to_vec(arg).unwrap();
-        assert_eq!(Some(Type::Bytes), Decoder::new(&vec).datatype().ok());
-        let val: &ByteSlice = minicbor::decode(&vec).unwrap();
+        let mut dec = Decoder::new(&vec);
+        assert_eq!(Some(Type::Bytes), dec.datatype().ok());
+        dec.set_position(0);
+        let val: &ByteSlice = dec.decode().unwrap();
+        assert_eq!(dec.position(), vec.len());
         arg == val
     }
 
@@ -176,9 +187,12 @@ fn byte_array() {
 
     let arg = ByteArray::from([1,2,3,4,5,6,7,8]);
     let vec = minicbor::to_vec(&arg).unwrap();
-    assert_eq!(Some(Type::Bytes), Decoder::new(&vec).datatype().ok());
-    let val: ByteArray<8> = minicbor::decode(&vec).unwrap();
-    assert_eq!(arg, val)
+    let mut dec = Decoder::new(&vec);
+    assert_eq!(Some(Type::Bytes), dec.datatype().ok());
+    dec.set_position(0);
+    let val: ByteArray<8> = dec.decode().unwrap();
+    assert_eq!(arg, val);
+    assert_eq!(dec.position(), vec.len())
 }
 
 #[test]
@@ -188,8 +202,11 @@ fn byte_vec() {
     fn property(arg: Vec<u8>) -> bool {
         let arg = ByteVec::from(arg);
         let vec = minicbor::to_vec(&arg).unwrap();
-        assert_eq!(Some(Type::Bytes), Decoder::new(&vec).datatype().ok());
-        let val: ByteVec = minicbor::decode(&vec).unwrap();
+        let mut dec = Decoder::new(&vec);
+        assert_eq!(Some(Type::Bytes), dec.datatype().ok());
+        dec.set_position(0);
+        let val: ByteVec = dec.decode().unwrap();
+        assert_eq!(dec.position(), vec.len());
         arg == val
     }
 
@@ -213,7 +230,9 @@ fn binaryheap() {
 
     fn property(arg: BinaryHeap<i32>) -> bool {
         let vec = minicbor::to_vec(&arg).unwrap();
-        let val: BinaryHeap<i32> = minicbor::decode(&vec).unwrap();
+        let mut dec = minicbor::Decoder::new(&vec);
+        let val: BinaryHeap<i32> = dec.decode().unwrap();
+        assert_eq!(dec.position(), vec.len());
         let a = BTreeSet::from_iter(arg.into_iter());
         let b = BTreeSet::from_iter(val.into_iter());
         a == b
@@ -347,5 +366,129 @@ fn array4() {
         identity([a, b, c, d])
     }
     quickcheck(property as fn(bool, bool, bool, bool) -> bool)
+}
+
+#[test]
+fn bound_u32() {
+    quickcheck(identity as fn(core::ops::Bound<u32>) -> bool)
+}
+
+#[test]
+fn bound_i32() {
+    quickcheck(identity as fn(core::ops::Bound<i32>) -> bool)
+}
+
+#[test]
+fn path_buf() {
+    quickcheck(identity as fn(std::path::PathBuf) -> bool)
+}
+
+#[test]
+fn path() {
+    fn property(arg: std::path::PathBuf) -> bool {
+        let vec = minicbor::to_vec(arg.as_path()).unwrap();
+        let mut dec = minicbor::Decoder::new(&vec);
+        let val = dec.decode::<&std::path::Path>().unwrap();
+        assert_eq!(dec.position(), vec.len());
+        arg == val
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn range() {
+    quickcheck(identity as fn(core::ops::Range<i32>) -> bool)
+}
+
+#[test]
+fn range_from() {
+    quickcheck(identity as fn(core::ops::RangeFrom<i32>) -> bool)
+}
+
+#[test]
+fn range_inclusive() {
+    quickcheck(identity as fn(core::ops::RangeInclusive<i32>) -> bool)
+}
+
+#[test]
+fn range_to() {
+    quickcheck(identity as fn(core::ops::RangeTo<i32>) -> bool)
+}
+
+#[test]
+fn range_to_inclusive() {
+    quickcheck(identity as fn(core::ops::RangeToInclusive<i32>) -> bool)
+}
+
+#[test]
+fn wrapping() {
+    quickcheck(identity as fn(core::num::Wrapping<i32>) -> bool)
+}
+
+#[test]
+fn cell() {
+    fn property(n: u32) -> bool {
+        identity(core::cell::Cell::new(n))
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn refcell() {
+    fn property(n: u32) -> bool {
+        identity(core::cell::RefCell::new(n))
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn system_time() {
+    fn property(t: std::time::SystemTime) -> bool {
+        if t < std::time::UNIX_EPOCH {
+            minicbor::to_vec(t).is_err()
+        } else {
+            identity(t)
+        }
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn atomic_u64() {
+    fn property(n: u64) -> bool {
+        let arg = core::sync::atomic::AtomicU64::new(n);
+        let vec = minicbor::to_vec(&arg).unwrap();
+        let mut dec = minicbor::Decoder::new(&vec);
+        let val = dec.decode::<core::sync::atomic::AtomicU64>().unwrap();
+        assert_eq!(dec.position(), vec.len());
+        n == val.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn atomic_i64() {
+    fn property(n: i64) -> bool {
+        let arg = core::sync::atomic::AtomicI64::new(n);
+        let vec = minicbor::to_vec(&arg).unwrap();
+        let mut dec = minicbor::Decoder::new(&vec);
+        let val = dec.decode::<core::sync::atomic::AtomicI64>().unwrap();
+        assert_eq!(dec.position(), vec.len());
+        n == val.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn atomic_bool() {
+    fn property(n: bool) -> bool {
+        let arg = core::sync::atomic::AtomicBool::new(n);
+        let vec = minicbor::to_vec(&arg).unwrap();
+        let mut dec = minicbor::Decoder::new(&vec);
+        let val = dec.decode::<core::sync::atomic::AtomicBool>().unwrap();
+        assert_eq!(dec.position(), vec.len());
+        n == val.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    quickcheck(property as fn(_) -> bool)
 }
 

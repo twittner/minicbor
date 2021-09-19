@@ -85,12 +85,27 @@ where
     }
 }
 
+#[cfg(feature = "std")]
+impl<T, S> Encode for std::collections::HashSet<T, S>
+where
+    T: Encode,
+    S: std::hash::BuildHasher
+{
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(as_u64(self.len()))?;
+        for x in self {
+            x.encode(e)?
+        }
+        Ok(())
+    }
+}
 
 #[cfg(feature = "std")]
-impl<K, V> Encode for std::collections::HashMap<K, V>
+impl<K, V, S> Encode for std::collections::HashMap<K, V, S>
 where
     K: Encode + Eq + std::hash::Hash,
-    V: Encode
+    V: Encode,
+    S: std::hash::BuildHasher
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
         e.map(as_u64(self.len()))?;
@@ -127,6 +142,12 @@ impl<T> Encode for core::marker::PhantomData<T> {
 impl Encode for () {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
         e.array(0)?.ok()
+    }
+}
+
+impl<T: Encode> Encode for core::num::Wrapping<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        self.0.encode(e)
     }
 }
 
@@ -196,6 +217,33 @@ encode_nonzero! {
     core::num::NonZeroI64
 }
 
+macro_rules! encode_atomic {
+    ($($t:ty)*) => {
+        $(
+            impl Encode for $t {
+                fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+                    self.load(core::sync::atomic::Ordering::SeqCst).encode(e)?;
+                    Ok(())
+                }
+            }
+        )*
+    }
+}
+
+encode_atomic! {
+    core::sync::atomic::AtomicBool
+    core::sync::atomic::AtomicU8
+    core::sync::atomic::AtomicU16
+    core::sync::atomic::AtomicU32
+    core::sync::atomic::AtomicU64
+    core::sync::atomic::AtomicUsize
+    core::sync::atomic::AtomicI8
+    core::sync::atomic::AtomicI16
+    core::sync::atomic::AtomicI32
+    core::sync::atomic::AtomicI64
+    core::sync::atomic::AtomicIsize
+}
+
 macro_rules! encode_sequential {
     ($($t:ty)*) => {
         $(
@@ -221,11 +269,6 @@ encode_sequential! {
     alloc::collections::LinkedList<T>
     alloc::collections::BinaryHeap<T>
     alloc::collections::BTreeSet<T>
-}
-
-#[cfg(feature = "std")]
-encode_sequential! {
-    std::collections::HashSet<T>
 }
 
 macro_rules! encode_arrays {
@@ -289,6 +332,51 @@ impl Encode for core::time::Duration {
 }
 
 #[cfg(feature = "std")]
+impl Encode for std::time::SystemTime {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        if let Ok(d) = self.duration_since(std::time::UNIX_EPOCH) {
+            d.encode(e)
+        } else {
+            Err(Error::Message("could not determine system time duration"))
+        }
+    }
+}
+
+impl<T: Encode + Copy> Encode for core::cell::Cell<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        self.get().encode(e)
+    }
+}
+
+impl<T: Encode> Encode for core::cell::RefCell<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        if let Ok(v) = self.try_borrow() {
+            v.encode(e)
+        } else {
+            Err(Error::Message("could not borrow ref cell value"))
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl Encode for std::path::Path {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        if let Some(s) = self.to_str() {
+            e.str(s)?.ok()
+        } else {
+            Err(Error::Message("non-utf-8 path values are not supported"))
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl Encode for std::path::PathBuf {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        self.as_path().encode(e)
+    }
+}
+
+#[cfg(feature = "std")]
 impl Encode for std::net::IpAddr {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
         e.array(2)?;
@@ -341,6 +429,59 @@ impl Encode for std::net::SocketAddrV6 {
             .encode(self.ip())?
             .encode(self.port())?
             .ok()
+    }
+}
+
+impl<T: Encode> Encode for core::ops::Range<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(2)?
+            .encode(&self.start)?
+            .encode(&self.end)?
+            .ok()
+    }
+}
+
+impl<T: Encode> Encode for core::ops::RangeFrom<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(1)?
+            .encode(&self.start)?
+            .ok()
+    }
+}
+
+impl<T: Encode> Encode for core::ops::RangeTo<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(1)?
+            .encode(&self.end)?
+            .ok()
+    }
+}
+
+impl<T: Encode> Encode for core::ops::RangeToInclusive<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(1)?
+            .encode(&self.end)?
+            .ok()
+    }
+}
+
+impl<T: Encode> Encode for core::ops::RangeInclusive<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(2)?
+            .encode(self.start())?
+            .encode(self.end())?
+            .ok()
+    }
+}
+
+impl<T: Encode> Encode for core::ops::Bound<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.array(2)?;
+        match self {
+            core::ops::Bound::Included(v) => e.u32(0)?.encode(v)?.ok(),
+            core::ops::Bound::Excluded(v) => e.u32(1)?.encode(v)?.ok(),
+            core::ops::Bound::Unbounded   => e.u32(2)?.array(0)?.ok()
+        }
     }
 }
 

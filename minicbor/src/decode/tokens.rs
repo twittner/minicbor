@@ -213,13 +213,20 @@ impl fmt::Display for Tokenizer<'_> {
                         stack.push(E::S(", "));
                         stack.push(E::N)
                     }
-                    E::A(None) => if let Some(Ok(Token::Break)) = iter.peek() {
-                        iter.next();
-                        f.write_str("]")?
-                    } else {
-                        stack.push(E::A(None));
-                        stack.push(E::X(", "));
-                        stack.push(E::N)
+                    E::A(None) => match iter.peek() {
+                        None => {
+                            write!(f, " !!! indefinite array not closed")?;
+                            return Ok(())
+                        }
+                        Some(Ok(Token::Break)) => {
+                            iter.next();
+                            f.write_str("]")?
+                        }
+                        _ => {
+                            stack.push(E::A(None));
+                            stack.push(E::X(", "));
+                            stack.push(E::N)
+                        }
                     }
                     E::M(Some(0)) => f.write_str("}")?,
                     E::M(Some(1)) => {
@@ -235,31 +242,52 @@ impl fmt::Display for Tokenizer<'_> {
                         stack.push(E::S(": "));
                         stack.push(E::N)
                     }
-                    E::M(None) => if let Some(Ok(Token::Break)) = iter.peek() {
-                        iter.next();
-                        f.write_str("}")?
-                    } else {
-                        stack.push(E::M(None));
-                        stack.push(E::X(", "));
-                        stack.push(E::N);
-                        stack.push(E::S(": "));
-                        stack.push(E::N)
+                    E::M(None) => match iter.peek() {
+                        None => {
+                            write!(f, " !!! indefinite map not closed")?;
+                            return Ok(())
+                        }
+                        Some(Ok(Token::Break)) => {
+                            iter.next();
+                            f.write_str("}")?
+                        }
+                        _ => {
+                            stack.push(E::M(None));
+                            stack.push(E::X(", "));
+                            stack.push(E::N);
+                            stack.push(E::S(": "));
+                            stack.push(E::N)
+                        }
                     }
-                    E::B => if let Some(Ok(Token::Break)) = iter.peek() {
-                        iter.next();
-                        f.write_str(")")?
-                    } else {
-                        stack.push(E::B);
-                        stack.push(E::X(", "));
-                        stack.push(E::N)
+                    E::B => match iter.peek() {
+                        None => {
+                            write!(f, " !!! indefinite byte string not closed")?;
+                            return Ok(())
+                        }
+                        Some(Ok(Token::Break)) => {
+                            iter.next();
+                            f.write_str(")")?
+                        }
+                        _ => {
+                            stack.push(E::B);
+                            stack.push(E::X(", "));
+                            stack.push(E::N)
+                        }
                     }
-                    E::D => if let Some(Ok(Token::Break)) = iter.peek() {
-                        iter.next();
-                        f.write_str(")")?
-                    } else {
-                        stack.push(E::D);
-                        stack.push(E::X(", "));
-                        stack.push(E::N)
+                    E::D => match iter.peek() {
+                        None => {
+                            write!(f, " !!! indefinite string not closed")?;
+                            return Ok(())
+                        }
+                        Some(Ok(Token::Break)) => {
+                            iter.next();
+                            f.write_str(")")?
+                        }
+                        _ => {
+                            stack.push(E::D);
+                            stack.push(E::X(", "));
+                            stack.push(E::N)
+                        }
                     }
                 }
             }
