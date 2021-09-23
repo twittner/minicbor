@@ -9,6 +9,7 @@ repository    = "https://gitlab.com/twittner/minicbor"
 documentation = "https://twittner.gitlab.io/minicbor/minicbor/"
 keywords      = ["cbor", "encoding", "binary"]
 categories    = ["encoding"]
+build         = "build.rs"
 
 [package.metadata.docs.rs]
 features = ["std", "derive", "half"]
