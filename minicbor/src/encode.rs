@@ -217,6 +217,7 @@ encode_nonzero! {
     core::num::NonZeroI64
 }
 
+#[cfg(any(atomic32, atomic64))]
 macro_rules! encode_atomic {
     ($($t:ty)*) => {
         $(
@@ -230,6 +231,20 @@ macro_rules! encode_atomic {
     }
 }
 
+#[cfg(atomic32)]
+encode_atomic! {
+    core::sync::atomic::AtomicBool
+    core::sync::atomic::AtomicU8
+    core::sync::atomic::AtomicU16
+    core::sync::atomic::AtomicU32
+    core::sync::atomic::AtomicUsize
+    core::sync::atomic::AtomicI8
+    core::sync::atomic::AtomicI16
+    core::sync::atomic::AtomicI32
+    core::sync::atomic::AtomicIsize
+}
+
+#[cfg(atomic64)]
 encode_atomic! {
     core::sync::atomic::AtomicBool
     core::sync::atomic::AtomicU8
