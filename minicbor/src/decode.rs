@@ -249,6 +249,7 @@ decode_nonzero! {
     core::num::NonZeroI64, "unexpected 0 when decoding a `NonZeroI64`"
 }
 
+#[cfg(any(atomic32, atomic64))]
 macro_rules! decode_atomic {
     ($($t:ty)*) => {
         $(
@@ -261,6 +262,20 @@ macro_rules! decode_atomic {
     }
 }
 
+#[cfg(atomic32)]
+decode_atomic! {
+    core::sync::atomic::AtomicBool
+    core::sync::atomic::AtomicU8
+    core::sync::atomic::AtomicU16
+    core::sync::atomic::AtomicU32
+    core::sync::atomic::AtomicUsize
+    core::sync::atomic::AtomicI8
+    core::sync::atomic::AtomicI16
+    core::sync::atomic::AtomicI32
+    core::sync::atomic::AtomicIsize
+}
+
+#[cfg(atomic64)]
 decode_atomic! {
     core::sync::atomic::AtomicBool
     core::sync::atomic::AtomicU8
