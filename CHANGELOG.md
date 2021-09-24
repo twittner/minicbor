@@ -6,6 +6,12 @@
 
 # minicbor
 
+## `0.11.3`
+
+- Bugfix release: Version `0.11.2` added `Encode`/`Decode` impls for various atomic types without
+  considering their availability on the target platform (cf. issue #11). In here we attempt to
+  only offer impls for available atomic types (cf. merge request !13 for details).
+
 ## `0.11.2`
 
 - Improves `minicbor::display` to be more robust when applied to malformed CBOR values
