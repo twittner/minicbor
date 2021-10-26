@@ -19,6 +19,20 @@ pub use tokens::{Token, Tokenizer};
 pub trait Decode<'b>: Sized {
     /// Decode a value using the given `Decoder`.
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error>;
+
+    /// If possible, return a null value of `Self`.
+    ///
+    /// This method allows creating a special value denoting the absence
+    /// of a "real" value if no CBOR value is present. The canonical
+    /// example of a type were this is sensible is the `Option` type whose
+    /// `Decode::null` method would return `Some(None)`.
+    ///
+    /// NB: A type implementing `Decode` with an overriden `Decode::null`
+    /// method should also override `Encode::is_null` if it implements `Encode`
+    /// at all.
+    fn null() -> Option<Self> {
+        None
+    }
 }
 
 #[cfg(feature = "alloc")]
@@ -59,6 +73,10 @@ impl<'b, T: Decode<'b>> Decode<'b> for Option<T> {
             return Ok(None)
         }
         T::decode(d).map(Some)
+    }
+
+    fn null() -> Option<Self> {
+        Some(None)
     }
 }
 

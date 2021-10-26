@@ -105,6 +105,10 @@ impl Attributes {
                 return Ok(Attributes::new(l))
             };
 
+        let mut is_null = None;
+        let mut null = None;
+        let mut has_null = None;
+
         for nested in &cbor.nested {
             match nested {
                 syn::NestedMeta::Meta(syn::Meta::Path(arg)) =>
@@ -116,27 +120,47 @@ impl Attributes {
                         attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Map, nested.span()))?
                     } else if arg.is_ident("array") {
                         attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Array, nested.span()))?
+                    } else if arg.is_ident("has_null") {
+                        has_null = Some(arg.span())
                     } else {
                         return Err(syn::Error::new(nested.span(), "unknown attribute"))
                     }
                 syn::NestedMeta::Meta(syn::Meta::NameValue(arg)) =>
                     if arg.path.is_ident("encode_with") {
                         if let syn::Lit::Str(path) = &arg.lit {
-                            let cc = CustomCodec::Encode(syn::parse_str(&path.value())?);
+                            let cc = CustomCodec::Encode {
+                                encode: syn::parse_str(&path.value())?,
+                                is_null: is_null.take()
+                            };
                             attrs.try_insert(Kind::Codec, Value::Codec(cc, nested.span()))?
+                        } else {
+                            return Err(syn::Error::new(arg.span(), "string required"))
+                        }
+                    } else if arg.path.is_ident("is_null") {
+                        if let syn::Lit::Str(path) = &arg.lit {
+                            is_null = Some(syn::parse_str(&path.value())?)
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
                         }
                     } else if arg.path.is_ident("decode_with") {
                         if let syn::Lit::Str(path) = &arg.lit {
-                            let cc = CustomCodec::Decode(syn::parse_str(&path.value())?);
+                            let cc = CustomCodec::Decode {
+                                decode: syn::parse_str(&path.value())?,
+                                null: null.take()
+                            };
                             attrs.try_insert(Kind::Codec, Value::Codec(cc, nested.span()))?
+                        } else {
+                            return Err(syn::Error::new(arg.span(), "string required"))
+                        }
+                    } else if arg.path.is_ident("null") {
+                        if let syn::Lit::Str(path) = &arg.lit {
+                            null = Some(syn::parse_str(&path.value())?)
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
                         }
                     } else if arg.path.is_ident("with") {
                         if let syn::Lit::Str(path) = &arg.lit {
-                            let cc = CustomCodec::Module(syn::parse_str(&path.value())?);
+                            let cc = CustomCodec::Module(syn::parse_str(&path.value())?, has_null.is_some());
                             attrs.try_insert(Kind::Codec, Value::Codec(cc, nested.span()))?
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
@@ -175,14 +199,14 @@ impl Attributes {
                             let idx = parse_int(n).map(Idx::N)?;
                             attrs.try_insert(Kind::Index, Value::Index(idx, a.tokens.span()))?;
                         } else {
-                            return Err(syn::Error::new(arg.span(), "n expects a u32 argument"))
+                            return Err(syn::Error::new(arg.span(), "`n` expects a u32 argument"))
                         }
                     } else if arg.path.is_ident("b") {
                         if let Some(syn::NestedMeta::Lit(syn::Lit::Int(n))) = arg.nested.first() {
                             let idx = parse_int(n).map(Idx::B)?;
                             attrs.try_insert(Kind::Index, Value::Index(idx, a.tokens.span()))?;
                         } else {
-                            return Err(syn::Error::new(arg.span(), "b expects a u32 argument"))
+                            return Err(syn::Error::new(arg.span(), "`b` expects a u32 argument"))
                         }
                     } else {
                         return Err(syn::Error::new(nested.span(), "unknown attribute"))
@@ -192,6 +216,40 @@ impl Attributes {
                 }
             }
         }
+
+        if let Some(a) = is_null {
+            if let Some(Value::Codec(cc, _)) = attrs.get_mut(Kind::Codec) {
+                if cc.has_is_null() {
+                    return Err(syn::Error::new(a.span(), "duplicate attribute"))
+                }
+                cc.set_is_null(a)
+            } else {
+                return Err(syn::Error::new(a.span(), "`is_null` requires `encode_with` attribute"))
+            }
+        }
+
+        if let Some(a) = null {
+            if let Some(Value::Codec(cc, _)) = attrs.get_mut(Kind::Codec) {
+                if cc.has_null() {
+                    return Err(syn::Error::new(a.span(), "duplicate attribute"))
+                }
+                cc.set_null(a)
+            } else {
+                return Err(syn::Error::new(a.span(), "`null` requires `decode_with` attribute"))
+            }
+        }
+
+        if let Some(a) = has_null {
+            if let Some(Value::Codec(cc, _)) = attrs.get_mut(Kind::Codec) {
+                if cc.has_module_null() {
+                    return Err(syn::Error::new(a.span(), "duplicate attribute"))
+                }
+                cc.set_module_null()
+            } else {
+                return Err(syn::Error::new(a, "`has_null` requires `with` attribute"))
+            }
+        }
+
         Ok(attrs)
     }
 
@@ -266,12 +324,22 @@ impl Attributes {
             if let Some(Value::Codec(cc, _)) = self.get_mut(key) {
                 let s = val.span();
                 match (val, &cc) {
-                    (Value::Codec(CustomCodec::Encode(e), _), CustomCodec::Decode(d)) => {
-                        *cc = CustomCodec::Both { encode: e, decode: d.clone() };
+                    (Value::Codec(CustomCodec::Encode { encode, is_null }, _), CustomCodec::Decode { decode, null }) => {
+                        *cc = CustomCodec::Both {
+                            encode,
+                            is_null,
+                            decode: decode.clone(),
+                            null: null.clone()
+                        };
                         return Ok(())
                     }
-                    (Value::Codec(CustomCodec::Decode(d), _), CustomCodec::Encode(e)) => {
-                        *cc = CustomCodec::Both { encode: e.clone(), decode: d };
+                    (Value::Codec(CustomCodec::Decode { decode, null }, _), CustomCodec::Encode { encode, is_null }) => {
+                        *cc = CustomCodec::Both {
+                            encode: encode.clone(),
+                            is_null: is_null.clone(),
+                            decode,
+                            null
+                        };
                         return Ok(())
                     }
                     _ => return Err(syn::Error::new(s, "duplicate attribute"))

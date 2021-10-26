@@ -8,7 +8,17 @@ pub enum CustomCodec {
     ///   `fn<T, W: Write>(&T, &mut Encoder<W>) -> Result<(), Error<W::Error>>`
     ///
     /// Declared with `#[cbor(encode_with = "...")]`.
-    Encode(syn::ExprPath),
+    ///
+    /// In addition an optional custom `is_null` function can be declared which
+    /// is assumed to be of a type equivalent to:
+    ///
+    ///   `fn<T>(&T) -> bool`
+    ///
+    /// Declared with `#[cbor(is_null = "...")]`
+    Encode {
+        encode: syn::ExprPath,
+        is_null: Option<syn::ExprPath>
+    },
     /// Custom decode function.
     ///
     /// Assumed to be of a type equivalent to:
@@ -16,11 +26,23 @@ pub enum CustomCodec {
     ///   `fn<T>(&mut Decoder<'_>) -> Result<T, Error>`
     ///
     /// Declared with `#[cbor(decode_with = "...")]`.
-    Decode(syn::ExprPath),
-    /// The combination of `encode_with` and `decode_with`.
+    ///
+    /// In addition an optional custom `null` function can be declared which
+    /// is assumed to be of a type equivalent to:
+    ///
+    ///   `fn<T>() -> Option<T>`
+    ///
+    /// Declared with `#[cbor(null = "...")]`
+    Decode {
+        decode: syn::ExprPath,
+        null: Option<syn::ExprPath>
+    },
+    /// The combination of `encode_with` + `is_null` and `decode_with` + `null`.
     Both {
         encode: syn::ExprPath,
-        decode: syn::ExprPath
+        is_null: Option<syn::ExprPath>,
+        decode: syn::ExprPath,
+        null: Option<syn::ExprPath>
     },
     /// A module which contains custom encode/decode functions.
     ///
@@ -28,27 +50,47 @@ pub enum CustomCodec {
     /// `decode` whose types match those declared with
     /// `#[cbor(encode_with = "...")]` or `#[cbor(decode_with = "...")]`
     /// respectively. Declared with `#[cbor(with = "...")]`.
-    Module(syn::ExprPath)
+    ///
+    /// Optionally the attribute `has_null` can be added which means that
+    /// the module contains functions `is_null` and `null` matching those
+    /// declared with `is_null` and `null` when using `encode_with` and
+    /// `decode_with`.
+    Module(syn::ExprPath, bool)
 }
 
 impl CustomCodec {
     /// Is this a custom codec from `encode_with` or `with`?
     pub fn is_encode(&self) -> bool {
-        !matches!(self, CustomCodec::Decode(_))
+        !matches!(self, CustomCodec::Decode {..})
     }
 
     /// Is this a custom codec from `decode_with` or `with`?
     pub fn is_decode(&self) -> bool {
-        !matches!(self, CustomCodec::Encode(_))
+        !matches!(self, CustomCodec::Encode {..})
+    }
+
+    /// Does this codec support checking for optionality?
+    pub fn has_is_null(&self) -> bool {
+        matches!(self, CustomCodec::Encode { is_null: Some(_), .. } | CustomCodec::Module(_, true))
+    }
+
+    /// Does this codec support creating a default optional value?
+    pub fn has_null(&self) -> bool {
+        matches!(self, CustomCodec::Decode { null: Some(_), .. } | CustomCodec::Module(_, true))
+    }
+
+    /// Does this codec module support optionality semantics?
+    pub fn has_module_null(&self) -> bool {
+        matches!(self, CustomCodec::Module(_, true))
     }
 
     /// Extract the encode function unless this `CustomCodec` does not declare one.
     pub fn to_encode_path(&self) -> Option<syn::ExprPath> {
         match self {
-            CustomCodec::Encode(p) => Some(p.clone()),
-            CustomCodec::Both { encode, .. } => Some(encode.clone()),
-            CustomCodec::Decode(_) => None,
-            CustomCodec::Module(p) => {
+            CustomCodec::Encode { encode, .. } => Some(encode.clone()),
+            CustomCodec::Both   { encode, .. } => Some(encode.clone()),
+            CustomCodec::Decode { .. } => None,
+            CustomCodec::Module(p, _) => {
                 let mut p = p.clone();
                 let ident = syn::Ident::new("encode", proc_macro2::Span::call_site());
                 p.path.segments.push(ident.into());
@@ -60,15 +102,74 @@ impl CustomCodec {
     /// Extract the decode function unless this `CustomCodec` does not declare one.
     pub fn to_decode_path(&self) -> Option<syn::ExprPath> {
         match self {
-            CustomCodec::Encode(_) => None,
-            CustomCodec::Decode(p) => Some(p.clone()),
-            CustomCodec::Both { decode, .. } => Some(decode.clone()),
-            CustomCodec::Module(p) => {
+            CustomCodec::Encode {..} => None,
+            CustomCodec::Decode { decode, .. } => Some(decode.clone()),
+            CustomCodec::Both   { decode, .. } => Some(decode.clone()),
+            CustomCodec::Module(p, _) => {
                 let mut p = p.clone();
                 let ident = syn::Ident::new("decode", proc_macro2::Span::call_site());
                 p.path.segments.push(ident.into());
                 Some(p)
             }
+        }
+    }
+
+    /// Extrace the `is_null` function if possible.
+    pub fn to_is_null_path(&self) -> Option<syn::ExprPath> {
+        match self {
+            CustomCodec::Encode { is_null, .. } => is_null.clone(),
+            CustomCodec::Both   { is_null, .. } => is_null.clone(),
+            CustomCodec::Module(p, true) => {
+                let mut p = p.clone();
+                let ident = syn::Ident::new("is_null", proc_macro2::Span::call_site());
+                p.path.segments.push(ident.into());
+                Some(p)
+            }
+            CustomCodec::Module(_, false) => None,
+            CustomCodec::Decode { .. }    => None
+        }
+    }
+
+    /// Extrace the `null` function if possible.
+    pub fn to_null_path(&self) -> Option<syn::ExprPath> {
+        match self {
+            CustomCodec::Decode { null, .. } => null.clone(),
+            CustomCodec::Both   { null, .. } => null.clone(),
+            CustomCodec::Module(p, true) => {
+                let mut p = p.clone();
+                let ident = syn::Ident::new("null", proc_macro2::Span::call_site());
+                p.path.segments.push(ident.into());
+                Some(p)
+            }
+            CustomCodec::Module(_, false) => None,
+            CustomCodec::Encode { .. }    => None
+        }
+    }
+
+    /// Set the `is_null` function.
+    pub fn set_is_null(&mut self, p: syn::ExprPath) {
+        match self {
+            CustomCodec::Encode { is_null, .. } => *is_null = Some(p),
+            CustomCodec::Both   { is_null, .. } => *is_null = Some(p),
+            CustomCodec::Module(..)    => {}
+            CustomCodec::Decode { .. } => {}
+        }
+    }
+
+    /// Set the `null` function.
+    pub fn set_null(&mut self, p: syn::ExprPath) {
+        match self {
+            CustomCodec::Decode { null, .. } => *null = Some(p),
+            CustomCodec::Both   { null, .. } => *null = Some(p),
+            CustomCodec::Module (..)   => {}
+            CustomCodec::Encode { .. } => {}
+        }
+    }
+
+    /// Mark the custom codec module as supporting optionality.
+    pub fn set_module_null(&mut self) {
+        if let CustomCodec::Module(_, v) = self {
+            *v = true
         }
     }
 }

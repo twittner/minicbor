@@ -256,12 +256,20 @@ impl Encode for ByteVec {
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
 pub trait EncodeBytes {
     fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>>;
+
+    fn is_null(&self) -> bool {
+        false
+    }
 }
 
 /// Like [`Decode`] but specific for decoding from byte slices.
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
 pub trait DecodeBytes<'b>: Sized {
     fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error>;
+
+    fn null() -> Option<Self> {
+        None
+    }
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
@@ -364,6 +372,10 @@ impl<T: EncodeBytes> EncodeBytes for Option<T> {
             e.null()?.ok()
         }
     }
+
+    fn is_null(&self) -> bool {
+        self.is_none()
+    }
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
@@ -374,6 +386,10 @@ impl<'b, T: DecodeBytes<'b>> DecodeBytes<'b> for Option<T> {
             return Ok(None)
         }
         T::decode_bytes(d).map(Some)
+    }
+
+    fn null() -> Option<Self> {
+        Some(None)
     }
 }
 
@@ -389,6 +405,14 @@ where
     T::decode_bytes(d)
 }
 
+#[cfg(any(feature = "derive", feature = "partial-derive-support"))]
+pub fn null<'b, T>() -> Option<T>
+where
+    T: DecodeBytes<'b>
+{
+    T::null()
+}
+
 /// Freestanding function calling `EncodeBytes::encode_bytes`.
 ///
 /// For use in `#[cbor(with = "minicbor::bytes")]` or `#[cbor(encode_with =
@@ -402,3 +426,10 @@ where
     T::encode_bytes(xs, e)
 }
 
+#[cfg(any(feature = "derive", feature = "partial-derive-support"))]
+pub fn is_null<T>(xs: &T) -> bool
+where
+    T: EncodeBytes
+{
+    T::is_null(xs)
+}

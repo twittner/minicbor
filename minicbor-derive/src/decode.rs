@@ -78,6 +78,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     let field_str  = fields.idents.iter().map(|n| format!("{}::{}", name, n)).collect::<Vec<_>>();
     let statements = gen_statements(&fields, &decode_fns, attrs.encoding().unwrap_or_default())?;
+    let nulls      = nulls(&fields.types, &decode_fns);
 
     let Fields { indices, idents, .. } = fields;
 
@@ -86,6 +87,8 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             Ok(#name {
                 #(#idents : if let Some(x) = #idents {
                     x
+                } else if let Some(z) = #nulls {
+                    z
                 } else {
                     return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
                 }),*
@@ -97,6 +100,8 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         quote! {
             Ok(#name(#(if let Some(x) = #idents {
                 x
+            } else if let Some(z) = #nulls {
+                z
             } else {
                 return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
             }),*))
@@ -166,6 +171,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 collect_type_params(&inp.generics, iter)
             });
             let statements = gen_statements(&fields, &decode_fns, encoding)?;
+            let nulls      = nulls(&fields.types, &decode_fns);
             let Fields { indices, idents, .. } = fields;
             if let syn::Fields::Named(_) = var.fields {
                 quote! {
@@ -174,6 +180,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         Ok(#name::#con {
                             #(#idents : if let Some(x) = #idents {
                                 x
+                            } else if let Some(z) = #nulls {
+                                z
                             } else {
                                 return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
                             }),*
@@ -186,6 +194,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         #statements
                         Ok(#name::#con(#(if let Some(x) = #idents {
                             x
+                        } else if let Some(z) = #nulls {
+                            z
                         } else {
                             return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
                         }),*))
@@ -264,27 +274,50 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
     let actions = fields.indices.iter().zip(fields.idents.iter().zip(fields.types.iter().zip(decode_fns)))
         .map(|(ix, (name, (ty, ff)))| {
             let decode_fn = ff.as_ref()
-                .and_then(|ff| ff.to_decode_path())
+                .and_then(CustomCodec::to_decode_path)
                 .unwrap_or_else(|| default_decode_fn.clone());
-            if is_option(ty, |_| true) {
-                return quote! {
-                    match #decode_fn(__d777) {
-                        Ok(__v777) => #name = Some(__v777),
-                        Err(minicbor::decode::Error::UnknownVariant(_)) => { __d777.skip()? }
-                        Err(e) => return Err(e)
+
+            let unknown_var_err =
+                if let Some(cd) = ff {
+                    if let Some(p) = cd.to_null_path() {
+                        quote! {
+                            Err(minicbor::decode::Error::UnknownVariant(_)) if #p().is_some() => {
+                                __d777.skip()?
+                            }
+                        }
+                    } else if is_option(ty, |_| true) {
+                        quote! {
+                            Err(minicbor::decode::Error::UnknownVariant(_)) => __d777.skip()?,
+                        }
+                    } else {
+                        quote!()
                     }
+                } else if is_option(ty, |_| true) {
+                    quote! {
+                        Err(minicbor::decode::Error::UnknownVariant(_)) => __d777.skip()?,
+                    }
+                } else {
+                    quote! {
+                        Err(minicbor::decode::Error::UnknownVariant(_)) if <#ty>::null().is_some() => {
+                            __d777.skip()?
+                        }
+                    }
+                };
+
+            let value =
+                if ix.is_b() && is_cow(ty, |t| is_str(t) || is_byte_slice(t)) {
+                    quote!(Some(minicbor::bytes::Cow::Borrowed(__v777)))
+                } else {
+                    quote!(Some(__v777))
+                };
+
+            quote! {
+                match #decode_fn(__d777) {
+                    Ok(__v777) => #name = #value,
+                    #unknown_var_err
+                    Err(e) => return Err(e)
                 }
             }
-            if ix.is_b() && is_cow(ty, |t| is_str(t) || is_byte_slice(t)) {
-                return quote! {
-                    match #decode_fn(__d777) {
-                        Ok(__v777) => #name = Some(minicbor::bytes::Cow::Borrowed(__v777)),
-                        Err(minicbor::decode::Error::UnknownVariant(_)) => { __d777.skip()? }
-                        Err(e) => return Err(e)
-                    }
-                }
-            }
-            quote!({ #name = Some(#decode_fn(__d777)?) })
     })
     .collect::<Vec<_>>();
 
@@ -374,4 +407,22 @@ fn make_transparent_impl
 
 fn gen_decode_bound() -> syn::Result<syn::TypeParamBound> {
     syn::parse_str("minicbor::Decode<'bytes>")
+}
+
+fn nulls(types: &[syn::Type], decode_fns: &[Option<CustomCodec>]) -> Vec<proc_macro2::TokenStream> {
+    types.iter().zip(decode_fns)
+        .map(|(ty, dec)| {
+            if let Some(d) = dec {
+                if let Some(p) = d.to_null_path() {
+                    quote!(#p())
+                } else if is_option(ty, |_| true) {
+                    quote!(Some(None))
+                } else {
+                    quote!(None)
+                }
+            } else {
+                quote!(<#ty>::null())
+            }
+        })
+        .collect()
 }
