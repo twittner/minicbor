@@ -583,7 +583,7 @@ impl<'b> Decoder<'b> {
 
     /// Consume and return *n* bytes starting at the current position.
     fn read_slice(&mut self, n: usize) -> Result<&'b [u8], Error> {
-        if let Some(b) = self.buf.get(self.pos .. self.pos + n) {
+        if let Some(b) = self.pos.checked_add(n).and_then(|end| self.buf.get(self.pos .. end)) {
             self.pos += n;
             return Ok(b)
         }

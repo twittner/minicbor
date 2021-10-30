@@ -6,6 +6,13 @@
 
 # minicbor
 
+## `0.11.4`
+
+- Bugfix: Decoding strings or bytes with a length of `u64::MAX` would cause an overflow of the
+  internal decoder position value. This case is now properly handled. See issue #12 for details.
+- Bugfix: The `partial-derive-support` feature did not re-export `minicbor-derive`, nor did it
+  make the functionality of `minicbor::bytes` available. See merge request !14 for details.
+
 ## `0.11.3`
 
 - Bugfix release: Version `0.11.2` added `Encode`/`Decode` impls for various atomic types without
