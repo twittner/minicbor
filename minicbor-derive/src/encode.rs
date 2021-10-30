@@ -319,8 +319,7 @@ fn encode_fields
 
     match encoding {
         // Under map encoding each field is encoded with its index.
-        // If the field type is an `Option` and `None`, neither the
-        // index nor the field value are encoded.
+        // Only field values which are not "null" are encoded.
         Encoding::Map => for field in iter {
             let (i, (idx, (ident, (&is_name, (typ, encode))))) = field;
             let is_null = is_null(typ, encode);
@@ -366,9 +365,6 @@ fn encode_fields
         // Under array encoding only field values are encoded and their
         // index is represented as the array position. Gaps between indexes
         // need to be filled with null.
-        // We do not encode the suffix of `Option` fields which are `None`
-        // so we check for each field if it is still below the max. index,
-        // otherwise we do not encode it.
         Encoding::Array => {
             let mut first = true;
             let mut k = 0;

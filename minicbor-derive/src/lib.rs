@@ -193,7 +193,7 @@
 //!
 //! ## `#[cbor(has_null)]`
 //!
-//! Only valid in conjuction with [`#[cbor(with = "...")]`](#cborwith--path). If present
+//! Only valid in conjuction with [`#[cbor(with = "...")]`](#cborwith--path). If present,
 //! the attribute signals that the module denoted by `with` also contains functions `null`
 //! and `is_null` to create null values and to check if a value is a null value.
 //!

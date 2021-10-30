@@ -121,6 +121,9 @@ impl Attributes {
                     } else if arg.is_ident("array") {
                         attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Array, nested.span()))?
                     } else if arg.is_ident("has_null") {
+                        if has_null.is_some() {
+                            return Err(syn::Error::new(arg.span(), "duplicate attribute"))
+                        }
                         has_null = Some(arg.span())
                     } else {
                         return Err(syn::Error::new(nested.span(), "unknown attribute"))
@@ -128,32 +131,38 @@ impl Attributes {
                 syn::NestedMeta::Meta(syn::Meta::NameValue(arg)) =>
                     if arg.path.is_ident("encode_with") {
                         if let syn::Lit::Str(path) = &arg.lit {
-                            let cc = CustomCodec::Encode {
+                            let cc = CustomCodec::Encode(codec::Encode {
                                 encode: syn::parse_str(&path.value())?,
                                 is_null: is_null.take()
-                            };
+                            });
                             attrs.try_insert(Kind::Codec, Value::Codec(cc, nested.span()))?
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
                         }
                     } else if arg.path.is_ident("is_null") {
                         if let syn::Lit::Str(path) = &arg.lit {
+                            if is_null.is_some() {
+                                return Err(syn::Error::new(arg.span(), "duplicate attribute"))
+                            }
                             is_null = Some(syn::parse_str(&path.value())?)
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
                         }
                     } else if arg.path.is_ident("decode_with") {
                         if let syn::Lit::Str(path) = &arg.lit {
-                            let cc = CustomCodec::Decode {
+                            let cc = CustomCodec::Decode(codec::Decode {
                                 decode: syn::parse_str(&path.value())?,
                                 null: null.take()
-                            };
+                            });
                             attrs.try_insert(Kind::Codec, Value::Codec(cc, nested.span()))?
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
                         }
                     } else if arg.path.is_ident("null") {
                         if let syn::Lit::Str(path) = &arg.lit {
+                            if null.is_some() {
+                                return Err(syn::Error::new(arg.span(), "duplicate attribute"))
+                            }
                             null = Some(syn::parse_str(&path.value())?)
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
@@ -324,22 +333,14 @@ impl Attributes {
             if let Some(Value::Codec(cc, _)) = self.get_mut(key) {
                 let s = val.span();
                 match (val, &cc) {
-                    (Value::Codec(CustomCodec::Encode { encode, is_null }, _), CustomCodec::Decode { decode, null }) => {
-                        *cc = CustomCodec::Both {
-                            encode,
-                            is_null,
-                            decode: decode.clone(),
-                            null: null.clone()
-                        };
+                    (Value::Codec(CustomCodec::Encode(e), _), CustomCodec::Decode(d)) => {
+                        let d = codec::Decode { decode: d.decode.clone(), null: d.null.clone() };
+                        *cc = CustomCodec::Both(Box::new(e), Box::new(d));
                         return Ok(())
                     }
-                    (Value::Codec(CustomCodec::Decode { decode, null }, _), CustomCodec::Encode { encode, is_null }) => {
-                        *cc = CustomCodec::Both {
-                            encode: encode.clone(),
-                            is_null: is_null.clone(),
-                            decode,
-                            null
-                        };
+                    (Value::Codec(CustomCodec::Decode(d), _), CustomCodec::Encode(e)) => {
+                        let e = codec::Encode { encode: e.encode.clone(), is_null: e.is_null.clone() };
+                        *cc = CustomCodec::Both(Box::new(e), Box::new(d));
                         return Ok(())
                     }
                     _ => return Err(syn::Error::new(s, "duplicate attribute"))
