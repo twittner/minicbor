@@ -589,6 +589,15 @@ impl<'b> Decoder<'b> {
         }
         Err(Error::EndOfInput)
     }
+
+    /// Consume the remaining bytes as is.
+    pub(crate) fn consume(&mut self) -> Result<&'b [u8], Error> {
+        if let Some(b) = self.buf.get(self.pos ..) {
+            self.pos = self.buf.len();
+            return Ok(b)
+        }
+        Err(Error::EndOfInput)
+    }
 }
 
 /// An iterator over byte slices.
