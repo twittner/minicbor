@@ -278,7 +278,7 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
             if ix.is_b() && is_cow(ty, |t| is_str(t) || is_byte_slice(t)) {
                 return quote! {
                     match #decode_fn(__d777) {
-                        Ok(__v777) => #name = Some(std::borrow::Cow::Borrowed(__v777)),
+                        Ok(__v777) => #name = Some(minicbor::bytes::Cow::Borrowed(__v777)),
                         Err(minicbor::decode::Error::UnknownVariant(_)) => { __d777.skip()? }
                         Err(e) => return Err(e)
                     }
