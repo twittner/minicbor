@@ -27,7 +27,10 @@ enum Kind {
     Index,
     IndexOnly,
     Transparent,
-    TypeParam
+    TypeParam,
+    Null,
+    IsNull,
+    HasNull
 }
 
 #[derive(Debug, Clone)]
@@ -36,7 +39,10 @@ enum Value {
     Encoding(Encoding, proc_macro2::Span),
     Index(Idx, proc_macro2::Span),
     Span(proc_macro2::Span),
-    TypeParam(TypeParams, proc_macro2::Span)
+    TypeParam(TypeParams, proc_macro2::Span),
+    Null(syn::ExprPath, proc_macro2::Span),
+    IsNull(syn::ExprPath, proc_macro2::Span),
+    HasNull(proc_macro2::Span)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -74,10 +80,19 @@ impl Attributes {
                 this.try_insert(k, v)?;
             }
         }
+        if let Some(Value::IsNull(_, s)) = this.get(Kind::IsNull) {
+            return Err(syn::Error::new(*s, "`is_null` requires `encode_with`"))
+        }
+        if let Some(Value::Null(_, s)) = this.get(Kind::Null) {
+            return Err(syn::Error::new(*s, "`null` requires `decode_with`"))
+        }
+        if let Some(Value::HasNull(s)) = this.get(Kind::HasNull) {
+            return Err(syn::Error::new(*s, "`has_null` requires `with`"))
+        }
         Ok(this)
     }
 
-    fn try_from(l: Level, a: &syn::Attribute) -> syn::Result<Attributes> {
+    fn try_from(l: Level, a: &syn::Attribute) -> syn::Result<Self> {
         let mut attrs = Attributes::new(l);
 
         // #[n(...)]
@@ -105,10 +120,6 @@ impl Attributes {
                 return Ok(Attributes::new(l))
             };
 
-        let mut is_null = None;
-        let mut null = None;
-        let mut has_null = None;
-
         for nested in &cbor.nested {
             match nested {
                 syn::NestedMeta::Meta(syn::Meta::Path(arg)) =>
@@ -121,10 +132,7 @@ impl Attributes {
                     } else if arg.is_ident("array") {
                         attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Array, nested.span()))?
                     } else if arg.is_ident("has_null") {
-                        if has_null.is_some() {
-                            return Err(syn::Error::new(arg.span(), "duplicate attribute"))
-                        }
-                        has_null = Some(arg.span())
+                        attrs.try_insert(Kind::HasNull, Value::HasNull(nested.span()))?
                     } else {
                         return Err(syn::Error::new(nested.span(), "unknown attribute"))
                     }
@@ -133,7 +141,7 @@ impl Attributes {
                         if let syn::Lit::Str(path) = &arg.lit {
                             let cc = CustomCodec::Encode(codec::Encode {
                                 encode: syn::parse_str(&path.value())?,
-                                is_null: is_null.take()
+                                is_null: None
                             });
                             attrs.try_insert(Kind::Codec, Value::Codec(cc, nested.span()))?
                         } else {
@@ -141,10 +149,7 @@ impl Attributes {
                         }
                     } else if arg.path.is_ident("is_null") {
                         if let syn::Lit::Str(path) = &arg.lit {
-                            if is_null.is_some() {
-                                return Err(syn::Error::new(arg.span(), "duplicate attribute"))
-                            }
-                            is_null = Some(syn::parse_str(&path.value())?)
+                            attrs.try_insert(Kind::IsNull, Value::IsNull(syn::parse_str(&path.value())?, nested.span()))?
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
                         }
@@ -152,7 +157,7 @@ impl Attributes {
                         if let syn::Lit::Str(path) = &arg.lit {
                             let cc = CustomCodec::Decode(codec::Decode {
                                 decode: syn::parse_str(&path.value())?,
-                                null: null.take()
+                                null: None
                             });
                             attrs.try_insert(Kind::Codec, Value::Codec(cc, nested.span()))?
                         } else {
@@ -160,16 +165,13 @@ impl Attributes {
                         }
                     } else if arg.path.is_ident("null") {
                         if let syn::Lit::Str(path) = &arg.lit {
-                            if null.is_some() {
-                                return Err(syn::Error::new(arg.span(), "duplicate attribute"))
-                            }
-                            null = Some(syn::parse_str(&path.value())?)
+                            attrs.try_insert(Kind::Null, Value::Null(syn::parse_str(&path.value())?, nested.span()))?
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
                         }
                     } else if arg.path.is_ident("with") {
                         if let syn::Lit::Str(path) = &arg.lit {
-                            let cc = CustomCodec::Module(syn::parse_str(&path.value())?, has_null.is_some());
+                            let cc = CustomCodec::Module(syn::parse_str(&path.value())?, false);
                             attrs.try_insert(Kind::Codec, Value::Codec(cc, nested.span()))?
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
@@ -226,39 +228,6 @@ impl Attributes {
             }
         }
 
-        if let Some(a) = is_null {
-            if let Some(Value::Codec(cc, _)) = attrs.get_mut(Kind::Codec) {
-                if cc.has_is_null() {
-                    return Err(syn::Error::new(a.span(), "duplicate attribute"))
-                }
-                cc.set_is_null(a)
-            } else {
-                return Err(syn::Error::new(a.span(), "`is_null` requires `encode_with` attribute"))
-            }
-        }
-
-        if let Some(a) = null {
-            if let Some(Value::Codec(cc, _)) = attrs.get_mut(Kind::Codec) {
-                if cc.has_null() {
-                    return Err(syn::Error::new(a.span(), "duplicate attribute"))
-                }
-                cc.set_null(a)
-            } else {
-                return Err(syn::Error::new(a.span(), "`null` requires `decode_with` attribute"))
-            }
-        }
-
-        if let Some(a) = has_null {
-            if let Some(Value::Codec(cc, _)) = attrs.get_mut(Kind::Codec) {
-                if cc.has_module_null() {
-                    return Err(syn::Error::new(a.span(), "duplicate attribute"))
-                }
-                cc.set_module_null()
-            } else {
-                return Err(syn::Error::new(a, "`has_null` requires `with` attribute"))
-            }
-        }
-
         Ok(attrs)
     }
 
@@ -298,32 +267,72 @@ impl Attributes {
         self.1.get_mut(&k)
     }
 
-    fn try_insert(&mut self, key: Kind, val: Value) -> syn::Result<()> {
+    fn remove(&mut self, k: Kind) -> Option<Value> {
+        self.1.remove(&k)
+    }
+
+    fn try_insert(&mut self, key: Kind, mut val: Value) -> syn::Result<()> {
         match self.0 {
             Level::Struct => match key {
-                Kind::Encoding  | Kind::Transparent => {}
-                Kind::TypeParam | Kind::Codec | Kind::Index | Kind::IndexOnly => {
+                | Kind::Encoding
+                | Kind::Transparent
+                => {}
+                | Kind::TypeParam
+                | Kind::Codec
+                | Kind::Index
+                | Kind::IndexOnly
+                | Kind::Null
+                | Kind::IsNull
+                | Kind::HasNull
+                => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
                 }
             }
             Level::Field => match key {
-                Kind::TypeParam | Kind::Codec     | Kind::Index => {}
-                Kind::Encoding  | Kind::IndexOnly | Kind::Transparent => {
+                | Kind::TypeParam
+                | Kind::Codec
+                | Kind::Index
+                | Kind::Null
+                | Kind::IsNull
+                | Kind::HasNull
+                => {}
+                | Kind::Encoding
+                | Kind::IndexOnly
+                | Kind::Transparent
+                => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
                 }
             }
             Level::Enum => match key {
-                Kind::Encoding  | Kind::IndexOnly => {}
-                Kind::TypeParam | Kind::Codec | Kind::Index | Kind::Transparent => {
+                | Kind::Encoding
+                | Kind::IndexOnly
+                => {}
+                | Kind::TypeParam
+                | Kind::Codec
+                | Kind::Index
+                | Kind::Transparent
+                | Kind::Null
+                | Kind::IsNull
+                | Kind::HasNull
+                => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
                 }
             }
             Level::Variant => match key {
-                Kind::Encoding  | Kind::Index => {}
-                Kind::TypeParam | Kind::Codec | Kind::IndexOnly | Kind::Transparent => {
+                | Kind::Encoding
+                | Kind::Index
+                => {}
+                | Kind::TypeParam
+                | Kind::Codec
+                | Kind::IndexOnly
+                | Kind::Transparent
+                | Kind::Null
+                | Kind::IsNull
+                | Kind::HasNull
+                => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
                 }
@@ -356,6 +365,94 @@ impl Attributes {
                 return Err(syn::Error::new(val.span(), "duplicate attribute"))
             }
         }
+        match &mut val {
+            Value::IsNull(is_null, s) => {
+                match self.get_mut(Kind::Codec) {
+                    Some(Value::Codec(CustomCodec::Encode(e), _)) => {
+                        if e.is_null.is_some() {
+                            return Err(syn::Error::new(*s, "duplicate attribute"))
+                        }
+                        e.is_null = Some(is_null.clone());
+                        return Ok(())
+                    }
+                    Some(Value::Codec(CustomCodec::Both(e, _), _)) => {
+                        if e.is_null.is_some() {
+                            return Err(syn::Error::new(*s, "duplicate attribute"))
+                        }
+                        e.is_null = Some(is_null.clone());
+                        return Ok(())
+                    }
+                    _ => {}
+                }
+            }
+            Value::Null(null, s) => {
+                match self.get_mut(Kind::Codec) {
+                    Some(Value::Codec(CustomCodec::Decode(d), _)) => {
+                        if d.null.is_some() {
+                            return Err(syn::Error::new(*s, "duplicate attribute"))
+                        }
+                        d.null = Some(null.clone());
+                        return Ok(())
+                    }
+                    Some(Value::Codec(CustomCodec::Both(_, d), _)) => {
+                        if d.null.is_some() {
+                            return Err(syn::Error::new(*s, "duplicate attribute"))
+                        }
+                        d.null = Some(null.clone());
+                        return Ok(())
+                    }
+                    _ => {}
+                }
+            }
+            Value::HasNull(s) => {
+                if let Some(Value::Codec(CustomCodec::Module(_, b), _)) = self.get_mut(Kind::Codec) {
+                    if *b {
+                        return Err(syn::Error::new(*s, "duplicate attribute"))
+                    }
+                    *b = true;
+                    return Ok(())
+                }
+            }
+            Value::Codec(CustomCodec::Encode(e), s) => {
+                if let Some(Value::IsNull(is_null, _)) = self.remove(Kind::IsNull) {
+                    if e.is_null.is_some() {
+                        return Err(syn::Error::new(*s, "duplicate attribute"))
+                    }
+                    e.is_null = Some(is_null)
+                }
+            }
+            Value::Codec(CustomCodec::Decode(d), s) => {
+                if let Some(Value::Null(null, _)) = self.remove(Kind::Null) {
+                    if d.null.is_some() {
+                        return Err(syn::Error::new(*s, "duplicate attribute"))
+                    }
+                    d.null = Some(null)
+                }
+            }
+            Value::Codec(CustomCodec::Both(e, d), s) => {
+                if let Some(Value::IsNull(is_null, _)) = self.remove(Kind::IsNull) {
+                    if e.is_null.is_some() {
+                        return Err(syn::Error::new(*s, "duplicate attribute"))
+                    }
+                    e.is_null = Some(is_null)
+                }
+                if let Some(Value::Null(null, _)) = self.remove(Kind::Null) {
+                    if d.null.is_some() {
+                        return Err(syn::Error::new(*s, "duplicate attribute"))
+                    }
+                    d.null = Some(null)
+                }
+            }
+            Value::Codec(CustomCodec::Module(_, b), s) => {
+                if let Some(Value::HasNull(_)) = self.remove(Kind::HasNull) {
+                    if *b {
+                        return Err(syn::Error::new(*s, "duplicate attribute"))
+                    }
+                    *b = true
+                }
+            }
+            _ => {}
+        }
         self.1.insert(key, val);
         Ok(())
     }
@@ -368,7 +465,10 @@ impl Value {
             Value::Codec(_, s)     => *s,
             Value::Encoding(_, s)  => *s,
             Value::Index(_, s)     => *s,
-            Value::Span(s)         => *s
+            Value::Span(s)         => *s,
+            Value::Null(_, s)      => *s,
+            Value::IsNull(_, s)    => *s,
+            Value::HasNull(s)      => *s
         }
     }
 

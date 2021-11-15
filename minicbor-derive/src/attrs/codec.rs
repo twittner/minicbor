@@ -70,21 +70,6 @@ impl CustomCodec {
         !matches!(self, CustomCodec::Encode(_))
     }
 
-    /// Does this codec support checking for optionality?
-    pub fn has_is_null(&self) -> bool {
-        matches!(self, CustomCodec::Encode(Encode { is_null: Some(_), .. }))
-    }
-
-    /// Does this codec support creating a default optional value?
-    pub fn has_null(&self) -> bool {
-        matches!(self, CustomCodec::Decode(Decode { null: Some(_), .. }))
-    }
-
-    /// Does this codec module support optionality semantics?
-    pub fn has_module_null(&self) -> bool {
-        matches!(self, CustomCodec::Module(_, true))
-    }
-
     /// Extract the encode function unless this `CustomCodec` does not declare one.
     pub fn to_encode_path(&self) -> Option<syn::ExprPath> {
         match self {
@@ -144,33 +129,6 @@ impl CustomCodec {
             }
             CustomCodec::Module(_, false) => None,
             CustomCodec::Encode(_)        => None
-        }
-    }
-
-    /// Set the `is_null` function.
-    pub fn set_is_null(&mut self, p: syn::ExprPath) {
-        match self {
-            CustomCodec::Encode(e)  => e.is_null = Some(p),
-            CustomCodec::Both(e, _) => e.is_null = Some(p),
-            CustomCodec::Module(..) => {}
-            CustomCodec::Decode(_)  => {}
-        }
-    }
-
-    /// Set the `null` function.
-    pub fn set_null(&mut self, p: syn::ExprPath) {
-        match self {
-            CustomCodec::Decode(d)  => d.null = Some(p),
-            CustomCodec::Both(_, d) => d.null = Some(p),
-            CustomCodec::Module(..) => {}
-            CustomCodec::Encode(_)  => {}
-        }
-    }
-
-    /// Mark the custom codec module as supporting optionality.
-    pub fn set_module_null(&mut self) {
-        if let CustomCodec::Module(_, v) = self {
-            *v = true
         }
     }
 }
