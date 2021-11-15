@@ -241,7 +241,7 @@ fn encode_fields
         // index + 1. Each value is checked if it is not null and if so,
         // the highest index is incremented.
         Encoding::Array => {
-            for field in iter.clone().rev() {
+            for field in iter.clone() {
                 let (i, (idx, (ident, (&is_name, (typ, encode))))) = field;
                 let is_null = is_null(typ, encode);
                 let n = idx.val();
@@ -270,7 +270,6 @@ fn encode_fields
                     };
                 tests.push(expr)
             }
-            tests.reverse()
         }
         // Under map encoding the number of map entries is the number
         // of fields minus those which are null. Further down we define

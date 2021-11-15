@@ -24,8 +24,12 @@ pub trait Decode<'b>: Sized {
     ///
     /// This method allows creating a special value denoting the absence
     /// of a "real" value if no CBOR value is present. The canonical
-    /// example of a type were this is sensible is the `Option` type, whose
+    /// example of a type where this is sensible is the `Option` type, whose
     /// `Decode::null` method would return `Some(None)`.
+    ///
+    /// With the exception of `Option<_>` all types `T` are considered
+    /// mandatory by default, i.e. `T::null()` returns `None`. Missing values
+    /// of `T` therefore cause decoding errors.
     ///
     /// NB: A type implementing `Decode` with an overriden `Decode::null`
     /// method should also override `Encode::is_null` if it implements `Encode`

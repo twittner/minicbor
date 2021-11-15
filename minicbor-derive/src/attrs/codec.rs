@@ -100,7 +100,7 @@ impl CustomCodec {
         }
     }
 
-    /// Extrace the `is_null` function if possible.
+    /// Extract the `is_null` function if possible.
     pub fn to_is_null_path(&self) -> Option<syn::ExprPath> {
         match self {
             CustomCodec::Encode(e)       => e.is_null.clone(),
@@ -116,7 +116,7 @@ impl CustomCodec {
         }
     }
 
-    /// Extrace the `null` function if possible.
+    /// Extract the `null` function if possible.
     pub fn to_null_path(&self) -> Option<syn::ExprPath> {
         match self {
             CustomCodec::Decode(d)       => d.null.clone(),
