@@ -364,6 +364,22 @@ impl<'b> Decoder<'b> {
         self.unsigned(info_of(b)).map(Tag::from)
     }
 
+    /// Decode a CBOR null value.
+    pub fn null(&mut self) -> Result<(), Error> {
+        match self.read()? {
+            0xf6 => Ok(()),
+            n    => Err(Error::TypeMismatch(Type::read(n), "expected null"))
+        }
+    }
+
+    /// Decode a CBOR undefined value.
+    pub fn undefined(&mut self) -> Result<(), Error> {
+        match self.read()? {
+            0xf7 => Ok(()),
+            n    => Err(Error::TypeMismatch(Type::read(n), "expected undefined"))
+        }
+    }
+
     /// Decode a CBOR simple value.
     pub fn simple(&mut self) -> Result<u8, Error> {
         match self.read()? {

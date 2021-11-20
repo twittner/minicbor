@@ -1,10 +1,10 @@
-use minicbor::{Encode, Decode, Decoder, data::Type};
+use minicbor::{Encode, Encoder, Decode, Decoder, data::Type};
 use quickcheck::quickcheck;
 use std::marker::PhantomData;
 
 fn identity<T: Encode + Eq + for<'a> Decode<'a>>(arg: T) -> bool {
     let vec = minicbor::to_vec(&arg).unwrap();
-    let mut dec = minicbor::Decoder::new(&vec);
+    let mut dec = Decoder::new(&vec);
     let val = dec.decode().unwrap();
     assert_eq!(dec.position(), vec.len());
     arg == val
@@ -73,9 +73,9 @@ fn nonzero_u64() {
 #[test]
 fn f16() {
     fn property(arg: f32) -> bool {
-        let mut e = minicbor::Encoder::new(Vec::new());
+        let mut e = Encoder::new(Vec::new());
         e.f16(arg).unwrap();
-        let mut d = minicbor::Decoder::new(e.as_ref());
+        let mut d = Decoder::new(e.as_ref());
         let val = d.f16().unwrap();
         assert_eq!(d.position(), e.as_ref().len());
         half::f16::from_f32(arg).to_f32().to_bits() == val.to_bits()
@@ -87,7 +87,7 @@ fn f16() {
 fn f32() {
     fn property(arg: f32) -> bool {
         let vec = minicbor::to_vec(&arg).unwrap();
-        let mut dec = minicbor::Decoder::new(&vec);
+        let mut dec = Decoder::new(&vec);
         let val = dec.f32().unwrap();
         assert_eq!(dec.position(), vec.len());
         arg.to_bits() == val.to_bits()
@@ -99,7 +99,7 @@ fn f32() {
 fn f64() {
     fn property(arg: f64) -> bool {
         let vec = minicbor::to_vec(&arg).unwrap();
-        let mut dec = minicbor::Decoder::new(&vec);
+        let mut dec = Decoder::new(&vec);
         let val = dec.f64().unwrap();
         assert_eq!(dec.position(), vec.len());
         arg.to_bits() == val.to_bits()
@@ -230,7 +230,7 @@ fn binaryheap() {
 
     fn property(arg: BinaryHeap<i32>) -> bool {
         let vec = minicbor::to_vec(&arg).unwrap();
-        let mut dec = minicbor::Decoder::new(&vec);
+        let mut dec = Decoder::new(&vec);
         let val: BinaryHeap<i32> = dec.decode().unwrap();
         assert_eq!(dec.position(), vec.len());
         let a = BTreeSet::from_iter(arg.into_iter());
@@ -387,7 +387,7 @@ fn path_buf() {
 fn path() {
     fn property(arg: std::path::PathBuf) -> bool {
         let vec = minicbor::to_vec(arg.as_path()).unwrap();
-        let mut dec = minicbor::Decoder::new(&vec);
+        let mut dec = Decoder::new(&vec);
         let val = dec.decode::<&std::path::Path>().unwrap();
         assert_eq!(dec.position(), vec.len());
         arg == val
@@ -458,7 +458,7 @@ fn atomic_u64() {
     fn property(n: u64) -> bool {
         let arg = core::sync::atomic::AtomicU64::new(n);
         let vec = minicbor::to_vec(&arg).unwrap();
-        let mut dec = minicbor::Decoder::new(&vec);
+        let mut dec = Decoder::new(&vec);
         let val = dec.decode::<core::sync::atomic::AtomicU64>().unwrap();
         assert_eq!(dec.position(), vec.len());
         n == val.load(core::sync::atomic::Ordering::SeqCst)
@@ -471,7 +471,7 @@ fn atomic_i64() {
     fn property(n: i64) -> bool {
         let arg = core::sync::atomic::AtomicI64::new(n);
         let vec = minicbor::to_vec(&arg).unwrap();
-        let mut dec = minicbor::Decoder::new(&vec);
+        let mut dec = Decoder::new(&vec);
         let val = dec.decode::<core::sync::atomic::AtomicI64>().unwrap();
         assert_eq!(dec.position(), vec.len());
         n == val.load(core::sync::atomic::Ordering::SeqCst)
@@ -484,11 +484,31 @@ fn atomic_bool() {
     fn property(n: bool) -> bool {
         let arg = core::sync::atomic::AtomicBool::new(n);
         let vec = minicbor::to_vec(&arg).unwrap();
-        let mut dec = minicbor::Decoder::new(&vec);
+        let mut dec = Decoder::new(&vec);
         let val = dec.decode::<core::sync::atomic::AtomicBool>().unwrap();
         assert_eq!(dec.position(), vec.len());
         n == val.load(core::sync::atomic::Ordering::SeqCst)
     }
     quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn null() {
+    let mut buf = [0; 1];
+    let mut enc = Encoder::new(buf.as_mut());
+    enc.null().unwrap();
+    let mut dec = Decoder::new(buf.as_ref());
+    assert!(dec.null().is_ok());
+    assert_eq!(1, dec.position());
+}
+
+#[test]
+fn undefined() {
+    let mut buf = [0; 1];
+    let mut enc = Encoder::new(buf.as_mut());
+    enc.undefined().unwrap();
+    let mut dec = Decoder::new(buf.as_ref());
+    assert!(dec.undefined().is_ok());
+    assert_eq!(1, dec.position())
 }
 
