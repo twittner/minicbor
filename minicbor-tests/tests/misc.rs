@@ -93,7 +93,7 @@ quickcheck! {
         v[0] = 0x19;
         v[1 .. 3].copy_from_slice(&n.to_be_bytes()[..]);
         let mut d = Decoder::new(&v);
-        u64::from(d.probe().u64().unwrap()) == d.u64().unwrap()
+        u64::from(d.probe().u16().unwrap()) == d.u64().unwrap()
     }
 
     fn u16_cbor_read_as_i8(n: u8) -> TestResult {
