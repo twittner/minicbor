@@ -121,6 +121,10 @@
 
 # minicbor-derive
 
+## `0.7.2`
+
+- Small bugfix release.
+
 ## `0.7.1`
 
 - Small error reporting improvement (cf. 1b1cb41).

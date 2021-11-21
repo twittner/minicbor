@@ -24,7 +24,7 @@ partial-derive-support = ["minicbor-derive", "partial-skip-support"]
 __test-partial-skip-support = []
 
 [dependencies]
-minicbor-derive = { version = "0.7.1", path = "../minicbor-derive", optional = true }
+minicbor-derive = { version = "0.7.2", path = "../minicbor-derive", optional = true }
 half            = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
