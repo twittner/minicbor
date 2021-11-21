@@ -6,6 +6,12 @@
 
 # minicbor
 
+## `0.11.5`
+
+- Accept non-preferred integer encodings (see issue #14 for details).
+- Added `Decoder::{null, undefined}` methods.
+- Added `data::Cbor` as identity element of `Encode` and `Decode`.
+
 ## `0.11.4`
 
 - Bugfix: Decoding strings or bytes with a length of `u64::MAX` would cause an overflow of the
@@ -114,6 +120,10 @@
   `Decoder::f16` method and depends on the feature `half`.
 
 # minicbor-derive
+
+## `0.7.2`
+
+- Small bugfix release.
 
 ## `0.7.1`
 

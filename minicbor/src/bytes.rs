@@ -20,6 +20,10 @@ use core::ops::{Deref, DerefMut};
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
+/// Re-export of `alloc::borrow::Cow`.
+#[cfg(feature = "alloc")]
+pub use alloc::borrow::Cow;
+
 /// Newtype for `[u8]`.
 ///
 /// Used to implement `Encode` and `Decode` which translate to
