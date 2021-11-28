@@ -6,6 +6,12 @@
 
 # minicbor
 
+## `0.12.0`
+
+- Extend the optionality of fields beyond `Option`. This applies to derived impls of `Encode`
+  and `Decode` which make use of newly added methods `Encode::is_nil` and `Decode::nil`
+  instead of `Option::is_none` and `None`. See issue #10 and merge request !15 for details.
+
 ## `0.11.5`
 
 - Accept non-preferred integer encodings (see issue #14 for details).
@@ -121,6 +127,13 @@
 
 # minicbor-derive
 
+## `0.8.0`
+
+- Uses `Encode::is_nil` and `Decode::nil` instead of `Option::is_none` and `None` to generalise
+  field optionality.
+- Adds new attributes `is_nil`, `nil` and `has_nil` to enable integration of optional types which
+  do not implement `Encode` or `Decode`.
+
 ## `0.7.2`
 
 - Small bugfix release.
@@ -173,6 +186,10 @@
   which do not implement these traits.
 
 # minicbor-io
+
+## `0.7.0`
+
+- Depends on `minicbor-0.12.0`.
 
 ## `0.6.0`
 
