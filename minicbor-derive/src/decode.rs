@@ -78,7 +78,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     let field_str  = fields.idents.iter().map(|n| format!("{}::{}", name, n)).collect::<Vec<_>>();
     let statements = gen_statements(&fields, &decode_fns, attrs.encoding().unwrap_or_default())?;
-    let nulls      = nulls(&fields.types, &decode_fns);
+    let nils       = nils(&fields.types, &decode_fns);
 
     let Fields { indices, idents, .. } = fields;
 
@@ -87,7 +87,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             Ok(#name {
                 #(#idents : if let Some(x) = #idents {
                     x
-                } else if let Some(z) = #nulls {
+                } else if let Some(z) = #nils {
                     z
                 } else {
                     return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
@@ -100,7 +100,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         quote! {
             Ok(#name(#(if let Some(x) = #idents {
                 x
-            } else if let Some(z) = #nulls {
+            } else if let Some(z) = #nils {
                 z
             } else {
                 return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
@@ -171,7 +171,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 collect_type_params(&inp.generics, iter)
             });
             let statements = gen_statements(&fields, &decode_fns, encoding)?;
-            let nulls      = nulls(&fields.types, &decode_fns);
+            let nils       = nils(&fields.types, &decode_fns);
             let Fields { indices, idents, .. } = fields;
             if let syn::Fields::Named(_) = var.fields {
                 quote! {
@@ -180,7 +180,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         Ok(#name::#con {
                             #(#idents : if let Some(x) = #idents {
                                 x
-                            } else if let Some(z) = #nulls {
+                            } else if let Some(z) = #nils {
                                 z
                             } else {
                                 return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
@@ -194,7 +194,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         #statements
                         Ok(#name::#con(#(if let Some(x) = #idents {
                             x
-                        } else if let Some(z) = #nulls {
+                        } else if let Some(z) = #nils {
                             z
                         } else {
                             return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
@@ -279,7 +279,7 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
 
             let unknown_var_err =
                 if let Some(cd) = ff {
-                    if let Some(p) = cd.to_null_path() {
+                    if let Some(p) = cd.to_nil_path() {
                         quote! {
                             Err(minicbor::decode::Error::UnknownVariant(_)) if #p().is_some() => {
                                 __d777.skip()?
@@ -298,7 +298,7 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
                     }
                 } else {
                     quote! {
-                        Err(minicbor::decode::Error::UnknownVariant(_)) if <#ty>::null().is_some() => {
+                        Err(minicbor::decode::Error::UnknownVariant(_)) if <#ty>::nil().is_some() => {
                             __d777.skip()?
                         }
                     }
@@ -409,11 +409,11 @@ fn gen_decode_bound() -> syn::Result<syn::TypeParamBound> {
     syn::parse_str("minicbor::Decode<'bytes>")
 }
 
-fn nulls(types: &[syn::Type], decode_fns: &[Option<CustomCodec>]) -> Vec<proc_macro2::TokenStream> {
+fn nils(types: &[syn::Type], decode_fns: &[Option<CustomCodec>]) -> Vec<proc_macro2::TokenStream> {
     types.iter().zip(decode_fns)
         .map(|(ty, dec)| {
             if let Some(d) = dec {
-                if let Some(p) = d.to_null_path() {
+                if let Some(p) = d.to_nil_path() {
                     quote!(#p())
                 } else if is_option(ty, |_| true) {
                     quote!(Some(None))
@@ -421,7 +421,7 @@ fn nulls(types: &[syn::Type], decode_fns: &[Option<CustomCodec>]) -> Vec<proc_ma
                     quote!(None)
                 }
             } else {
-                quote!(<#ty>::null())
+                quote!(<#ty>::nil())
             }
         })
         .collect()

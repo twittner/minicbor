@@ -21,17 +21,19 @@ pub trait Encode {
     /// Encode a value of this type using the given `Encoder`.
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>>;
 
-    /// Is this value of `Self` a null value?
+    /// Is this value of `Self` a nil value?
+    ///
+    /// This method is primarily used by `minicbor-derive`.
     ///
     /// Some types have a special value to denote the concept of "nothing", aka
-    /// "null". An example is the `Option` type with its `None` value. This
-    /// method--if overriden--allows checking if a value is such a special null
+    /// nil. An example is the `Option` type with its `None` value. This
+    /// method--if overriden--allows checking if a value is such a special nil
     /// value.
     ///
-    /// NB: A type implementing `Encode` with an overriden `Encode::is_null`
-    /// method should also override `Decode::null` if it implements `Decode`
+    /// NB: A type implementing `Encode` with an overriden `Encode::is_nil`
+    /// method should also override `Decode::nil` if it implements `Decode`
     /// at all.
-    fn is_null(&self) -> bool {
+    fn is_nil(&self) -> bool {
         false
     }
 }
@@ -71,7 +73,7 @@ impl<T: Encode> Encode for Option<T> {
         Ok(())
     }
 
-    fn is_null(&self) -> bool {
+    fn is_nil(&self) -> bool {
         self.is_none()
     }
 }

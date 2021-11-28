@@ -257,7 +257,7 @@ impl Encode for ByteVec {
 pub trait EncodeBytes {
     fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>>;
 
-    fn is_null(&self) -> bool {
+    fn is_nil(&self) -> bool {
         false
     }
 }
@@ -267,7 +267,7 @@ pub trait EncodeBytes {
 pub trait DecodeBytes<'b>: Sized {
     fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error>;
 
-    fn null() -> Option<Self> {
+    fn nil() -> Option<Self> {
         None
     }
 }
@@ -373,7 +373,7 @@ impl<T: EncodeBytes> EncodeBytes for Option<T> {
         }
     }
 
-    fn is_null(&self) -> bool {
+    fn is_nil(&self) -> bool {
         self.is_none()
     }
 }
@@ -388,7 +388,7 @@ impl<'b, T: DecodeBytes<'b>> DecodeBytes<'b> for Option<T> {
         T::decode_bytes(d).map(Some)
     }
 
-    fn null() -> Option<Self> {
+    fn nil() -> Option<Self> {
         Some(None)
     }
 }
@@ -406,11 +406,11 @@ where
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-pub fn null<'b, T>() -> Option<T>
+pub fn nil<'b, T>() -> Option<T>
 where
     T: DecodeBytes<'b>
 {
-    T::null()
+    T::nil()
 }
 
 /// Freestanding function calling `EncodeBytes::encode_bytes`.
@@ -427,9 +427,9 @@ where
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-pub fn is_null<T>(xs: &T) -> bool
+pub fn is_nil<T>(xs: &T) -> bool
 where
     T: EncodeBytes
 {
-    T::is_null(xs)
+    T::is_nil(xs)
 }

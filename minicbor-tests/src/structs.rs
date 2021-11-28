@@ -11,11 +11,11 @@ mod unit {
         unimplemented!()
     }
 
-    pub(super) fn is_null(_: &Unit) -> bool {
+    pub(super) fn is_nil(_: &Unit) -> bool {
         true
     }
 
-    pub(super) fn null() -> Option<Unit> {
+    pub(super) fn nil() -> Option<Unit> {
         Some(Unit(()))
     }
 }
@@ -27,7 +27,7 @@ struct Unit (#[n(0)] ());
 struct S0 { #[n(0)] field: Unit }
 
 #[derive(Encode, Decode)]
-struct S1 { #[cbor(n(0), with = "unit", has_null)] field: Unit }
+struct S1 { #[cbor(n(0), with = "unit", has_nil)] field: Unit }
 
 #[derive(Encode, Decode)]
 struct S2 { #[n(0)] #[cbor(encode_with = "unit::encode")] field: Unit }

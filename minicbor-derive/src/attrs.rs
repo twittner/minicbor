@@ -28,9 +28,9 @@ enum Kind {
     IndexOnly,
     Transparent,
     TypeParam,
-    Null,
-    IsNull,
-    HasNull
+    Nil,
+    IsNil,
+    HasNil
 }
 
 #[derive(Debug, Clone)]
@@ -40,9 +40,9 @@ enum Value {
     Index(Idx, proc_macro2::Span),
     Span(proc_macro2::Span),
     TypeParam(TypeParams, proc_macro2::Span),
-    Null(syn::ExprPath, proc_macro2::Span),
-    IsNull(syn::ExprPath, proc_macro2::Span),
-    HasNull(proc_macro2::Span)
+    Nil(syn::ExprPath, proc_macro2::Span),
+    IsNil(syn::ExprPath, proc_macro2::Span),
+    HasNil(proc_macro2::Span)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -80,14 +80,14 @@ impl Attributes {
                 this.try_insert(k, v)?;
             }
         }
-        if let Some(Value::IsNull(_, s)) = this.get(Kind::IsNull) {
-            return Err(syn::Error::new(*s, "`is_null` requires `encode_with`"))
+        if let Some(Value::IsNil(_, s)) = this.get(Kind::IsNil) {
+            return Err(syn::Error::new(*s, "`is_nil` requires `encode_with`"))
         }
-        if let Some(Value::Null(_, s)) = this.get(Kind::Null) {
-            return Err(syn::Error::new(*s, "`null` requires `decode_with`"))
+        if let Some(Value::Nil(_, s)) = this.get(Kind::Nil) {
+            return Err(syn::Error::new(*s, "`nil` requires `decode_with`"))
         }
-        if let Some(Value::HasNull(s)) = this.get(Kind::HasNull) {
-            return Err(syn::Error::new(*s, "`has_null` requires `with`"))
+        if let Some(Value::HasNil(s)) = this.get(Kind::HasNil) {
+            return Err(syn::Error::new(*s, "`has_nil` requires `with`"))
         }
         Ok(this)
     }
@@ -131,8 +131,8 @@ impl Attributes {
                         attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Map, nested.span()))?
                     } else if arg.is_ident("array") {
                         attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Array, nested.span()))?
-                    } else if arg.is_ident("has_null") {
-                        attrs.try_insert(Kind::HasNull, Value::HasNull(nested.span()))?
+                    } else if arg.is_ident("has_nil") {
+                        attrs.try_insert(Kind::HasNil, Value::HasNil(nested.span()))?
                     } else {
                         return Err(syn::Error::new(nested.span(), "unknown attribute"))
                     }
@@ -141,15 +141,15 @@ impl Attributes {
                         if let syn::Lit::Str(path) = &arg.lit {
                             let cc = CustomCodec::Encode(codec::Encode {
                                 encode: syn::parse_str(&path.value())?,
-                                is_null: None
+                                is_nil: None
                             });
                             attrs.try_insert(Kind::Codec, Value::Codec(cc, nested.span()))?
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
                         }
-                    } else if arg.path.is_ident("is_null") {
+                    } else if arg.path.is_ident("is_nil") {
                         if let syn::Lit::Str(path) = &arg.lit {
-                            attrs.try_insert(Kind::IsNull, Value::IsNull(syn::parse_str(&path.value())?, nested.span()))?
+                            attrs.try_insert(Kind::IsNil, Value::IsNil(syn::parse_str(&path.value())?, nested.span()))?
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
                         }
@@ -157,15 +157,15 @@ impl Attributes {
                         if let syn::Lit::Str(path) = &arg.lit {
                             let cc = CustomCodec::Decode(codec::Decode {
                                 decode: syn::parse_str(&path.value())?,
-                                null: None
+                                nil: None
                             });
                             attrs.try_insert(Kind::Codec, Value::Codec(cc, nested.span()))?
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
                         }
-                    } else if arg.path.is_ident("null") {
+                    } else if arg.path.is_ident("nil") {
                         if let syn::Lit::Str(path) = &arg.lit {
-                            attrs.try_insert(Kind::Null, Value::Null(syn::parse_str(&path.value())?, nested.span()))?
+                            attrs.try_insert(Kind::Nil, Value::Nil(syn::parse_str(&path.value())?, nested.span()))?
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
                         }
@@ -281,9 +281,9 @@ impl Attributes {
                 | Kind::Codec
                 | Kind::Index
                 | Kind::IndexOnly
-                | Kind::Null
-                | Kind::IsNull
-                | Kind::HasNull
+                | Kind::Nil
+                | Kind::IsNil
+                | Kind::HasNil
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -293,9 +293,9 @@ impl Attributes {
                 | Kind::TypeParam
                 | Kind::Codec
                 | Kind::Index
-                | Kind::Null
-                | Kind::IsNull
-                | Kind::HasNull
+                | Kind::Nil
+                | Kind::IsNil
+                | Kind::HasNil
                 => {}
                 | Kind::Encoding
                 | Kind::IndexOnly
@@ -313,9 +313,9 @@ impl Attributes {
                 | Kind::Codec
                 | Kind::Index
                 | Kind::Transparent
-                | Kind::Null
-                | Kind::IsNull
-                | Kind::HasNull
+                | Kind::Nil
+                | Kind::IsNil
+                | Kind::HasNil
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -329,9 +329,9 @@ impl Attributes {
                 | Kind::Codec
                 | Kind::IndexOnly
                 | Kind::Transparent
-                | Kind::Null
-                | Kind::IsNull
-                | Kind::HasNull
+                | Kind::Nil
+                | Kind::IsNil
+                | Kind::HasNil
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -343,12 +343,12 @@ impl Attributes {
                 let s = val.span();
                 match (val, &cc) {
                     (Value::Codec(CustomCodec::Encode(e), _), CustomCodec::Decode(d)) => {
-                        let d = codec::Decode { decode: d.decode.clone(), null: d.null.clone() };
+                        let d = codec::Decode { decode: d.decode.clone(), nil: d.nil.clone() };
                         *cc = CustomCodec::Both(Box::new(e), Box::new(d));
                         return Ok(())
                     }
                     (Value::Codec(CustomCodec::Decode(d), _), CustomCodec::Encode(e)) => {
-                        let e = codec::Encode { encode: e.encode.clone(), is_null: e.is_null.clone() };
+                        let e = codec::Encode { encode: e.encode.clone(), is_nil: e.is_nil.clone() };
                         *cc = CustomCodec::Both(Box::new(e), Box::new(d));
                         return Ok(())
                     }
@@ -366,45 +366,45 @@ impl Attributes {
             }
         }
         match &mut val {
-            Value::IsNull(is_null, s) => {
+            Value::IsNil(is_nil, s) => {
                 match self.get_mut(Kind::Codec) {
                     Some(Value::Codec(CustomCodec::Encode(e), _)) => {
-                        if e.is_null.is_some() {
+                        if e.is_nil.is_some() {
                             return Err(syn::Error::new(*s, "duplicate attribute"))
                         }
-                        e.is_null = Some(is_null.clone());
+                        e.is_nil = Some(is_nil.clone());
                         return Ok(())
                     }
                     Some(Value::Codec(CustomCodec::Both(e, _), _)) => {
-                        if e.is_null.is_some() {
+                        if e.is_nil.is_some() {
                             return Err(syn::Error::new(*s, "duplicate attribute"))
                         }
-                        e.is_null = Some(is_null.clone());
+                        e.is_nil = Some(is_nil.clone());
                         return Ok(())
                     }
                     _ => {}
                 }
             }
-            Value::Null(null, s) => {
+            Value::Nil(nil, s) => {
                 match self.get_mut(Kind::Codec) {
                     Some(Value::Codec(CustomCodec::Decode(d), _)) => {
-                        if d.null.is_some() {
+                        if d.nil.is_some() {
                             return Err(syn::Error::new(*s, "duplicate attribute"))
                         }
-                        d.null = Some(null.clone());
+                        d.nil = Some(nil.clone());
                         return Ok(())
                     }
                     Some(Value::Codec(CustomCodec::Both(_, d), _)) => {
-                        if d.null.is_some() {
+                        if d.nil.is_some() {
                             return Err(syn::Error::new(*s, "duplicate attribute"))
                         }
-                        d.null = Some(null.clone());
+                        d.nil = Some(nil.clone());
                         return Ok(())
                     }
                     _ => {}
                 }
             }
-            Value::HasNull(s) => {
+            Value::HasNil(s) => {
                 if let Some(Value::Codec(CustomCodec::Module(_, b), _)) = self.get_mut(Kind::Codec) {
                     if *b {
                         return Err(syn::Error::new(*s, "duplicate attribute"))
@@ -414,37 +414,37 @@ impl Attributes {
                 }
             }
             Value::Codec(CustomCodec::Encode(e), s) => {
-                if let Some(Value::IsNull(is_null, _)) = self.remove(Kind::IsNull) {
-                    if e.is_null.is_some() {
+                if let Some(Value::IsNil(is_nil, _)) = self.remove(Kind::IsNil) {
+                    if e.is_nil.is_some() {
                         return Err(syn::Error::new(*s, "duplicate attribute"))
                     }
-                    e.is_null = Some(is_null)
+                    e.is_nil = Some(is_nil)
                 }
             }
             Value::Codec(CustomCodec::Decode(d), s) => {
-                if let Some(Value::Null(null, _)) = self.remove(Kind::Null) {
-                    if d.null.is_some() {
+                if let Some(Value::Nil(nil, _)) = self.remove(Kind::Nil) {
+                    if d.nil.is_some() {
                         return Err(syn::Error::new(*s, "duplicate attribute"))
                     }
-                    d.null = Some(null)
+                    d.nil = Some(nil)
                 }
             }
             Value::Codec(CustomCodec::Both(e, d), s) => {
-                if let Some(Value::IsNull(is_null, _)) = self.remove(Kind::IsNull) {
-                    if e.is_null.is_some() {
+                if let Some(Value::IsNil(is_nil, _)) = self.remove(Kind::IsNil) {
+                    if e.is_nil.is_some() {
                         return Err(syn::Error::new(*s, "duplicate attribute"))
                     }
-                    e.is_null = Some(is_null)
+                    e.is_nil = Some(is_nil)
                 }
-                if let Some(Value::Null(null, _)) = self.remove(Kind::Null) {
-                    if d.null.is_some() {
+                if let Some(Value::Nil(nil, _)) = self.remove(Kind::Nil) {
+                    if d.nil.is_some() {
                         return Err(syn::Error::new(*s, "duplicate attribute"))
                     }
-                    d.null = Some(null)
+                    d.nil = Some(nil)
                 }
             }
             Value::Codec(CustomCodec::Module(_, b), s) => {
-                if let Some(Value::HasNull(_)) = self.remove(Kind::HasNull) {
+                if let Some(Value::HasNil(_)) = self.remove(Kind::HasNil) {
                     if *b {
                         return Err(syn::Error::new(*s, "duplicate attribute"))
                     }
@@ -466,9 +466,9 @@ impl Value {
             Value::Encoding(_, s)  => *s,
             Value::Index(_, s)     => *s,
             Value::Span(s)         => *s,
-            Value::Null(_, s)      => *s,
-            Value::IsNull(_, s)    => *s,
-            Value::HasNull(s)      => *s
+            Value::Nil(_, s)       => *s,
+            Value::IsNil(_, s)     => *s,
+            Value::HasNil(s)       => *s
         }
     }
 

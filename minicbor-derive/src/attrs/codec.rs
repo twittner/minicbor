@@ -9,12 +9,12 @@ pub enum CustomCodec {
     ///
     /// Declared with `#[cbor(encode_with = "...")]`.
     ///
-    /// In addition, an optional custom `is_null` function can be declared which
+    /// In addition, an optional custom `is_nil` function can be declared which
     /// is assumed to be of a type equivalent to:
     ///
     ///   `fn<T>(&T) -> bool`
     ///
-    /// Declared with `#[cbor(is_null = "...")]`
+    /// Declared with `#[cbor(is_nil = "...")]`
     Encode(Encode),
     /// Custom decode function.
     ///
@@ -24,14 +24,14 @@ pub enum CustomCodec {
     ///
     /// Declared with `#[cbor(decode_with = "...")]`.
     ///
-    /// In addition, an optional custom `null` function can be declared which
+    /// In addition, an optional custom `nil` function can be declared which
     /// is assumed to be of a type equivalent to:
     ///
     ///   `fn<T>() -> Option<T>`
     ///
-    /// Declared with `#[cbor(null = "...")]`
+    /// Declared with `#[cbor(nil = "...")]`
     Decode(Decode),
-    /// The combination of `encode_with` + `is_null` and `decode_with` + `null`.
+    /// The combination of `encode_with` + `is_nil` and `decode_with` + `nil`.
     Both(Box<Encode>, Box<Decode>),
     /// A module which contains custom encode/decode functions.
     ///
@@ -40,9 +40,9 @@ pub enum CustomCodec {
     /// `#[cbor(encode_with = "...")]` or `#[cbor(decode_with = "...")]`
     /// respectively. Declared with `#[cbor(with = "...")]`.
     ///
-    /// Optionally, the attribute `has_null` can be added which means that
-    /// the module contains functions `is_null` and `null` matching those
-    /// declared with `is_null` and `null` when using `encode_with` and
+    /// Optionally, the attribute `has_nil` can be added which means that
+    /// the module contains functions `is_nil` and `nil` matching those
+    /// declared with `is_nil` and `nil` when using `encode_with` and
     /// `decode_with`.
     Module(syn::ExprPath, bool)
 }
@@ -50,13 +50,13 @@ pub enum CustomCodec {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Encode {
     pub encode: syn::ExprPath,
-    pub is_null: Option<syn::ExprPath>
+    pub is_nil: Option<syn::ExprPath>
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Decode {
     pub decode: syn::ExprPath,
-    pub null: Option<syn::ExprPath>
+    pub nil: Option<syn::ExprPath>
 }
 
 impl CustomCodec {
@@ -100,14 +100,14 @@ impl CustomCodec {
         }
     }
 
-    /// Extract the `is_null` function if possible.
-    pub fn to_is_null_path(&self) -> Option<syn::ExprPath> {
+    /// Extract the `is_nil` function if possible.
+    pub fn to_is_nil_path(&self) -> Option<syn::ExprPath> {
         match self {
-            CustomCodec::Encode(e)       => e.is_null.clone(),
-            CustomCodec::Both(e, _)      => e.is_null.clone(),
+            CustomCodec::Encode(e)       => e.is_nil.clone(),
+            CustomCodec::Both(e, _)      => e.is_nil.clone(),
             CustomCodec::Module(p, true) => {
                 let mut p = p.clone();
-                let ident = syn::Ident::new("is_null", proc_macro2::Span::call_site());
+                let ident = syn::Ident::new("is_nil", proc_macro2::Span::call_site());
                 p.path.segments.push(ident.into());
                 Some(p)
             }
@@ -116,14 +116,14 @@ impl CustomCodec {
         }
     }
 
-    /// Extract the `null` function if possible.
-    pub fn to_null_path(&self) -> Option<syn::ExprPath> {
+    /// Extract the `nil` function if possible.
+    pub fn to_nil_path(&self) -> Option<syn::ExprPath> {
         match self {
-            CustomCodec::Decode(d)       => d.null.clone(),
-            CustomCodec::Both(_, d)      => d.null.clone(),
+            CustomCodec::Decode(d)       => d.nil.clone(),
+            CustomCodec::Both(_, d)      => d.nil.clone(),
             CustomCodec::Module(p, true) => {
                 let mut p = p.clone();
-                let ident = syn::Ident::new("null", proc_macro2::Span::call_site());
+                let ident = syn::Ident::new("nil", proc_macro2::Span::call_site());
                 p.path.segments.push(ident.into());
                 Some(p)
             }

@@ -94,9 +94,9 @@
 //! - [`#[cbor(decode_with)]`](#cbordecode_with--path)
 //! - [`#[cbor(encode_with)]`](#cborencode_with--path)
 //! - [`#[cbor(with)]`](#cborwith--path)
-//! - [`#[cbor(null)]`](#cbornull--path)
-//! - [`#[cbor(has_null)]`](#cborhas_null)
-//! - [`#[cbor(is_null)]`](#cboris_null--path)
+//! - [`#[cbor(nil)]`](#cbornil--path)
+//! - [`#[cbor(has_nil)]`](#cborhas_nil)
+//! - [`#[cbor(is_nil)]`](#cboris_nil--path)
 //! - [`#[cbor(decode_bound)]`](#cbordecode_bound--)
 //! - [`#[cbor(encode_bound)]`](#cborencode_bound--)
 //! - [`#[cbor(bound)]`](#cborbound)
@@ -178,34 +178,34 @@
 //! a module that contains functions named `encode` and `decode` that satisfy the
 //! respective type signatures mentioned in `encode_with` and `decode_with`.
 //!
-//! ## `#[cbor(null = "<path>")]`
+//! ## `#[cbor(nil = "<path>")]`
 //!
 //! Only valid in conjuction with [`#[cbor(decode_with = "...")]`](#cbordecode_with--path).
-//! If present, `<path>` denotes a function to create a "null"-like value of type `T`.
-//! See `minicbor::Decode::null` for details. The function needs to be equivalent to the
+//! If present, `<path>` denotes a function to create a nil-like value of type `T`.
+//! See `minicbor::Decode::nil` for details. The function needs to be equivalent to the
 //! following type:
 //!
 //! ```no_run
-//! fn null<T>() -> Option<T> {
+//! fn nil<T>() -> Option<T> {
 //!     todo!()
 //! }
 //! ```
 //!
-//! ## `#[cbor(has_null)]`
+//! ## `#[cbor(has_nil)]`
 //!
 //! Only valid in conjuction with [`#[cbor(with = "...")]`](#cborwith--path). If present,
-//! the attribute signals that the module denoted by `with` also contains functions `null`
-//! and `is_null` to create null values and to check if a value is a null value.
+//! the attribute signals that the module denoted by `with` also contains functions `nil`
+//! and `is_nil` to create nil values and to check if a value is a nil value.
 //!
-//! ## `#[cbor(is_null = "<path>")]`
+//! ## `#[cbor(is_nil = "<path>")]`
 //!
 //! Only valid in conjuction with [`#[cbor(encode_with = "...")]`](#cborencode_with--path).
 //! If present, `<path>` denotes a function to check if a value of type `T` is a
-//! "null"-like value. See `minicbor::Encode::is_null` for details. The function needs to
+//! nil-like value. See `minicbor::Encode::is_nil` for details. The function needs to
 //! be equivalent to the following type:
 //!
 //! ```no_run
-//! fn is_null<T>(v: &T) -> bool {
+//! fn is_nil<T>(v: &T) -> bool {
 //!     todo!()
 //! }
 //! ```

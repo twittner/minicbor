@@ -238,32 +238,32 @@ fn encode_fields
 
     match encoding {
         // Under array encoding the number of elements is the highest
-        // index + 1. Each value is checked if it is not null and if so,
+        // index + 1. Each value is checked if it is not nil and if so,
         // the highest index is incremented.
         Encoding::Array => {
             for field in iter.clone() {
                 let (i, (idx, (ident, (&is_name, (typ, encode))))) = field;
-                let is_null = is_null(typ, encode);
+                let is_nil = is_nil(typ, encode);
                 let n = idx.val();
                 let expr =
                     if has_self {
                         if is_name {
                             quote! {
-                                if !#is_null(&self.#ident) {
+                                if !#is_nil(&self.#ident) {
                                     __max_index777 = Some(#n)
                                 }
                             }
                         } else {
                             let i = syn::Index::from(*i);
                             quote! {
-                                if !#is_null(&self.#i) {
+                                if !#is_nil(&self.#i) {
                                     __max_index777 = Some(#n)
                                 }
                             }
                         }
                     } else {
                         quote! {
-                            if !#is_null(&#ident) {
+                            if !#is_nil(&#ident) {
                                 __max_index777 = Some(#n)
                             }
                         }
@@ -272,32 +272,32 @@ fn encode_fields
             }
         }
         // Under map encoding the number of map entries is the number
-        // of fields minus those which are null. Further down we define
-        // the total number of fields and here for each null value we
+        // of fields minus those which are nil. Further down we define
+        // the total number of fields and here for each nil value we
         // substract 1 from the total.
         Encoding::Map => {
             for field in iter.clone() {
                 let (i, (_idx, (ident, (&is_name, (typ, encode))))) = field;
-                let is_null = is_null(typ, encode);
+                let is_nil = is_nil(typ, encode);
                 let expr =
                     if has_self {
                         if is_name {
                             quote! {
-                                if #is_null(&self.#ident) {
+                                if #is_nil(&self.#ident) {
                                     __max_fields777 -= 1
                                 }
                             }
                         } else {
                             let i = syn::Index::from(*i);
                             quote! {
-                                if #is_null(&self.#i) {
+                                if #is_nil(&self.#i) {
                                     __max_fields777 -= 1
                                 }
                             }
                         }
                     } else {
                         quote! {
-                            if #is_null(&#ident) {
+                            if #is_nil(&#ident) {
                                 __max_fields777 -= 1
                             }
                         }
@@ -318,10 +318,10 @@ fn encode_fields
 
     match encoding {
         // Under map encoding each field is encoded with its index.
-        // Only field values which are not "null" are encoded.
+        // Only field values which are not nil are encoded.
         Encoding::Map => for field in iter {
             let (i, (idx, (ident, (&is_name, (typ, encode))))) = field;
-            let is_null = is_null(typ, encode);
+            let is_nil = is_nil(typ, encode);
             let encode_fn = encode.as_ref()
                 .and_then(|f| f.to_encode_path())
                 .unwrap_or_else(|| default_encode_fn.clone());
@@ -329,14 +329,14 @@ fn encode_fields
                 match (is_name, has_self) {
                     // struct
                     (IS_NAME, HAS_SELF) => quote! {
-                        if !#is_null(&self.#ident) {
+                        if !#is_nil(&self.#ident) {
                             __e777.u32(#idx)?;
                             #encode_fn(&self.#ident, __e777)?
                         }
                     },
                     // tuple struct
                     (IS_NAME, NO_SELF) => quote! {
-                        if !#is_null(&#ident) {
+                        if !#is_nil(&#ident) {
                             __e777.u32(#idx)?;
                             #encode_fn(#ident, __e777)?
                         }
@@ -345,7 +345,7 @@ fn encode_fields
                     (NO_NAME, HAS_SELF) => {
                         let i = syn::Index::from(*i);
                         quote! {
-                            if !#is_null(&self.#i) {
+                            if !#is_nil(&self.#i) {
                                 __e777.u32(#idx)?;
                                 #encode_fn(&self.#i, __e777)?
                             }
@@ -353,7 +353,7 @@ fn encode_fields
                     }
                     // enum tuple
                     (NO_NAME, NO_SELF) => quote! {
-                        if !#is_null(&#ident) {
+                        if !#is_nil(&#ident) {
                             __e777.u32(#idx)?;
                             #encode_fn(#ident, __e777)?
                         }
@@ -524,9 +524,9 @@ fn gen_encode_bound() -> syn::Result<syn::TypeParamBound> {
     syn::parse_str("minicbor::Encode")
 }
 
-fn is_null(ty: &syn::Type, codec: &Option<CustomCodec>) -> proc_macro2::TokenStream {
+fn is_nil(ty: &syn::Type, codec: &Option<CustomCodec>) -> proc_macro2::TokenStream {
     if let Some(ce) = codec {
-        if let Some(p) = ce.to_is_null_path() {
+        if let Some(p) = ce.to_is_nil_path() {
             p.to_token_stream()
         } else if is_option(ty, |_| true) {
             quote!(core::option::Option::is_none)
@@ -534,6 +534,6 @@ fn is_null(ty: &syn::Type, codec: &Option<CustomCodec>) -> proc_macro2::TokenStr
             quote!((|_| false))
         }
     } else {
-        quote!(minicbor::Encode::is_null)
+        quote!(minicbor::Encode::is_nil)
     }
 }
