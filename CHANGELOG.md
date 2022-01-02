@@ -6,6 +6,12 @@
 
 # minicbor
 
+## `0.12.1`
+
+- Change `Tokenizer::token` to move to the end of decoding input when an error occurs. This is
+  done because some errors do not cause consumption of the input, hence repeated calls to
+  `Tokenizer::token` may not terminate.
+
 ## `0.12.0`
 
 - Extend the optionality of fields beyond `Option`. This applies to derived impls of `Encode`
