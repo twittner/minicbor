@@ -1,4 +1,4 @@
-.PHONY: build test doc clean
+.PHONY: build test fuzz doc clean
 
 build:
 	cd minicbor-tests-nostd && cargo rustc -- -C link-arg=-nostartfiles
@@ -19,6 +19,9 @@ test:
 	cargo test --all --features="alloc,partial-derive-support"
 	cargo test --all --features="std,half,derive"
 	cargo test --all --all-features
+
+fuzz:
+	(cd minicbor-tests && cargo +nightly fuzz run tokenizer)
 
 doc:
 	cargo doc --features="std,half,derive"
