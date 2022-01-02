@@ -1,2 +1,4 @@
 **/target
+minicbor-tests/fuzz/artifacts
+minicbor-tests/fuzz/corpus
 Cargo.lock
