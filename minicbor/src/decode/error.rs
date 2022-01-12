@@ -1,5 +1,5 @@
-use core::{fmt, str};
 use crate::data::Type;
+use core::{fmt, str};
 
 /// Decoding errors.
 #[derive(Debug)]
@@ -23,22 +23,22 @@ pub enum Error {
     Message(&'static str),
     /// Custom error.
     #[cfg(feature = "std")]
-    Custom(Box<dyn std::error::Error + Send + Sync>)
+    Custom(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::EndOfInput         => f.write_str("end of input bytes"),
-            Error::InvalidChar(n)     => write!(f, "invalid char: {:#x?}", n),
-            Error::Utf8(e)            => write!(f, "invalid utf-8: {}", e),
-            Error::Overflow(n, m)     => write!(f, "{}: {} overflows target type", m, n),
+            Error::EndOfInput => f.write_str("end of input bytes"),
+            Error::InvalidChar(n) => write!(f, "invalid char: {:#x?}", n),
+            Error::Utf8(e) => write!(f, "invalid utf-8: {}", e),
+            Error::Overflow(n, m) => write!(f, "{}: {} overflows target type", m, n),
             Error::TypeMismatch(t, m) => write!(f, "unexpected type: {}, {}", t, m),
-            Error::UnknownVariant(n)  => write!(f, "unknown enum variant {}", n),
+            Error::UnknownVariant(n) => write!(f, "unknown enum variant {}", n),
             Error::MissingValue(n, s) => write!(f, "missing value at index {} for {}", n, s),
-            Error::Message(m)         => write!(f, "{}", m),
+            Error::Message(m) => write!(f, "{}", m),
             #[cfg(feature = "std")]
-            Error::Custom(e)          => write!(f, "{}", e)
+            Error::Custom(e) => write!(f, "{}", e),
         }
     }
 }
@@ -55,8 +55,7 @@ impl std::error::Error for Error {
             | Error::TypeMismatch(..)
             | Error::UnknownVariant(_)
             | Error::MissingValue(..)
-            | Error::Message(_)
-            => None
+            | Error::Message(_) => None,
         }
     }
 }
@@ -66,4 +65,3 @@ impl From<str::Utf8Error> for Error {
         Error::Utf8(e)
     }
 }
-
