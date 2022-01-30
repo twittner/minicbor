@@ -6,6 +6,12 @@
 
 # minicbor
 
+## `0.13.0`
+
+- ⚠️ **Breaking** ⚠️: Removed the `Clone` impl of `decode::Error`.
+- Added a new variant `decode::Error::Custom` (requires feature `std`) which contains an
+  arbitrary `Box<dyn std::error::Error + Send + Sync>`.
+
 ## `0.12.1`
 
 - Change `Tokenizer::token` to move to the end of decoding input when an error occurs. This is
@@ -192,6 +198,10 @@
   which do not implement these traits.
 
 # minicbor-io
+
+## `0.8.0`
+
+- Depends on `minicbor-0.13.0`.
 
 ## `0.7.0`
 
