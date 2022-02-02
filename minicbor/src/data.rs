@@ -66,39 +66,6 @@ impl fmt::Display for Type {
     }
 }
 
-impl Type {
-    pub(crate) fn read(n: u8) -> Self {
-        match n {
-            0x00 ..= 0x18        => Type::U8,
-            0x19                 => Type::U16,
-            0x1a                 => Type::U32,
-            0x1b                 => Type::U64,
-            0x20 ..= 0x38        => Type::I8,
-            0x39                 => Type::I16,
-            0x3a                 => Type::I32,
-            0x3b                 => Type::I64,
-            0x40 ..= 0x5b        => Type::Bytes,
-            0x5f                 => Type::BytesIndef,
-            0x60 ..= 0x7b        => Type::String,
-            0x7f                 => Type::StringIndef,
-            0x80 ..= 0x9b        => Type::Array,
-            0x9f                 => Type::ArrayIndef,
-            0xa0 ..= 0xbb        => Type::Map,
-            0xbf                 => Type::MapIndef,
-            0xc0 ..= 0xdb        => Type::Tag,
-            0xe0 ..= 0xf3 | 0xf8 => Type::Simple,
-            0xf4 | 0xf5          => Type::Bool,
-            0xf6                 => Type::Null,
-            0xf7                 => Type::Undefined,
-            0xf9                 => Type::F16,
-            0xfa                 => Type::F32,
-            0xfb                 => Type::F64,
-            0xff                 => Type::Break,
-            _                    => Type::Unknown(n)
-        }
-    }
-}
-
 /// CBOR data item tag.
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum Tag {

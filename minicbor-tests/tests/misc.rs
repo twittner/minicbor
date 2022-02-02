@@ -1,4 +1,6 @@
+use minicbor::data::Type;
 use minicbor::decode::{Decoder, Error};
+use minicbor::encode::Encoder;
 use quickcheck::{quickcheck, TestResult};
 
 #[test]
@@ -436,3 +438,57 @@ quickcheck! {
     }
 }
 
+#[test]
+fn type_of_negative_ints() {
+    let mut buf = [0u8; 1024];
+    let mut enc = Encoder::new(&mut buf[..]);
+
+    enc.i8(-0x80).unwrap();
+    enc.i16(-0x81).unwrap();
+    enc.i16(-0x80_00).unwrap();
+    enc.i32(-0x80_01).unwrap();
+    enc.i32(-0x80_00_00_00).unwrap();
+    enc.i64(-0x80_00_00_01).unwrap();
+    enc.i64(-0x80_00_00_00_00_00_00_00).unwrap();
+
+    let mut dec = Decoder::new(&buf);
+
+    assert_eq!(Some(Type::I8), dec.datatype().ok());
+    assert_eq!(Some(-0x80), dec.i8().ok());
+    assert_eq!(Some(Type::I16), dec.datatype().ok());
+    assert_eq!(Some(-0x81), dec.i16().ok());
+    assert_eq!(Some(Type::I16), dec.datatype().ok());
+    assert_eq!(Some(-0x80_00), dec.i16().ok());
+    assert_eq!(Some(Type::I32), dec.datatype().ok());
+    assert_eq!(Some(-0x80_01), dec.i32().ok());
+    assert_eq!(Some(Type::I32), dec.datatype().ok());
+    assert_eq!(Some(-0x80_00_00_00), dec.i32().ok());
+    assert_eq!(Some(Type::I64), dec.datatype().ok());
+    assert_eq!(Some(-0x80_00_00_01), dec.i64().ok());
+    assert_eq!(Some(Type::I64), dec.datatype().ok());
+    assert_eq!(Some(-0x80_00_00_00_00_00_00_00), dec.i64().ok());
+}
+
+quickcheck! {
+    fn type_of_i8(i: i8)   -> bool { check_type_of(i64::from(i)) }
+    fn type_of_i16(i: i16) -> bool { check_type_of(i64::from(i)) }
+    fn type_of_i32(i: i32) -> bool { check_type_of(i64::from(i)) }
+    fn type_of_i64(i: i64) -> bool { check_type_of(i) }
+}
+
+fn check_type_of(i: i64) -> bool {
+    let mut b = [0u8; 16];
+    minicbor::encode(i, b.as_mut()).unwrap();
+    let mut d = Decoder::new(&b);
+    match d.datatype().unwrap() {
+        Type::U8  => Some(i) == d.u8().ok().map(i64::from),
+        Type::U16 => Some(i) == d.u16().ok().map(i64::from),
+        Type::U32 => Some(i) == d.u32().ok().map(i64::from),
+        Type::U64 => Some(i) == d.u64().ok().and_then(|n| i64::try_from(n).ok()),
+        Type::I8  => Some(i) == d.i8().ok().map(i64::from),
+        Type::I16 => Some(i) == d.i16().ok().map(i64::from),
+        Type::I32 => Some(i) == d.i32().ok().map(i64::from),
+        Type::I64 => Some(i) == d.i64().ok(),
+        _         => false
+    }
+}

@@ -3,7 +3,7 @@ publish = false
 name    = "minicbor-tests-nostd"
 version = "0.1.0"
 authors = ["Toralf Wittner <tw@dtex.org>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 minicbor = { path = "../minicbor" }
