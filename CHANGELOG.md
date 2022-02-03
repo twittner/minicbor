@@ -6,6 +6,11 @@
 
 # minicbor
 
+## `0.13.1`
+
+- Bugfix: `Decoder::datatype` would sometimes report incorrect types for negative integers
+  (see issue #18 and commit 0bd97b72 for details).
+
 ## `0.13.0`
 
 - ⚠️ **Breaking** ⚠️: Removed the `Clone` impl of `decode::Error`.
