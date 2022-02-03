@@ -66,7 +66,7 @@ impl<'b> Decoder<'b> {
         match self.read()? {
             0xf4 => Ok(false),
             0xf5 => Ok(true),
-            b    => Err(Error::TypeMismatch(Type::read(b), "expected bool"))
+            b    => Err(Error::TypeMismatch(self.type_of(b)?, "expected bool"))
         }
     }
 
@@ -78,7 +78,7 @@ impl<'b> Decoder<'b> {
             0x19           => self.read_slice(2).map(read_u16).and_then(|n| try_as(n, "u16->u8")),
             0x1a           => self.read_slice(4).map(read_u32).and_then(|n| try_as(n, "u32->u8")),
             0x1b           => self.read_slice(8).map(read_u64).and_then(|n| try_as(n, "u64->u8")),
-            b              => Err(Error::TypeMismatch(Type::read(b), "expected u8"))
+            b              => Err(Error::TypeMismatch(self.type_of(b)?, "expected u8"))
         }
     }
 
@@ -90,7 +90,7 @@ impl<'b> Decoder<'b> {
             0x19           => self.read_slice(2).map(read_u16),
             0x1a           => self.read_slice(4).map(read_u32).and_then(|n| try_as(n, "u32->u16")),
             0x1b           => self.read_slice(8).map(read_u64).and_then(|n| try_as(n, "u64->u16")),
-            b              => Err(Error::TypeMismatch(Type::read(b), "expected u16"))
+            b              => Err(Error::TypeMismatch(self.type_of(b)?, "expected u16"))
         }
     }
 
@@ -102,7 +102,7 @@ impl<'b> Decoder<'b> {
             0x19           => self.read_slice(2).map(read_u16).map(u32::from),
             0x1a           => self.read_slice(4).map(read_u32),
             0x1b           => self.read_slice(8).map(read_u64).and_then(|n| try_as(n, "u64->u32")),
-            b              => Err(Error::TypeMismatch(Type::read(b), "expected u32"))
+            b              => Err(Error::TypeMismatch(self.type_of(b)?, "expected u32"))
         }
     }
 
@@ -125,7 +125,7 @@ impl<'b> Decoder<'b> {
             0x39              => self.read_slice(2).map(read_u16).and_then(|n| try_to!(n, i8, i8::MAX as u16, "u16->i8")),
             0x3a              => self.read_slice(4).map(read_u32).and_then(|n| try_to!(n, i8, i8::MAX as u32, "u32->i8")),
             0x3b              => self.read_slice(8).map(read_u64).and_then(|n| try_to!(n, i8, i8::MAX as u64, "u64->i8")),
-            b                 => Err(Error::TypeMismatch(Type::read(b), "expected i8"))
+            b                 => Err(Error::TypeMismatch(self.type_of(b)?, "expected i8"))
         }
     }
 
@@ -142,7 +142,7 @@ impl<'b> Decoder<'b> {
             0x39              => self.read_slice(2).map(read_u16).and_then(|n| try_to!(n, i16, i16::MAX as u16, "u16->i16")),
             0x3a              => self.read_slice(4).map(read_u32).and_then(|n| try_to!(n, i16, i16::MAX as u32, "u32->i16")),
             0x3b              => self.read_slice(8).map(read_u64).and_then(|n| try_to!(n, i16, i16::MAX as u64, "u64->i16")),
-            b                 => Err(Error::TypeMismatch(Type::read(b), "expected i16"))
+            b                 => Err(Error::TypeMismatch(self.type_of(b)?, "expected i16"))
         }
     }
 
@@ -159,7 +159,7 @@ impl<'b> Decoder<'b> {
             0x39              => self.read_slice(2).map(read_u16).map(|n| -1 - i32::from(n)),
             0x3a              => self.read_slice(4).map(read_u32).and_then(|n| try_to!(n, i32, i32::MAX as u32, "u32->i32")),
             0x3b              => self.read_slice(8).map(read_u64).and_then(|n| try_to!(n, i32, i32::MAX as u64, "u64->i32")),
-            b                 => Err(Error::TypeMismatch(Type::read(b), "expected i32"))
+            b                 => Err(Error::TypeMismatch(self.type_of(b)?, "expected i32"))
         }
     }
 
@@ -176,7 +176,7 @@ impl<'b> Decoder<'b> {
             0x39              => self.read_slice(2).map(read_u16).map(|n| -1 - i64::from(n)),
             0x3a              => self.read_slice(4).map(read_u32).map(|n| -1 - i64::from(n)),
             0x3b              => self.read_slice(8).map(read_u64).and_then(|n| try_to!(n, i64, i64::MAX as u64, "u64->i64")),
-            b                 => Err(Error::TypeMismatch(Type::read(b), "expected i64"))
+            b                 => Err(Error::TypeMismatch(self.type_of(b)?, "expected i64"))
         }
     }
 
@@ -187,7 +187,7 @@ impl<'b> Decoder<'b> {
     pub fn f16(&mut self) -> Result<f32, Error> {
         let b = self.read()?;
         if 0xf9 != b {
-            return Err(Error::TypeMismatch(Type::read(b), "expected f16"))
+            return Err(Error::TypeMismatch(self.type_of(b)?, "expected f16"))
         }
         let mut n = [0; 2];
         n.copy_from_slice(self.read_slice(2)?);
@@ -205,7 +205,7 @@ impl<'b> Decoder<'b> {
                 n.copy_from_slice(self.read_slice(4)?);
                 Ok(f32::from_be_bytes(n))
             }
-            b => Err(Error::TypeMismatch(Type::read(b), "expected f32"))
+            b => Err(Error::TypeMismatch(self.type_of(b)?, "expected f32"))
         }
     }
 
@@ -221,7 +221,7 @@ impl<'b> Decoder<'b> {
                 n.copy_from_slice(self.read_slice(8)?);
                 Ok(f64::from_be_bytes(n))
             }
-            b => Err(Error::TypeMismatch(Type::read(b), "expected f64"))
+            b => Err(Error::TypeMismatch(self.type_of(b)?, "expected f64"))
         }
     }
 
@@ -238,7 +238,7 @@ impl<'b> Decoder<'b> {
     pub fn bytes(&mut self) -> Result<&'b [u8], Error> {
         let b = self.read()?;
         if BYTES != type_of(b) || info_of(b) == 31 {
-            return Err(Error::TypeMismatch(Type::read(b), "expected bytes (definite length)"))
+            return Err(Error::TypeMismatch(self.type_of(b)?, "expected bytes (definite length)"))
         }
         let n = u64_to_usize(self.unsigned(info_of(b))?)?;
         self.read_slice(n)
@@ -252,7 +252,7 @@ impl<'b> Decoder<'b> {
     pub fn bytes_iter(&mut self) -> Result<BytesIter<'_, 'b>, Error> {
         let b = self.read()?;
         if BYTES != type_of(b) {
-            return Err(Error::TypeMismatch(Type::read(b), "expected bytes"))
+            return Err(Error::TypeMismatch(self.type_of(b)?, "expected bytes"))
         }
         match info_of(b) {
             31 => Ok(BytesIter { decoder: self, len: None }),
@@ -270,7 +270,7 @@ impl<'b> Decoder<'b> {
     pub fn str(&mut self) -> Result<&'b str, Error> {
         let b = self.read()?;
         if TEXT != type_of(b) || info_of(b) == 31 {
-            return Err(Error::TypeMismatch(Type::read(b), "expected text (definite length)"))
+            return Err(Error::TypeMismatch(self.type_of(b)?, "expected text (definite length)"))
         }
         let n = u64_to_usize(self.unsigned(info_of(b))?)?;
         let d = self.read_slice(n)?;
@@ -285,7 +285,7 @@ impl<'b> Decoder<'b> {
     pub fn str_iter(&mut self) -> Result<StrIter<'_, 'b>, Error> {
         let b = self.read()?;
         if TEXT != type_of(b) {
-            return Err(Error::TypeMismatch(Type::read(b), "expected text"))
+            return Err(Error::TypeMismatch(self.type_of(b)?, "expected text"))
         }
         match info_of(b) {
             31 => Ok(StrIter { decoder: self, len: None }),
@@ -304,7 +304,7 @@ impl<'b> Decoder<'b> {
     pub fn array(&mut self) -> Result<Option<u64>, Error> {
         let b = self.read()?;
         if ARRAY != type_of(b) {
-            return Err(Error::TypeMismatch(Type::read(b), "expected array"))
+            return Err(Error::TypeMismatch(self.type_of(b)?, "expected array"))
         }
         match info_of(b) {
             31 => Ok(None),
@@ -333,7 +333,7 @@ impl<'b> Decoder<'b> {
     pub fn map(&mut self) -> Result<Option<u64>, Error> {
         let b = self.read()?;
         if MAP != type_of(b) {
-            return Err(Error::TypeMismatch(Type::read(b), "expected map"))
+            return Err(Error::TypeMismatch(self.type_of(b)?, "expected map"))
         }
         match info_of(b) {
             31 => Ok(None),
@@ -359,7 +359,7 @@ impl<'b> Decoder<'b> {
     pub fn tag(&mut self) -> Result<Tag, Error> {
         let b = self.read()?;
         if TAGGED != type_of(b) {
-            return Err(Error::TypeMismatch(Type::read(b), "expected tag"))
+            return Err(Error::TypeMismatch(self.type_of(b)?, "expected tag"))
         }
         self.unsigned(info_of(b)).map(Tag::from)
     }
@@ -368,7 +368,7 @@ impl<'b> Decoder<'b> {
     pub fn null(&mut self) -> Result<(), Error> {
         match self.read()? {
             0xf6 => Ok(()),
-            n    => Err(Error::TypeMismatch(Type::read(n), "expected null"))
+            n    => Err(Error::TypeMismatch(self.type_of(n)?, "expected null"))
         }
     }
 
@@ -376,7 +376,7 @@ impl<'b> Decoder<'b> {
     pub fn undefined(&mut self) -> Result<(), Error> {
         match self.read()? {
             0xf7 => Ok(()),
-            n    => Err(Error::TypeMismatch(Type::read(n), "expected undefined"))
+            n    => Err(Error::TypeMismatch(self.type_of(n)?, "expected undefined"))
         }
     }
 
@@ -385,13 +385,13 @@ impl<'b> Decoder<'b> {
         match self.read()? {
             n @ SIMPLE ..= 0xf3 => Ok(n - SIMPLE),
             0xf8                => self.read(),
-            n                   => Err(Error::TypeMismatch(Type::read(n), "expected simple value"))
+            n                   => Err(Error::TypeMismatch(self.type_of(n)?, "expected simple value"))
         }
     }
 
     /// Inspect the CBOR type at the current position.
     pub fn datatype(&self) -> Result<Type, Error> {
-        self.current().map(Type::read)
+        self.type_of(self.current()?)
     }
 
     /// Skip over the current CBOR value.
@@ -483,7 +483,7 @@ impl<'b> Decoder<'b> {
                         irounds = irounds.saturating_sub(1)
                     }
                 }
-                other => return Err(Error::TypeMismatch(Type::read(other), "unknown type"))
+                other => return Err(Error::TypeMismatch(self.type_of(other)?, "unknown type"))
             }
             if nrounds == 0 && irounds == 0 {
                 while let Some(Some(0)) = stack.last() {
@@ -560,12 +560,21 @@ impl<'b> Decoder<'b> {
                     self.read()?;
                     irounds = irounds.saturating_sub(1)
                 }
-                other => return Err(Error::TypeMismatch(Type::read(other), "not supported"))
+                other => return Err(Error::TypeMismatch(self.type_of(other)?, "not supported"))
             }
             nrounds = nrounds.saturating_sub(1)
         }
 
         Ok(())
+    }
+
+    /// Consume the remaining bytes as is.
+    pub(crate) fn consume(&mut self) -> Result<&'b [u8], Error> {
+        if let Some(b) = self.buf.get(self.pos ..) {
+            self.pos = self.buf.len();
+            return Ok(b)
+        }
+        Err(Error::EndOfInput)
     }
 
     /// Decode a `u64` value beginning with `b`.
@@ -576,7 +585,7 @@ impl<'b> Decoder<'b> {
             0x19           => self.read_slice(2).map(read_u16).map(u64::from),
             0x1a           => self.read_slice(4).map(read_u32).map(u64::from),
             0x1b           => self.read_slice(8).map(read_u64),
-            _              => Err(Error::TypeMismatch(Type::read(b), "expected u64"))
+            _              => Err(Error::TypeMismatch(self.type_of(b)?, "expected u64"))
         }
     }
 
@@ -597,6 +606,13 @@ impl<'b> Decoder<'b> {
         Err(Error::EndOfInput)
     }
 
+    /// Peek to the next byte.
+    fn peek(&self) -> Result<u8, Error> {
+        self.pos.checked_add(1)
+            .and_then(|i| self.buf.get(i).copied())
+            .ok_or(Error::EndOfInput)
+    }
+
     /// Consume and return *n* bytes starting at the current position.
     fn read_slice(&mut self, n: usize) -> Result<&'b [u8], Error> {
         if let Some(b) = self.pos.checked_add(n).and_then(|end| self.buf.get(self.pos .. end)) {
@@ -606,13 +622,37 @@ impl<'b> Decoder<'b> {
         Err(Error::EndOfInput)
     }
 
-    /// Consume the remaining bytes as is.
-    pub(crate) fn consume(&mut self) -> Result<&'b [u8], Error> {
-        if let Some(b) = self.buf.get(self.pos ..) {
-            self.pos = self.buf.len();
-            return Ok(b)
-        }
-        Err(Error::EndOfInput)
+    /// Map the given byte to a [`Type`].
+    fn type_of(&self, n: u8) -> Result<Type, Error> {
+        Ok(match n {
+            0x00 ..= 0x18        => Type::U8,
+            0x19                 => Type::U16,
+            0x1a                 => Type::U32,
+            0x1b                 => Type::U64,
+            0x20 ..= 0x37        => Type::I8,
+            0x38                 => if self.peek()? < 0x80 { Type::I8  } else { Type::I16 }
+            0x39                 => if self.peek()? < 0x80 { Type::I16 } else { Type::I32 }
+            0x3a                 => if self.peek()? < 0x80 { Type::I32 } else { Type::I64 }
+            0x3b                 => Type::I64,
+            0x40 ..= 0x5b        => Type::Bytes,
+            0x5f                 => Type::BytesIndef,
+            0x60 ..= 0x7b        => Type::String,
+            0x7f                 => Type::StringIndef,
+            0x80 ..= 0x9b        => Type::Array,
+            0x9f                 => Type::ArrayIndef,
+            0xa0 ..= 0xbb        => Type::Map,
+            0xbf                 => Type::MapIndef,
+            0xc0 ..= 0xdb        => Type::Tag,
+            0xe0 ..= 0xf3 | 0xf8 => Type::Simple,
+            0xf4 | 0xf5          => Type::Bool,
+            0xf6                 => Type::Null,
+            0xf7                 => Type::Undefined,
+            0xf9                 => Type::F16,
+            0xfa                 => Type::F32,
+            0xfb                 => Type::F64,
+            0xff                 => Type::Break,
+            n                    => Type::Unknown(n)
+        })
     }
 }
 
@@ -689,13 +729,13 @@ impl<'a, 'b, T: Decode<'b>> Iterator for ArrayIter<'a, 'b, T> {
         match self.len {
             None => match self.decoder.current() {
                 Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
-                Ok(_)     => Some(T::decode(&mut self.decoder)),
+                Ok(_)     => Some(T::decode(self.decoder)),
                 Err(e)    => Some(Err(e))
             }
             Some(0) => None,
             Some(n) => {
                 self.len = Some(n - 1);
-                Some(T::decode(&mut self.decoder))
+                Some(T::decode(self.decoder))
             }
         }
     }
@@ -729,13 +769,13 @@ where
         match self.len {
             None => match self.decoder.current() {
                 Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
-                Ok(_)  => Some(pair(&mut self.decoder)),
+                Ok(_)  => Some(pair(self.decoder)),
                 Err(e) => Some(Err(e))
             }
             Some(0) => None,
             Some(n) => {
                 self.len = Some(n - 1);
-                Some(pair(&mut self.decoder))
+                Some(pair(self.decoder))
             }
         }
     }
