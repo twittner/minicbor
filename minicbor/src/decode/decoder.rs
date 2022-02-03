@@ -729,13 +729,13 @@ impl<'a, 'b, T: Decode<'b>> Iterator for ArrayIter<'a, 'b, T> {
         match self.len {
             None => match self.decoder.current() {
                 Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
-                Ok(_)     => Some(T::decode(&mut self.decoder)),
+                Ok(_)     => Some(T::decode(self.decoder)),
                 Err(e)    => Some(Err(e))
             }
             Some(0) => None,
             Some(n) => {
                 self.len = Some(n - 1);
-                Some(T::decode(&mut self.decoder))
+                Some(T::decode(self.decoder))
             }
         }
     }
@@ -769,13 +769,13 @@ where
         match self.len {
             None => match self.decoder.current() {
                 Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
-                Ok(_)  => Some(pair(&mut self.decoder)),
+                Ok(_)  => Some(pair(self.decoder)),
                 Err(e) => Some(Err(e))
             }
             Some(0) => None,
             Some(n) => {
                 self.len = Some(n - 1);
-                Some(pair(&mut self.decoder))
+                Some(pair(self.decoder))
             }
         }
     }
