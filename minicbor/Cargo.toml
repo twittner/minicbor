@@ -7,7 +7,7 @@ edition       = "2021"
 description   = "A small CBOR codec suitable for no_std environments."
 repository    = "https://gitlab.com/twittner/minicbor"
 documentation = "https://twittner.gitlab.io/minicbor/minicbor/"
-keywords      = ["cbor", "encoding", "binary"]
+keywords      = ["cbor", "serialization", "encoding", "binary", "no_std"]
 categories    = ["encoding"]
 build         = "build.rs"
 

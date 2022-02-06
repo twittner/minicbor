@@ -7,7 +7,7 @@ edition       = "2021"
 description   = "A set of I/O utilities for minicbor."
 repository    = "https://gitlab.com/twittner/minicbor"
 documentation = "https://twittner.gitlab.io/minicbor/minicbor_io/"
-keywords      = ["cbor", "encoding", "binary", "io"]
+keywords      = ["cbor", "serialization", "encoding", "binary", "io", "async"]
 categories    = ["encoding"]
 
 [package.metadata.docs.rs]
