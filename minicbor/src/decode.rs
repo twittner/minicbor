@@ -72,6 +72,13 @@ impl<'b> Decode<'b> for alloc::string::String {
     }
 }
 
+#[cfg(feature = "alloc")]
+impl<'b> Decode<'b> for alloc::boxed::Box<str> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        d.str().map(Into::into)
+    }
+}
+
 impl<'b, T: Decode<'b>> Decode<'b> for Option<T> {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
         if crate::data::Type::Null == d.datatype()? {
