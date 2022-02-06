@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.13.2`
+
+- Added `Decode` impl for `Box<str>` (see merge request !18 by @tailhook).
+
 ## `0.13.1`
 
 - Bugfix: `Decoder::datatype` would sometimes report incorrect types for negative integers
@@ -40,7 +44,7 @@
 - Bugfix: Decoding strings or bytes with a length of `u64::MAX` would cause an overflow of the
   internal decoder position value. This case is now properly handled. See issue #12 for details.
 - Bugfix: The `partial-derive-support` feature did not re-export `minicbor-derive`, nor did it
-  make the functionality of `minicbor::bytes` available. See merge request !14 for details.
+  make the functionality of `minicbor::bytes` available. See merge request !14 by @dne1 for details.
 
 ## `0.11.3`
 
@@ -95,6 +99,7 @@
   environment. See merge request !9 for details.
 - Added `ByteArray` to support compact encoding of `u8`-arrays, similarly to the already existing
   `ByteSlice` and `ByteVec` types added in `minicbor-0.6.0`. See merge request !10 for details.
+- Added `Write` impl for `alloc::vec::Vec` (see merge request !11 by @Hawk777).
 - Depends on `minicbor-derive-0.6.4`.
 
 ## `0.8.1`
@@ -141,6 +146,10 @@
 
 - Adds `Encoder::f16` to support encoding of `f32` values as half floats. Complements the existing
   `Decoder::f16` method and depends on the feature `half`.
+
+## `0.4.0`
+
+- Added `Encode` and `Decode` impls for tuples (see merge request !1 by @koushiro).
 
 # minicbor-derive
 
@@ -201,6 +210,10 @@
 - Adds `#[cbor(encode_with)]`, `#[cbor(decode_with)` and `#[cbor(with)]` attributes to allow custom
   encode/decode functions which replace their trait counterparts or provide a way to handle types
   which do not implement these traits.
+
+## `0.3.0`
+
+- Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
 
