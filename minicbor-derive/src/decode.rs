@@ -90,7 +90,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
                 } else if let Some(z) = #nils {
                     z
                 } else {
-                    return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
+                    return Err(minicbor::decode::Error::missing_value(#indices).with_message(#field_str).at(__p777))
                 }),*
             })
         }
@@ -103,7 +103,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             } else if let Some(z) = #nils {
                 z
             } else {
-                return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
+                return Err(minicbor::decode::Error::missing_value(#indices).with_message(#field_str).at(__p777))
             }),*))
         }
     };
@@ -111,6 +111,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'bytes> for #name #typ_generics #where_clause {
             fn decode(__d777: &mut minicbor::Decoder<'bytes>) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
+                let __p777 = __d777.position();
                 #statements
                 #result
             }
@@ -183,7 +184,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                             } else if let Some(z) = #nils {
                                 z
                             } else {
-                                return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
+                                return Err(minicbor::decode::Error::missing_value(#indices).with_message(#field_str).at(__p777))
                             }),*
                         })
                     }
@@ -197,7 +198,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         } else if let Some(z) = #nils {
                             z
                         } else {
-                            return Err(minicbor::decode::Error::MissingValue(#indices, #field_str))
+                            return Err(minicbor::decode::Error::missing_value(#indices).with_message(#field_str).at(__p777))
                         }),*))
                     }
                 }
@@ -218,12 +219,16 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     let check = if index_only {
-        quote!()
+        quote! {
+            let __p778 = __d777.position();
+        }
     } else {
         quote! {
+            let __p777 = __d777.position();
             if Some(2) != __d777.array()? {
-                return Err(minicbor::decode::Error::Message("expected enum (2-element array)"))
+                return Err(minicbor::decode::Error::message("expected enum (2-element array)").at(__p777))
             }
+            let __p778 = __d777.position();
         }
     };
 
@@ -233,7 +238,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 #check
                 match __d777.u32()? {
                     #(#rows)*
-                    n => Err(minicbor::decode::Error::UnknownVariant(n))
+                    n => Err(minicbor::decode::Error::unknown_variant(n).at(__p778))
                 }
             }
         }
@@ -281,24 +286,24 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
                 if let Some(cd) = ff {
                     if let Some(p) = cd.to_nil_path() {
                         quote! {
-                            Err(minicbor::decode::Error::UnknownVariant(_)) if #p().is_some() => {
+                            Err(e) if e.kind() == minicbor::decode::ErrorKind::UnknownVariant && #p().is_some() => {
                                 __d777.skip()?
                             }
                         }
                     } else if is_option(ty, |_| true) {
                         quote! {
-                            Err(minicbor::decode::Error::UnknownVariant(_)) => __d777.skip()?,
+                            Err(e) if e.kind() == minicbor::decode::ErrorKind::UnknownVariant => __d777.skip()?,
                         }
                     } else {
                         quote!()
                     }
                 } else if is_option(ty, |_| true) {
                     quote! {
-                        Err(minicbor::decode::Error::UnknownVariant(_)) => __d777.skip()?,
+                        Err(e) if e.kind() == minicbor::decode::ErrorKind::UnknownVariant => __d777.skip()?,
                     }
                 } else {
                     quote! {
-                        Err(minicbor::decode::Error::UnknownVariant(_)) if <#ty>::nil().is_some() => {
+                        Err(e) if e.kind() == minicbor::decode::ErrorKind::UnknownVariant && <#ty>::nil().is_some() => {
                             __d777.skip()?
                         }
                     }

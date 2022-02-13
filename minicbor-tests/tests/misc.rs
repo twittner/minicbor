@@ -1,5 +1,5 @@
 use minicbor::data::Type;
-use minicbor::decode::{Decoder, Error};
+use minicbor::decode::{Decoder, ErrorKind};
 use minicbor::encode::Encoder;
 use quickcheck::{quickcheck, TestResult};
 
@@ -7,14 +7,14 @@ use quickcheck::{quickcheck, TestResult};
 fn trigger_length_overflow_str() {
     let input = b"\x7B\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF";
     let mut d = Decoder::new(&input[..]);
-    assert!(matches!(d.str(), Err(Error::EndOfInput)))
+    assert!(matches!(d.str().map_err(|e| e.kind()), Err(ErrorKind::EndOfInput)))
 }
 
 #[test]
 fn trigger_length_overflow_bytes() {
     let input = b"\x5B\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF";
     let mut d = Decoder::new(&input[..]);
-    assert!(matches!(d.bytes(), Err(Error::EndOfInput)))
+    assert!(matches!(d.bytes().map_err(|e| e.kind()), Err(ErrorKind::EndOfInput)))
 }
 
 quickcheck! {
