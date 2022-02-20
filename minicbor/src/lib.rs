@@ -193,7 +193,7 @@ where
 
 /// Display the given CBOR bytes in [diagnostic notation][1].
 ///
-/// *Requires features* `"alloc"` and `"half"`.
+/// *Requires features* `"alloc"` *and* `"half"`.
 ///
 /// Quick syntax summary:
 ///

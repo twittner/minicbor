@@ -43,8 +43,7 @@ pub enum Token<'b> {
 
 /// An [`Iterator`] over CBOR tokens.
 ///
-/// The `Iterator` implementation calls [`Tokenizer::token`] until
-/// [`Error::EndOfInput`] is returned which is mapped to `None`.
+/// The `Iterator` implementation calls [`Tokenizer::token`] until end of input has been reached.
 ///
 /// *Requires feature* `"half"`.
 #[derive(Debug, Clone)]
@@ -58,7 +57,7 @@ impl<'b> Iterator for Tokenizer<'b> {
     fn next(&mut self) -> Option<Self::Item> {
         match self.token() {
             Ok(t) => Some(Ok(t)),
-            Err(Error::EndOfInput) => None,
+            Err(e) if e.is_end_of_input() => None,
             Err(e) => Some(Err(e))
         }
     }
@@ -108,18 +107,22 @@ impl<'b> Tokenizer<'b> {
             Type::String       => self.decoder.str().map(Token::String),
             Type::Tag          => self.decoder.tag().map(Token::Tag),
             Type::Simple       => self.decoder.simple().map(Token::Simple),
-            Type::Array        =>
+            Type::Array        => {
+                let p = self.decoder.position();
                 if let Some(n) = self.decoder.array()? {
                     Ok(Token::Array(n))
                 } else {
-                    Err(Error::TypeMismatch(Type::Array, "missing array length"))
+                    Err(Error::type_mismatch(Type::Array).at(p).with_message("missing array length"))
                 }
-            Type::Map          =>
+            }
+            Type::Map          => {
+                let p = self.decoder.position();
                 if let Some(n) = self.decoder.map()? {
                     Ok(Token::Map(n))
                 } else {
-                    Err(Error::TypeMismatch(Type::Array, "missing map length"))
+                    Err(Error::type_mismatch(Type::Array).at(p).with_message("missing map length"))
                 }
+            }
             Type::BytesIndef   => { self.skip_byte(); Ok(Token::BeginBytes)  }
             Type::StringIndef  => { self.skip_byte(); Ok(Token::BeginString) }
             Type::ArrayIndef   => { self.skip_byte(); Ok(Token::BeginArray)  }
@@ -127,7 +130,9 @@ impl<'b> Tokenizer<'b> {
             Type::Null         => { self.skip_byte(); Ok(Token::Null)        }
             Type::Undefined    => { self.skip_byte(); Ok(Token::Undefined)   }
             Type::Break        => { self.skip_byte(); Ok(Token::Break)       }
-            t@Type::Unknown(_) => Err(Error::TypeMismatch(t, "unknown cbor type"))
+            t@Type::Unknown(_) => Err(Error::type_mismatch(t)
+                .at(self.decoder.position())
+                .with_message("unknown cbor type"))
         }
     }
 
