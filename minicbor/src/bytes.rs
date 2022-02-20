@@ -183,9 +183,10 @@ impl<const N: usize> AsMut<[u8; N]> for ByteArray<N> {
 
 impl<'b, const N: usize> Decode<'b> for ByteArray<N> {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
+        let pos   = d.position();
         let slice = d.bytes()?;
         let array = <[u8; N]>::try_from(slice).map_err(|_| {
-            decode::Error::Message("byte slice length does not match expected array length")
+            decode::Error::message("byte slice length does not match expected array length").at(pos)
         })?;
         Ok(ByteArray(array))
     }

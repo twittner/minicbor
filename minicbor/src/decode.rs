@@ -99,13 +99,15 @@ where
     E: Decode<'b>
 {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        let p = d.position();
         if Some(2) != d.array()? {
-            return Err(Error::Message("expected enum (2-element array)"))
+            return Err(Error::message("expected enum (2-element array)").at(p))
         }
+        let p = d.position();
         match d.u32()? {
             0 => T::decode(d).map(Ok),
             1 => E::decode(d).map(Err),
-            n => Err(Error::UnknownVariant(n))
+            n => Err(Error::unknown_variant(n).at(p))
         }
     }
 }
@@ -193,8 +195,9 @@ where
 
 impl<'b, T> Decode<'b> for core::marker::PhantomData<T> {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        let p = d.position();
         if Some(0) != d.array()? {
-            return Err(Error::Message("expected phantom data, i.e. an empty array"))
+            return Err(Error::message("expected phantom data, i.e. an empty array").at(p))
         }
         Ok(core::marker::PhantomData)
     }
@@ -202,8 +205,9 @@ impl<'b, T> Decode<'b> for core::marker::PhantomData<T> {
 
 impl<'b> Decode<'b> for () {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        let p = d.position();
         if Some(0) != d.array()? {
-            return Err(Error::Message("expected unit, i.e. an empty array"))
+            return Err(Error::message("expected unit, i.e. an empty array").at(p))
         }
         Ok(())
     }
@@ -262,7 +266,8 @@ macro_rules! decode_nonzero {
         $(
             impl<'b> Decode<'b> for $t {
                 fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-                    <$t>::new(Decode::decode(d)?).ok_or(Error::Message($msg))
+                    let p = d.position();
+                    <$t>::new(Decode::decode(d)?).ok_or_else(|| Error::message($msg).at(p))
                 }
             }
         )*
@@ -351,20 +356,21 @@ macro_rules! decode_arrays {
         $(
             impl<'b, T: Decode<'b> + Default> Decode<'b> for [T; $n] {
                 fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+                    let p = d.position();
                     let iter: ArrayIter<T> = d.array_iter()?;
                     let mut a: [T; $n] = Default::default();
                     let mut i = 0;
                     for x in iter {
                         if i >= a.len() {
                             let msg = concat!("array has more than ", $n, " elements");
-                            return Err(Error::Message(msg))
+                            return Err(Error::message(msg).at(p))
                         }
                         a[i] = x?;
                         i += 1;
                     }
                     if i < a.len() {
                         let msg = concat!("array has less than ", $n, " elements");
-                        return Err(Error::Message(msg))
+                        return Err(Error::message(msg).at(p))
                     }
                     Ok(a)
                 }
@@ -380,9 +386,10 @@ macro_rules! decode_tuples {
         $(
             impl<'b, $($T: Decode<'b>),+> Decode<'b> for ($($T,)+) {
                 fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+                    let p = d.position();
                     let n = d.array()?;
                     if n != Some($len) {
-                        return Err(Error::Message(concat!("invalid ", $len, "-tuple length")))
+                        return Err(Error::message(concat!("invalid ", $len, "-tuple length")).at(p))
                     }
                     Ok(($($T::decode(d)?,)+))
                 }
@@ -414,6 +421,8 @@ macro_rules! decode_fields {
     ($d:ident | $($n:literal $x:ident => $t:ty ; $msg:literal)*) => {
         $(let mut $x = None;)*
 
+        let p = $d.position();
+
         match $d.array()? {
             Some(n) => for i in 0 .. n {
                 match i {
@@ -437,7 +446,7 @@ macro_rules! decode_fields {
         $(let $x = if let Some(x) = $x {
             x
         } else {
-            return Err(Error::MissingValue($n, $msg))
+            return Err(Error::missing_value($n).at(p).with_message($msg))
         };)*
     }
 }
@@ -455,9 +464,10 @@ impl<'b> Decode<'b> for core::time::Duration {
 #[cfg(feature = "std")]
 impl<'b> Decode<'b> for std::time::SystemTime {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        let p = d.position();
         std::time::UNIX_EPOCH
             .checked_add(d.decode()?)
-            .ok_or(Error::Message("duration value can not represent system time"))
+            .ok_or_else(|| Error::message("duration value can not represent system time").at(p))
     }
 }
 
@@ -497,13 +507,15 @@ impl<'b> Decode<'b> for std::path::PathBuf {
 #[cfg(feature = "std")]
 impl<'b> Decode<'b> for std::net::IpAddr {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        let p = d.position();
         if Some(2) != d.array()? {
-            return Err(Error::Message("expected enum (2-element array)"))
+            return Err(Error::message("expected enum (2-element array)").at(p))
         }
+        let p = d.position();
         match d.u32()? {
             0 => Ok(std::net::Ipv4Addr::decode(d)?.into()),
             1 => Ok(std::net::Ipv6Addr::decode(d)?.into()),
-            n => Err(Error::UnknownVariant(n))
+            n => Err(Error::unknown_variant(n).at(p))
         }
     }
 }
@@ -527,13 +539,15 @@ impl<'b> Decode<'b> for std::net::Ipv6Addr {
 #[cfg(feature = "std")]
 impl<'b> Decode<'b> for std::net::SocketAddr {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        let p = d.position();
         if Some(2) != d.array()? {
-            return Err(Error::Message("expected enum (2-element array)"))
+            return Err(Error::message("expected enum (2-element array)").at(p))
         }
+        let p = d.position();
         match d.u32()? {
             0 => Ok(std::net::SocketAddrV4::decode(d)?.into()),
             1 => Ok(std::net::SocketAddrV6::decode(d)?.into()),
-            n => Err(Error::UnknownVariant(n))
+            n => Err(Error::unknown_variant(n).at(p))
         }
     }
 }
@@ -609,14 +623,16 @@ impl<'b, T: Decode<'b>> Decode<'b> for core::ops::RangeInclusive<T> {
 
 impl<'b, T: Decode<'b>> Decode<'b> for core::ops::Bound<T> {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        let p = d.position();
         if Some(2) != d.array()? {
-            return Err(Error::Message("expected enum (2-element array)"))
+            return Err(Error::message("expected enum (2-element array)").at(p))
         }
+        let p = d.position();
         match d.u32()? {
             0 => d.decode().map(core::ops::Bound::Included),
             1 => d.decode().map(core::ops::Bound::Excluded),
             2 => d.limited_skip().map(|_| core::ops::Bound::Unbounded),
-            n => Err(Error::UnknownVariant(n))
+            n => Err(Error::unknown_variant(n).at(p))
         }
     }
 }

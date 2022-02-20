@@ -216,7 +216,7 @@ fn index_only_enum() {
     d.skip().unwrap();
     assert_eq!("foo", d.probe().str().unwrap());
     d.skip().unwrap();
-    assert!(matches!(d.skip(), Err(minicbor::decode::Error::EndOfInput)))
+    assert!(d.skip().unwrap_err().is_end_of_input())
 }
 
 #[test]
@@ -254,6 +254,6 @@ fn regular_enum() {
     d.skip().unwrap();
     assert_eq!("foo", d.probe().str().unwrap());
     d.skip().unwrap();
-    assert!(matches!(d.skip(), Err(minicbor::decode::Error::EndOfInput)))
+    assert!(d.skip().unwrap_err().is_end_of_input())
 }
 

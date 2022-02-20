@@ -6,6 +6,14 @@
 
 # minicbor
 
+## `0.14.0`
+
+- ⚠️ **Breaking** ⚠️: `encode::Error` and `decode::Error` are now structs instead of enums.
+  The actual error representation is hidden and errors are constructed with functions instead
+  of creating enum values directly, for example `Error::Message("foo")` is now
+  `Error::message("foo")`. This was done to support adding more information to error values,
+  like the decoding position. For details see merge request !19.
+
 ## `0.13.2`
 
 - Added `Decode` impl for `Box<str>` (see merge request !18 by @tailhook).
@@ -153,6 +161,10 @@
 
 # minicbor-derive
 
+## `0.9.0`
+
+- Depends on `minicbor-0.14.0`.
+
 ## `0.8.0`
 
 - Uses `Encode::is_nil` and `Decode::nil` instead of `Option::is_none` and `None` to generalise
@@ -216,6 +228,10 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.9.0`
+
+- Depends on `minicbor-0.14.0`.
 
 ## `0.8.0`
 
