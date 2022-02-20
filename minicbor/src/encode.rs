@@ -369,10 +369,9 @@ impl Encode for core::time::Duration {
 #[cfg(feature = "std")]
 impl Encode for std::time::SystemTime {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        if let Ok(d) = self.duration_since(std::time::UNIX_EPOCH) {
-            d.encode(e)
-        } else {
-            Err(Error::Message("could not determine system time duration"))
+        match self.duration_since(std::time::UNIX_EPOCH) {
+            Ok(d)  => d.encode(e),
+            Err(e) => Err(Error::custom(e.into()).with_message("when encoding system time"))
         }
     }
 }
@@ -388,7 +387,7 @@ impl<T: Encode> Encode for core::cell::RefCell<T> {
         if let Ok(v) = self.try_borrow() {
             v.encode(e)
         } else {
-            Err(Error::Message("could not borrow ref cell value"))
+            Err(Error::message("could not borrow ref cell value"))
         }
     }
 }
@@ -399,7 +398,7 @@ impl Encode for std::path::Path {
         if let Some(s) = self.to_str() {
             e.str(s)?.ok()
         } else {
-            Err(Error::Message("non-utf-8 path values are not supported"))
+            Err(Error::message("non-utf-8 path values are not supported"))
         }
     }
 }

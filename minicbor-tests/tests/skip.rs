@@ -135,7 +135,7 @@ impl<'b> Decode<'b> for Cbor {
                     }
                     Ok(Cbor::Array(v))
                 } else {
-                    Err(decode::Error::TypeMismatch(Type::Array, "missing length"))
+                    Err(decode::Error::type_mismatch(Type::Array).with_message("missing length"))
                 }
             }
             Type::ArrayIndef => {
@@ -147,7 +147,7 @@ impl<'b> Decode<'b> for Cbor {
                     d.skip()?;
                     Ok(Cbor::ArrayIndef(v))
                 } else {
-                    Err(decode::Error::TypeMismatch(Type::ArrayIndef, "unexpected length"))
+                    Err(decode::Error::type_mismatch(Type::ArrayIndef).with_message("unexpected length"))
                 }
             }
             Type::Map => {
@@ -160,7 +160,7 @@ impl<'b> Decode<'b> for Cbor {
                     }
                     Ok(Cbor::Map(m))
                 } else {
-                    Err(decode::Error::TypeMismatch(Type::Array, "missing length"))
+                    Err(decode::Error::type_mismatch(Type::Array).with_message("missing length"))
                 }
             }
             Type::MapIndef => {
@@ -174,7 +174,7 @@ impl<'b> Decode<'b> for Cbor {
                     d.skip()?;
                     Ok(Cbor::MapIndef(m))
                 } else {
-                    Err(decode::Error::TypeMismatch(Type::Array, "unexpected length"))
+                    Err(decode::Error::type_mismatch(Type::Array).with_message("unexpected length"))
                 }
             }
             Type::Tag => {
@@ -204,7 +204,7 @@ impl<'b> Decode<'b> for Cbor {
                 }
                 Ok(Cbor::BytesIndef(v))
             }
-            other => Err(decode::Error::TypeMismatch(other, "unknown type"))
+            other => Err(decode::Error::type_mismatch(other).with_message("unknown type").at(d.position()))
         }
     }
 }
