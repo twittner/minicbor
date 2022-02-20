@@ -7,7 +7,7 @@ mod error;
 
 pub use decoder::{Decoder, Probe};
 pub use decoder::{ArrayIter, BytesIter, MapIter, StrIter};
-pub use error::{Error, ErrorKind};
+pub use error::Error;
 
 #[cfg(feature = "half")]
 mod tokens;
@@ -467,7 +467,7 @@ impl<'b> Decode<'b> for std::time::SystemTime {
         let p = d.position();
         std::time::UNIX_EPOCH
             .checked_add(d.decode()?)
-            .ok_or(Error::message("duration value can not represent system time").at(p))
+            .ok_or_else(|| Error::message("duration value can not represent system time").at(p))
     }
 }
 

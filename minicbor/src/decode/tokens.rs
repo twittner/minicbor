@@ -3,7 +3,7 @@
 use core::fmt;
 use crate::Decoder;
 use crate::data::{Tag, Type};
-use crate::decode::{Error, ErrorKind};
+use crate::decode::Error;
 
 /// Representation of possible CBOR tokens.
 ///
@@ -43,8 +43,7 @@ pub enum Token<'b> {
 
 /// An [`Iterator`] over CBOR tokens.
 ///
-/// The `Iterator` implementation calls [`Tokenizer::token`] until
-/// [`ErrorKind::EndOfInput`] is returned which is mapped to `None`.
+/// The `Iterator` implementation calls [`Tokenizer::token`] until end of input has been reached.
 ///
 /// *Requires feature* `"half"`.
 #[derive(Debug, Clone)]
@@ -58,7 +57,7 @@ impl<'b> Iterator for Tokenizer<'b> {
     fn next(&mut self) -> Option<Self::Item> {
         match self.token() {
             Ok(t) => Some(Ok(t)),
-            Err(e) if e.kind() == ErrorKind::EndOfInput => None,
+            Err(e) if e.is_end_of_input() => None,
             Err(e) => Some(Err(e))
         }
     }

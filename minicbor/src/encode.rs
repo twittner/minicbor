@@ -371,7 +371,7 @@ impl Encode for std::time::SystemTime {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
         match self.duration_since(std::time::UNIX_EPOCH) {
             Ok(d)  => d.encode(e),
-            Err(e) => Err(Error::custom(e.into()))
+            Err(e) => Err(Error::custom(e.into()).with_message("when encoding system time"))
         }
     }
 }

@@ -286,24 +286,24 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
                 if let Some(cd) = ff {
                     if let Some(p) = cd.to_nil_path() {
                         quote! {
-                            Err(e) if e.kind() == minicbor::decode::ErrorKind::UnknownVariant && #p().is_some() => {
+                            Err(e) if e.is_unknown_variant() && #p().is_some() => {
                                 __d777.skip()?
                             }
                         }
                     } else if is_option(ty, |_| true) {
                         quote! {
-                            Err(e) if e.kind() == minicbor::decode::ErrorKind::UnknownVariant => __d777.skip()?,
+                            Err(e) if e.is_unknown_variant() => __d777.skip()?,
                         }
                     } else {
                         quote!()
                     }
                 } else if is_option(ty, |_| true) {
                     quote! {
-                        Err(e) if e.kind() == minicbor::decode::ErrorKind::UnknownVariant => __d777.skip()?,
+                        Err(e) if e.is_unknown_variant() => __d777.skip()?,
                     }
                 } else {
                     quote! {
-                        Err(e) if e.kind() == minicbor::decode::ErrorKind::UnknownVariant && <#ty>::nil().is_some() => {
+                        Err(e) if e.is_unknown_variant() && <#ty>::nil().is_some() => {
                             __d777.skip()?
                         }
                     }
