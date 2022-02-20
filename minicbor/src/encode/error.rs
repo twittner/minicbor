@@ -40,8 +40,8 @@ impl<E> Error<E> {
     ///
     /// *Requires feature* `"std"`.
     #[cfg(feature = "std")]
-    pub fn custom(err: Box<dyn std::error::Error + Send + Sync>) -> Self {
-        Error { err: ErrorImpl::Custom(err), msg: Default::default() }
+    pub fn custom<T: std::error::Error + Send + Sync + 'static>(err: T) -> Self {
+        Error { err: ErrorImpl::Custom(Box::new(err)), msg: Default::default() }
     }
 
     /// Add a message to this error value.

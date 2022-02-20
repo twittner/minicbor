@@ -63,9 +63,9 @@ impl Error {
     ///
     /// *Requires feature* `"std"`.
     #[cfg(feature = "std")]
-    pub fn custom(err: Box<dyn std::error::Error + Send + Sync>) -> Self {
+    pub fn custom<T: std::error::Error + Send + Sync + 'static>(err: T) -> Self {
         Error {
-            err: ErrorImpl::Custom(err),
+            err: ErrorImpl::Custom(Box::new(err)),
             pos: None,
             msg: Default::default()
         }
