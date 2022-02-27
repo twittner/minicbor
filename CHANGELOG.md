@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.14.1`
+
+- Maintenance release: Add position information to UTF-8 decoding errors.
+
 ## `0.14.0`
 
 - ⚠️ **Breaking** ⚠️: `encode::Error` and `decode::Error` are now structs instead of enums.
