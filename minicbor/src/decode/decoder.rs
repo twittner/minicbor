@@ -296,7 +296,7 @@ impl<'b> Decoder<'b> {
         }
         let n = u64_to_usize(self.unsigned(info_of(b), p)?, p)?;
         let d = self.read_slice(n)?;
-        str::from_utf8(d).map_err(Error::utf8)
+        str::from_utf8(d).map_err(|e| Error::utf8(e).at(p))
     }
 
     /// Iterate over string slices.
@@ -313,10 +313,10 @@ impl<'b> Decoder<'b> {
                 .at(p))
         }
         match info_of(b) {
-            31 => Ok(StrIter { decoder: self, len: None }),
+            31 => Ok(StrIter { decoder: self, len: None, pos: p }),
             n  => {
                 let len = u64_to_usize(self.unsigned(n, p)?, p)?;
-                Ok(StrIter { decoder: self, len: Some(len) })
+                Ok(StrIter { decoder: self, len: Some(len), pos: p })
             }
         }
     }
@@ -743,7 +743,8 @@ impl<'a, 'b> Iterator for BytesIter<'a, 'b> {
 #[derive(Debug)]
 pub struct StrIter<'a, 'b> {
     decoder: &'a mut Decoder<'b>,
-    len: Option<usize>
+    len: Option<usize>,
+    pos: usize
 }
 
 impl<'a, 'b> Iterator for StrIter<'a, 'b> {
@@ -759,7 +760,7 @@ impl<'a, 'b> Iterator for StrIter<'a, 'b> {
             Some(0) => None,
             Some(n) => {
                 self.len = Some(0);
-                Some(self.decoder.read_slice(n).and_then(|d| str::from_utf8(d).map_err(Error::utf8)))
+                Some(self.decoder.read_slice(n).and_then(|d| str::from_utf8(d).map_err(|e| Error::utf8(e).at(self.pos))))
             }
         }
     }
