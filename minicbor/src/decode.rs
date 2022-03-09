@@ -425,7 +425,7 @@ decode_tuples! {
 
 macro_rules! decode_fields {
     ($d:ident | $($n:literal $x:ident => $t:ty ; $msg:literal)*) => {
-        $(let mut $x = None;)*
+        $(let mut $x : core::option::Option<$t> = None;)*
 
         let p = $d.position();
 
@@ -529,16 +529,16 @@ impl<'b> Decode<'b> for std::net::IpAddr {
 #[cfg(feature = "std")]
 impl<'b> Decode<'b> for std::net::Ipv4Addr {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        let octets: [u8; 4] = Decode::decode(d)?;
-        Ok(octets.into())
+        let octets: crate::bytes::ByteArray<4> = Decode::decode(d)?;
+        Ok(<[u8; 4]>::from(octets).into())
     }
 }
 
 #[cfg(feature = "std")]
 impl<'b> Decode<'b> for std::net::Ipv6Addr {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        let octets: [u8; 16] = Decode::decode(d)?;
-        Ok(octets.into())
+        let octets: crate::bytes::ByteArray<16> = Decode::decode(d)?;
+        Ok(<[u8; 16]>::from(octets).into())
     }
 }
 
