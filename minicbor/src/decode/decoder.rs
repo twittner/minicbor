@@ -189,6 +189,30 @@ impl<'b> Decoder<'b> {
         }
     }
 
+    /// Decode an `i64` value as an `i128`.
+    ///
+    /// Note that despite the name of this method, CBOR does not support 128-bit integers.
+    /// Instead, this method is offered because CBOR keeps the sign bit for its integer
+    /// representation in the major type and has thus one bit more for signed numbers compared
+    /// to Rust's `i64`. Therefore, decoding signed integers from -2<sup>64</sup> to
+    /// -2<sup>63</sup>-1 requires Rust's `i128` type to represent those values.
+    pub fn i128(&mut self) -> Result<i128, Error> {
+        let p = self.pos;
+        match self.read()? {
+            n @ 0x00 ..= 0x17 => Ok(i128::from(n)),
+            0x18              => self.read().map(i128::from),
+            0x19              => self.read_slice(2).map(read_u16).map(i128::from),
+            0x1a              => self.read_slice(4).map(read_u32).map(i128::from),
+            0x1b              => self.read_slice(8).map(read_u64).map(i128::from),
+            n @ 0x20 ..= 0x37 => Ok(-1 - i128::from(n - 0x20)),
+            0x38              => self.read().map(|n| -1 - i128::from(n)),
+            0x39              => self.read_slice(2).map(read_u16).map(|n| -1 - i128::from(n)),
+            0x3a              => self.read_slice(4).map(read_u32).map(|n| -1 - i128::from(n)),
+            0x3b              => self.read_slice(8).map(read_u64).map(|n| -1 - i128::from(n)),
+            b                 => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected i64"))
+        }
+    }
+
     /// Decode a half float (`f16`) and return it in an `f32`.
     ///
     /// Only available when the feature `half` is present.
