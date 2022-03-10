@@ -40,9 +40,6 @@ fn rfc_tv_int() {
     roundtrip!(i64, "29", -10);
     roundtrip!(i64, "3863", -100);
     roundtrip!(i64, "3903e7", -1000);
-    let x = hex::decode("3bffffffffffffffff").unwrap();
-    let mut d = Decoder::new(&x);
-    assert_eq!(-18446744073709551616, d.i128().unwrap())
 }
 
 #[test]

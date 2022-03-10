@@ -247,6 +247,12 @@ impl<'b> Decode<'b> for isize {
     }
 }
 
+impl<'b> Decode<'b> for crate::data::Int {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+        d.int()
+    }
+}
+
 macro_rules! decode_basic {
     ($($t:ident)*) => {
         $(

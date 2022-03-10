@@ -47,7 +47,12 @@ fn check<'a>(d: &mut Decoder<'a>, c: Cbor) -> Result<(), decode::Error> {
             d.skip()?
         }
         Value::Bool(b)    => assert_eq!(b, d.bool()?),
-        Value::Integer(i) => assert_eq!(i, d.i64()? as i128),
+        Value::Integer(i) =>
+            if let Ok(i) = i64::try_from(i) {
+                assert_eq!(i, d.i64()?)
+            } else {
+                assert_eq!(i, d.int()?.into())
+            }
         Value::Float(f)   => assert_eq!(f, d.f64()?),
         Value::Bytes(b)   => assert_eq!(b, d.bytes()?),
         Value::Text(s)    => assert_eq!(s, d.str()?),
@@ -77,7 +82,7 @@ fn gen_value(g: &mut Gen, rem: usize) -> Value {
         0 => Value::Null,
         1 => Value::Bool(true),
         2 => Value::Bool(false),
-        3 => Value::Integer(r.gen::<i128>() % std::i64::MAX as i128),
+        3 => Value::Integer(r.gen_range(-2_i128.pow(64) .. 2_i128.pow(64))),
         4 => Value::Float(r.gen()),
         5 => Value::Bytes(Arbitrary::arbitrary(g)),
         6 => Value::Text(Arbitrary::arbitrary(g)),
@@ -110,7 +115,7 @@ where
     match val {
         Value::Null       => { e.null()?; }
         Value::Bool(b)    => { e.bool(*b)?; }
-        Value::Integer(i) => { e.i64(*i as i64)?; }
+        Value::Integer(i) => { e.int((*i).try_into().unwrap())?; }
         Value::Float(f)   => { e.f64(*f)?; }
         Value::Bytes(b)   => { e.bytes(b)?; }
         Value::Text(s)    => { e.str(s)?; }

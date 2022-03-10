@@ -199,6 +199,12 @@ impl Encode for isize {
     }
 }
 
+impl Encode for crate::data::Int {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+        e.int(*self)?.ok()
+    }
+}
+
 macro_rules! encode_basic {
     ($($t:ident)*) => {
         $(

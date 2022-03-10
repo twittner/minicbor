@@ -16,6 +16,7 @@ pub enum Type {
     I16,
     I32,
     I64,
+    Int,
     F16,
     F32,
     F64,
@@ -47,6 +48,7 @@ impl fmt::Display for Type {
             Type::I16         => f.write_str("i16"),
             Type::I32         => f.write_str("i32"),
             Type::I64         => f.write_str("i64"),
+            Type::Int         => f.write_str("int"),
             Type::F16         => f.write_str("f16"),
             Type::F32         => f.write_str("f32"),
             Type::F64         => f.write_str("f64"),
@@ -182,9 +184,125 @@ impl<'b> crate::Decode<'b> for Cbor<'b> {
 }
 
 #[cfg(all(feature = "alloc", feature = "half"))]
-impl core::fmt::Display for Cbor<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Display for Cbor<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> core::fmt::Result {
         crate::display(self.0).fmt(f)
     }
 }
+
+/// CBOR integer type that covers values of [-2<sup>64</sup>, 2<sup>64</sup> - 1]
+///
+/// CBOR integers keep the sign bit in the major type so there is one extra bit
+/// availvale for signed numbers compared to Rust's integer types. This type can
+/// be used to encode and decode the full CBOR integer range.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Int { neg: bool, val: u64 }
+
+/// Max. CBOR integer value (2<sup>64</sup> - 1).
+pub const MAX_INT: Int = Int { neg: false, val: u64::MAX };
+
+/// Min. CBOR integer value (-2<sup>64</sup>).
+pub const MIN_INT: Int = Int { neg: true, val: u64::MAX };
+
+impl Int {
+    pub(crate) fn pos<T: Into<u64>>(val: T) -> Self {
+        Int { neg: false, val: val.into() }
+    }
+
+    pub(crate) fn neg<T: Into<u64>>(val: T) -> Self {
+        Int { neg: true, val: val.into() }
+    }
+
+    pub(crate) fn value(&self) -> u64 {
+        self.val
+    }
+
+    pub(crate) fn is_negative(&self) -> bool {
+        self.neg
+    }
+}
+
+impl fmt::Display for Int {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", i128::from(*self))
+    }
+}
+
+// Introductions:
+
+impl From<i64> for Int {
+    fn from(i: i64) -> Self {
+        if i.is_negative() {
+            Int { neg: true, val: (-1 - i) as u64 }
+        } else {
+            Int { neg: false, val: i as u64 }
+        }
+    }
+}
+
+impl From<u64> for Int {
+    fn from(i: u64) -> Self {
+        Int::pos(i)
+    }
+}
+
+impl TryFrom<i128> for Int {
+    type Error = TryFromIntError;
+
+    fn try_from(i: i128) -> Result<Self, Self::Error> {
+        if i.is_negative() {
+            if i < -0x1_0000_0000_0000_0000 {
+                Err(TryFromIntError("Int"))
+            } else {
+                Ok(Int { neg: true, val: (-1 - i) as u64 })
+            }
+        } else if i > 0xFFFF_FFFF_FFFF_FFFF {
+            Err(TryFromIntError("Int"))
+        } else {
+            Ok(Int { neg: false, val: i as u64 })
+        }
+    }
+}
+
+// Eliminations:
+
+impl TryFrom<Int> for i64 {
+    type Error = TryFromIntError;
+
+    fn try_from(i: Int) -> Result<Self, Self::Error> {
+        let j = i64::try_from(i.val).map_err(|_| TryFromIntError("i64"))?;
+        Ok(if i.neg { -1 - j } else { j })
+    }
+}
+
+impl TryFrom<Int> for u64 {
+    type Error = TryFromIntError;
+
+    fn try_from(i: Int) -> Result<Self, Self::Error> {
+        if i.neg {
+            return Err(TryFromIntError("u64"))
+        }
+        Ok(i.val)
+    }
+}
+
+impl From<Int> for i128 {
+    fn from(i: Int) -> Self {
+        let j = i128::from(i.val);
+        if i.neg { -1 - j } else { j }
+    }
+}
+
+/// Error when conversion of a CBOR [`Int`] to another type failed.
+#[derive(Debug)]
+pub struct TryFromIntError(&'static str);
+
+impl fmt::Display for TryFromIntError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "value out of {} range", self.0)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for TryFromIntError {}
 
