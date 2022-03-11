@@ -7,31 +7,31 @@ build-stable:
   stage: build
   image: "rust:latest"
   script:
-    - make build
+    - just build
 
 build-nightly:
   stage: build
   image: "rustlang/rust:nightly"
   script:
-    - make build
+    - just build
 
 test-stable:
   stage: test
   image: "rust:latest"
   script:
-    - make test
+    - just test
 
 test-nightly:
   stage: test
   image: "rustlang/rust:nightly"
   script:
-    - make test
+    - just test
 
 pages:
   stage: deploy
   image: "rustlang/rust:nightly"
   script:
-    - make doc
+    - just doc
     - mv target/doc public
   artifacts:
     paths:
