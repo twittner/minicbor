@@ -1,6 +1,9 @@
 use core::{fmt, str};
 use crate::data::Type;
 
+#[cfg(feature = "alloc")]
+use alloc::string::ToString;
+
 /// Decoding error.
 #[derive(Debug)]
 pub struct Error {
