@@ -1,5 +1,8 @@
 use core::fmt;
 
+#[cfg(feature = "alloc")]
+use alloc::string::ToString;
+
 /// Encoding error.
 #[derive(Debug)]
 pub struct Error<E> {
