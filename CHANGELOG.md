@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.14.2`
+
+- Bugfix release: Imports `alloc::string::ToString` when necessary (see issue #21) for details.
+
 ## `0.14.1`
 
 - Maintenance release: Add position information to UTF-8 decoding errors.
