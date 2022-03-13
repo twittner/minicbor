@@ -2,7 +2,7 @@
 
 use core::fmt;
 use crate::Decoder;
-use crate::data::{Tag, Type};
+use crate::data::{Int, Tag, Type};
 use crate::decode::Error;
 
 /// Representation of possible CBOR tokens.
@@ -19,6 +19,7 @@ pub enum Token<'b> {
     I16(i16),
     I32(i32),
     I64(i64),
+    Int(Int),
     F16(f32),
     F32(f32),
     F64(f64),
@@ -100,6 +101,7 @@ impl<'b> Tokenizer<'b> {
             Type::I16          => self.decoder.i16().map(Token::I16),
             Type::I32          => self.decoder.i32().map(Token::I32),
             Type::I64          => self.decoder.i64().map(Token::I64),
+            Type::Int          => self.decoder.int().map(Token::Int),
             Type::F16          => self.decoder.f16().map(Token::F16),
             Type::F32          => self.decoder.f32().map(Token::F32),
             Type::F64          => self.decoder.f64().map(Token::F64),
@@ -350,6 +352,7 @@ impl fmt::Display for Token<'_> {
             Token::I16(n)      => write!(f, "{}", n),
             Token::I32(n)      => write!(f, "{}", n),
             Token::I64(n)      => write!(f, "{}", n),
+            Token::Int(n)      => write!(f, "{}", n),
             Token::F16(n)      => write!(f, "{:e}", n),
             Token::F32(n)      => write!(f, "{:e}", n),
             Token::F64(n)      => write!(f, "{:e}", n),

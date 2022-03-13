@@ -1,5 +1,5 @@
 use crate::{SIGNED, BYTES, TEXT, ARRAY, MAP, TAGGED, SIMPLE};
-use crate::data::Tag;
+use crate::data::{Int, Tag};
 use crate::encode::{Encode, Error, Write};
 
 /// A non-allocating CBOR encoder writing encoded bytes to the given [`Write`] sink.
@@ -110,6 +110,22 @@ impl<W: Write> Encoder<W> {
             return self.u64(x as u64)
         }
         match (-1 - x) as u64 {
+            n @ 0        ..= 0x17        => self.put(&[SIGNED | n as u8]),
+            n @ 0x18     ..= 0xff        => self.put(&[SIGNED | 24, n as u8]),
+            n @ 0x100    ..= 0xffff      => self.put(&[SIGNED | 25])?.put(&(n as u16).to_be_bytes()[..]),
+            n @ 0x1_0000 ..= 0xffff_ffff => self.put(&[SIGNED | 26])?.put(&(n as u32).to_be_bytes()[..]),
+            n                            => self.put(&[SIGNED | 27])?.put(&n.to_be_bytes()[..])
+        }
+    }
+
+    /// Encode a CBOR integer.
+    ///
+    /// See [`Int`] for details regarding the value range of CBOR integers.
+    pub fn int(&mut self, x: Int) -> Result<&mut Self, Error<W::Error>> {
+        if !x.is_negative() {
+            return self.u64(x.value())
+        }
+        match x.value() {
             n @ 0        ..= 0x17        => self.put(&[SIGNED | n as u8]),
             n @ 0x18     ..= 0xff        => self.put(&[SIGNED | 24, n as u8]),
             n @ 0x100    ..= 0xffff      => self.put(&[SIGNED | 25])?.put(&(n as u16).to_be_bytes()[..]),

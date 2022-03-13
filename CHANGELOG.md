@@ -6,6 +6,27 @@
 
 # minicbor
 
+## `0.15.0`
+
+- ⚠️ **Breaking** ⚠️: The encoding of IP addresses changed (see commit fac39d5a). This affects the
+  following types:
+
+    - std::net::IpAddr
+    - std::net::Ipv4Addr
+    - std::net::Ipv6Addr
+    - std::net::SocketAddr
+    - std::net::SocketAddrV4
+    - std::net::SocketAddrV6
+
+  A new module `minicbor::legacy` is introduced which contains newtype wrappers for these types
+  which continue to use the array-based encoding. Users can opt out of the new compact format by
+  enabling the cargo feature `"legacy"` and importing the types from the legacy module.
+- A new type `minicbor::data::Int` has been introduced (see merge request !20) to allow encoding
+  and decoding of the whole CBOR integer range [-2<sup>64</sup>, 2<sup>64</sup> - 1].
+- ⚠️ **Breaking** ⚠️: As a consequence of adding the new `Int` type, a new constructor
+  `minicbor::data::Type::Int` has been added to denote those (signed) integers that do not fit
+  into an `i64`. Similarly the new constructor `minicbor::decode::Token::Int` captures those values.
+
 ## `0.14.2`
 
 - Bugfix release: Imports `alloc::string::ToString` when necessary (see issue #21) for details.
@@ -236,6 +257,10 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.10.0`
+
+- Depends on `minicbor-0.15.0`.
 
 ## `0.9.0`
 

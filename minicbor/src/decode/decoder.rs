@@ -1,25 +1,10 @@
 #![allow(clippy::unusual_byte_groupings)]
 
 use crate::{ARRAY, BREAK, BYTES, MAP, SIMPLE, TAGGED, TEXT, SIGNED, UNSIGNED};
-use crate::data::{Tag, Type};
+use crate::data::{Int, Tag, Type};
 use crate::decode::{Decode, Error};
 use core::{char, f32, i8, i16, i32, i64};
 use core::{convert::TryInto, marker, str};
-
-// Convert an expression of an unsigned int type to a signed int type.
-//
-// This is used when decoding signed int types whose representation
-// is -1 - unsigned int. Turning the unsigned int into an int may
-// overflow which is what we check here.
-macro_rules! try_to {
-    ($v: ident, $t: ty, $max: expr, $msg: expr, $pos: expr) => {{
-        if $v > $max {
-            Err(Error::overflow(u64::from($v)).at($pos).with_message($msg))
-        } else {
-            Ok(-1 - $v as $t)
-        }
-    }}
-}
 
 /// A non-allocating CBOR decoder.
 #[derive(Debug, Clone)]
@@ -127,10 +112,10 @@ impl<'b> Decoder<'b> {
             0x1a              => self.read_slice(4).map(read_u32).and_then(|n| try_as(n, "when converting u32 to i8", p)),
             0x1b              => self.read_slice(8).map(read_u64).and_then(|n| try_as(n, "when converting u64 to i8", p)),
             n @ 0x20 ..= 0x37 => Ok(-1 - (n - 0x20) as i8),
-            0x38              => self.read().and_then(|n| try_to!(n, i8, i8::MAX as u8, "when converting u8 to i8", p)),
-            0x39              => self.read_slice(2).map(read_u16).and_then(|n| try_to!(n, i8, i8::MAX as u16, "when converting u16 to i8", p)),
-            0x3a              => self.read_slice(4).map(read_u32).and_then(|n| try_to!(n, i8, i8::MAX as u32, "when converting u32 to i8", p)),
-            0x3b              => self.read_slice(8).map(read_u64).and_then(|n| try_to!(n, i8, i8::MAX as u64, "when converting u64 to i8", p)),
+            0x38              => self.read().and_then(|n| try_as(n, "when converting u8 to i8", p).map(|n: i8| -1 - n)),
+            0x39              => self.read_slice(2).map(read_u16).and_then(|n| try_as(n, "when converting u16 to i8", p).map(|n: i8| -1 - n)),
+            0x3a              => self.read_slice(4).map(read_u32).and_then(|n| try_as(n, "when converting u32 to i8", p).map(|n: i8| -1 - n)),
+            0x3b              => self.read_slice(8).map(read_u64).and_then(|n| try_as(n, "when converting u64 to i8", p).map(|n: i8| -1 - n)),
             b                 => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected i8"))
         }
     }
@@ -146,9 +131,9 @@ impl<'b> Decoder<'b> {
             0x1b              => self.read_slice(8).map(read_u64).and_then(|n| try_as(n, "when converting u64 to i16", p)),
             n @ 0x20 ..= 0x37 => Ok(-1 - i16::from(n - 0x20)),
             0x38              => self.read().map(|n| -1 - i16::from(n)),
-            0x39              => self.read_slice(2).map(read_u16).and_then(|n| try_to!(n, i16, i16::MAX as u16, "when converting u16 to i16", p)),
-            0x3a              => self.read_slice(4).map(read_u32).and_then(|n| try_to!(n, i16, i16::MAX as u32, "when converting u32 to i16", p)),
-            0x3b              => self.read_slice(8).map(read_u64).and_then(|n| try_to!(n, i16, i16::MAX as u64, "when converting u64 to i16", p)),
+            0x39              => self.read_slice(2).map(read_u16).and_then(|n| try_as(n, "when converting u16 to i16", p).map(|n: i16| -1 - n)),
+            0x3a              => self.read_slice(4).map(read_u32).and_then(|n| try_as(n, "when converting u32 to i16", p).map(|n: i16| -1 - n)),
+            0x3b              => self.read_slice(8).map(read_u64).and_then(|n| try_as(n, "when converting u64 to i16", p).map(|n: i16| -1 - n)),
             b                 => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected i16"))
         }
     }
@@ -165,8 +150,8 @@ impl<'b> Decoder<'b> {
             n @ 0x20 ..= 0x37 => Ok(-1 - i32::from(n - 0x20)),
             0x38              => self.read().map(|n| -1 - i32::from(n)),
             0x39              => self.read_slice(2).map(read_u16).map(|n| -1 - i32::from(n)),
-            0x3a              => self.read_slice(4).map(read_u32).and_then(|n| try_to!(n, i32, i32::MAX as u32, "when converting u32 to i32", p)),
-            0x3b              => self.read_slice(8).map(read_u64).and_then(|n| try_to!(n, i32, i32::MAX as u64, "when converting u64 to i32", p)),
+            0x3a              => self.read_slice(4).map(read_u32).and_then(|n| try_as(n, "when converting u32 to i32", p).map(|n: i32| -1 - n)),
+            0x3b              => self.read_slice(8).map(read_u64).and_then(|n| try_as(n, "when converting u64 to i32", p).map(|n: i32| -1 - n)),
             b                 => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected i32"))
         }
     }
@@ -184,8 +169,28 @@ impl<'b> Decoder<'b> {
             0x38              => self.read().map(|n| -1 - i64::from(n)),
             0x39              => self.read_slice(2).map(read_u16).map(|n| -1 - i64::from(n)),
             0x3a              => self.read_slice(4).map(read_u32).map(|n| -1 - i64::from(n)),
-            0x3b              => self.read_slice(8).map(read_u64).and_then(|n| try_to!(n, i64, i64::MAX as u64, "when converting u64 to i64", p)),
+            0x3b              => self.read_slice(8).map(read_u64).and_then(|n| try_as(n, "when converting u64 to i64", p).map(|n: i64| -1 - n)),
             b                 => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected i64"))
+        }
+    }
+
+    /// Decode a CBOR integer.
+    ///
+    /// See [`Int`] for details regarding the value range of CBOR integers.
+    pub fn int(&mut self) -> Result<Int, Error> {
+        let p = self.pos;
+        match self.read()? {
+            n @ 0x00 ..= 0x17 => Ok(Int::pos(n)),
+            0x18              => self.read().map(Int::pos),
+            0x19              => self.read_slice(2).map(read_u16).map(Int::pos),
+            0x1a              => self.read_slice(4).map(read_u32).map(Int::pos),
+            0x1b              => self.read_slice(8).map(read_u64).map(Int::pos),
+            n @ 0x20 ..= 0x37 => Ok(Int::neg(n - 0x20)),
+            0x38              => self.read().map(Int::neg),
+            0x39              => self.read_slice(2).map(read_u16).map(Int::neg),
+            0x3a              => self.read_slice(4).map(read_u32).map(Int::neg),
+            0x3b              => self.read_slice(8).map(read_u64).map(Int::neg),
+            b                 => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected int"))
         }
     }
 
@@ -458,7 +463,7 @@ impl<'b> Decoder<'b> {
         while nrounds > 0 || irounds > 0 || !stack.is_empty() {
             match self.current()? {
                 UNSIGNED ..= 0x1b => { self.u64()?; }
-                SIGNED   ..= 0x3b => { self.i64()?; }
+                SIGNED   ..= 0x3b => { self.int()?; }
                 BYTES    ..= 0x5f => { for _ in self.bytes_iter()? {} }
                 TEXT     ..= 0x7f => { for _ in self.str_iter()? {} }
                 ARRAY    ..= 0x9f =>
@@ -577,7 +582,7 @@ impl<'b> Decoder<'b> {
         while nrounds > 0 || irounds > 0 {
             match self.current()? {
                 UNSIGNED ..= 0x1b => { self.u64()?; }
-                SIGNED   ..= 0x3b => { self.i64()?; }
+                SIGNED   ..= 0x3b => { self.int()?; }
                 BYTES    ..= 0x5f => { for _ in self.bytes_iter()? {} }
                 TEXT     ..= 0x7f => { for _ in self.str_iter()? {} }
                 ARRAY    ..= 0x9f =>
@@ -686,7 +691,7 @@ impl<'b> Decoder<'b> {
             0x38                 => if self.peek()? < 0x80 { Type::I8  } else { Type::I16 }
             0x39                 => if self.peek()? < 0x80 { Type::I16 } else { Type::I32 }
             0x3a                 => if self.peek()? < 0x80 { Type::I32 } else { Type::I64 }
-            0x3b                 => Type::I64,
+            0x3b                 => if self.peek()? < 0x80 { Type::I64 } else { Type::Int }
             0x40 ..= 0x5b        => Type::Bytes,
             0x5f                 => Type::BytesIndef,
             0x60 ..= 0x7b        => Type::String,

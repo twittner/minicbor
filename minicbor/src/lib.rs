@@ -140,6 +140,9 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+#[cfg(feature = "legacy")]
+pub mod legacy;
+
 pub mod bytes;
 pub mod data;
 pub mod decode;
