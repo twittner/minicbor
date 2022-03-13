@@ -29,9 +29,47 @@ fn int_bounds() {
 }
 
 quickcheck! {
+    fn to_from_i8(n: i8) -> bool {
+        let i = Int::from(n);
+        n == i8::try_from(i).unwrap()
+    }
+
+    fn to_from_i16(n: i16) -> bool {
+        let i = Int::from(n);
+        n == i16::try_from(i).unwrap()
+    }
+
+    fn to_from_i32(n: i32) -> bool {
+        let i = Int::from(n);
+        n == i32::try_from(i).unwrap()
+    }
+
     fn to_from_i64(n: i64) -> bool {
         let i = Int::from(n);
         n == i64::try_from(i).unwrap()
+    }
+
+    fn to_from_i128(n: i128) -> TestResult {
+        if let Ok(i) = Int::try_from(n) {
+            TestResult::from_bool(n == i128::from(i))
+        } else {
+            TestResult::discard()
+        }
+    }
+
+    fn to_from_u8(n: u8) -> bool {
+        let i = Int::from(n);
+        n == u8::try_from(i).unwrap()
+    }
+
+    fn to_from_u16(n: u16) -> bool {
+        let i = Int::from(n);
+        n == u16::try_from(i).unwrap()
+    }
+
+    fn to_from_u32(n: u32) -> bool {
+        let i = Int::from(n);
+        n == u32::try_from(i).unwrap()
     }
 
     fn to_from_u64(n: u64) -> bool {
@@ -39,7 +77,39 @@ quickcheck! {
         n == u64::try_from(i).unwrap()
     }
 
+    fn to_from_u128(n: u128) -> TestResult {
+        if let Ok(i) = Int::try_from(n) {
+            TestResult::from_bool(n == u128::try_from(i).unwrap())
+        } else {
+            TestResult::discard()
+        }
+    }
+
+    fn int_u8(n: u8) -> bool {
+        identity(n)
+    }
+
+    fn int_u16(n: u16) -> bool {
+        identity(n)
+    }
+
+    fn int_u32(n: u32) -> bool {
+        identity(n)
+    }
+
     fn int_u64_id(n: u64) -> bool {
+        identity(n)
+    }
+
+    fn int_i8_id(n: i8) -> bool {
+        identity(n)
+    }
+
+    fn int_i16_id(n: i16) -> bool {
+        identity(n)
+    }
+
+    fn int_i32_id(n: i32) -> bool {
         identity(n)
     }
 
