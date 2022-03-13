@@ -193,7 +193,7 @@ impl fmt::Display for Cbor<'_> {
 /// CBOR integer type that covers values of [-2<sup>64</sup>, 2<sup>64</sup> - 1]
 ///
 /// CBOR integers keep the sign bit in the major type so there is one extra bit
-/// availvale for signed numbers compared to Rust's integer types. This type can
+/// available for signed numbers compared to Rust's integer types. This type can
 /// be used to encode and decode the full CBOR integer range.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Int { neg: bool, val: u64 }
