@@ -277,8 +277,24 @@ fn ip() {
 }
 
 #[test]
+fn legacy_ip() {
+    fn property(x: std::net::IpAddr) -> bool {
+        identity(minicbor::legacy::IpAddr(x))
+    }
+    quickcheck(property as fn(std::net::IpAddr) -> bool)
+}
+
+#[test]
 fn ipv4() {
     quickcheck(identity as fn(std::net::Ipv4Addr) -> bool)
+}
+
+#[test]
+fn legacy_ipv4() {
+    fn property(x: std::net::Ipv4Addr) -> bool {
+        identity(minicbor::legacy::Ipv4Addr(x))
+    }
+    quickcheck(property as fn(std::net::Ipv4Addr) -> bool)
 }
 
 #[test]
@@ -287,8 +303,24 @@ fn ipv6() {
 }
 
 #[test]
+fn legacy_ipv6() {
+    fn property(x: std::net::Ipv6Addr) -> bool {
+        identity(minicbor::legacy::Ipv6Addr(x))
+    }
+    quickcheck(property as fn(std::net::Ipv6Addr) -> bool)
+}
+
+#[test]
 fn socketaddr() {
     quickcheck(identity as fn(std::net::SocketAddr) -> bool)
+}
+
+#[test]
+fn legacy_socketaddr() {
+    fn property(x: std::net::SocketAddr) -> bool {
+        identity(minicbor::legacy::SocketAddr(x))
+    }
+    quickcheck(property as fn(std::net::SocketAddr) -> bool)
 }
 
 #[test]
@@ -297,11 +329,29 @@ fn socketaddrv4() {
 }
 
 #[test]
+fn legacy_socketaddrv4() {
+    fn property(x: std::net::SocketAddrV4) -> bool {
+        identity(minicbor::legacy::SocketAddrV4(x))
+    }
+    quickcheck(property as fn(std::net::SocketAddrV4) -> bool)
+}
+
+#[test]
 fn socketaddrv6() {
     fn property(mut x: std::net::SocketAddrV6) -> bool {
         x.set_flowinfo(0);
         x.set_scope_id(0);
         identity(x)
+    }
+    quickcheck(property as fn(std::net::SocketAddrV6) -> bool)
+}
+
+#[test]
+fn legacy_socketaddrv6() {
+    fn property(mut x: std::net::SocketAddrV6) -> bool {
+        x.set_flowinfo(0);
+        x.set_scope_id(0);
+        identity(minicbor::legacy::SocketAddrV6(x))
     }
     quickcheck(property as fn(std::net::SocketAddrV6) -> bool)
 }

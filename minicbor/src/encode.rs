@@ -430,14 +430,14 @@ impl Encode for std::net::IpAddr {
 #[cfg(feature = "std")]
 impl Encode for std::net::Ipv4Addr {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        self.octets().encode(e)
+        e.bytes(&self.octets())?.ok()
     }
 }
 
 #[cfg(feature = "std")]
 impl Encode for std::net::Ipv6Addr {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
-        self.octets().encode(e)
+        e.bytes(&self.octets())?.ok()
     }
 }
 
