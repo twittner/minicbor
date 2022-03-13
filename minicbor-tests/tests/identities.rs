@@ -1,4 +1,5 @@
-use minicbor::{Encode, Encoder, Decode, Decoder, data::Type};
+use minicbor::{Encode, Encoder, Decode, Decoder};
+use minicbor::data::{Int, Type};
 use quickcheck::quickcheck;
 use std::marker::PhantomData;
 
@@ -48,6 +49,15 @@ fn i32() {
 #[test]
 fn i64() {
     quickcheck(identity as fn(i64) -> bool)
+}
+
+#[test]
+fn int() {
+    assert!(identity(Int::try_from(-2_i128.pow(64)).unwrap()));
+    assert!(identity(Int::from(-1_i64)));
+    assert!(identity(Int::from(0_i64)));
+    assert!(identity(Int::from(1_i64)));
+    assert!(identity(Int::try_from(2_i128.pow(64) - 1).unwrap()))
 }
 
 #[test]
