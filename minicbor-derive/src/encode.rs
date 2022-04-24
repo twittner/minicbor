@@ -55,7 +55,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         add_bound_to_type_params(bound, params, &blacklist, &fields.attrs, Mode::Encode);
     }
 
-    let gen = add_typeparam(&inp.generics, gen_ctx_param()?);
+    let gen = add_typeparam(&inp.generics, gen_ctx_param()?, attrs.context_bound());
     let impl_generics = gen.split_for_impl().0;
 
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
@@ -182,7 +182,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         add_bound_to_type_params(bound, params, &blacklist, &field_attrs, Mode::Encode);
     }
 
-    let gen = add_typeparam(&inp.generics, gen_ctx_param()?);
+    let gen = add_typeparam(&inp.generics, gen_ctx_param()?, enum_attrs.context_bound());
     let impl_generics = gen.split_for_impl().0;
 
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
