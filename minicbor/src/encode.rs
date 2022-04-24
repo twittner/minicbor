@@ -25,7 +25,7 @@ pub trait Encode<C> {
     /// encoding context and should be completely generic in the context
     /// type. In cases where a context is needed and the `Encode` impl type is
     /// meant to be combined with other types that require a different context
-    /// type it is preferrable to constrain the context type variable `C` with
+    /// type, it is preferrable to constrain the context type variable `C` with
     /// a trait bound instead of fixing the type.
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>>;
 

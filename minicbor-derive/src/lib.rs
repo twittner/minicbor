@@ -100,7 +100,7 @@
 //! - [`#[cbor(decode_bound)]`](#cbordecode_bound--)
 //! - [`#[cbor(encode_bound)]`](#cborencode_bound--)
 //! - [`#[cbor(bound)]`](#cborbound)
-//! - [`#[cbor(context_bound)]`(#cborcontext_bound--)
+//! - [`#[cbor(context_bound)]`](#cborcontext_bound--)
 //!
 //! ## `#[n(...)]` and `#[b(...)]` (or `#[cbor(n(...))]` and `#[cbor(b(...))]`)
 //!
@@ -614,6 +614,6 @@ where
 }
 
 fn gen_ctx_param() -> syn::Result<syn::TypeParam> {
-    syn::parse_str("__C777")
+    syn::parse_str("Ctx")
 }
 

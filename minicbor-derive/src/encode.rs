@@ -74,8 +74,8 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let statements = encode_fields(&fields, true, encoding, &custom_enc)?;
 
     Ok(quote! {
-        impl #impl_generics minicbor::Encode<__C777> for #name #typ_generics #where_clause {
-            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut __C777) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
+        impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {
+            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut Ctx) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
                 __W777: minicbor::encode::Write
             {
@@ -200,8 +200,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     };
 
     Ok(quote! {
-        impl #impl_generics minicbor::Encode<__C777> for #name #typ_generics #where_clause {
-            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut __C777) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
+        impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {
+            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut Ctx) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
                 __W777: minicbor::encode::Write
             {
@@ -516,8 +516,8 @@ fn make_transparent_impl
         };
 
     Ok(quote! {
-        impl #impl_generics minicbor::Encode<__C777> for #name #typ_generics #where_clause {
-            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut __C777) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
+        impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {
+            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut Ctx) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
                 __W777: minicbor::encode::Write
             {
@@ -528,7 +528,7 @@ fn make_transparent_impl
 }
 
 fn gen_encode_bound() -> syn::Result<syn::TypeParamBound> {
-    syn::parse_str("minicbor::Encode<__C777>")
+    syn::parse_str("minicbor::Encode<Ctx>")
 }
 
 fn is_nil(ty: &syn::Type, codec: &Option<CustomCodec>) -> proc_macro2::TokenStream {
@@ -541,6 +541,6 @@ fn is_nil(ty: &syn::Type, codec: &Option<CustomCodec>) -> proc_macro2::TokenStre
             quote!((|_| false))
         }
     } else {
-        quote!(minicbor::Encode::<__C777>::is_nil)
+        quote!(minicbor::Encode::<Ctx>::is_nil)
     }
 }
