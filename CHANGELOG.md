@@ -6,6 +6,55 @@
 
 # minicbor
 
+## `0.16.0`
+
+- ⚠️ **Breaking** ⚠️: The `Encode` and `Decode` traits are now parameterised by a context type and
+  the context value is passed as another argument to `Encode::encode` and `Decode::decode`.
+  Implementations of these traits that do not make use of the context need to be generic in the
+  type variable and accept the context parameter, e.g. instead of
+
+  ```rust
+  struct T;
+
+  impl Encode for T {
+      fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> { ... }
+  }
+
+  impl<'b> Decode<'b> for T {
+      fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> { ... }
+  }
+  ```
+
+  one would now write:
+
+  ```rust
+  struct T;
+
+  impl<C> Encode<C> for T {
+      fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> { ... }
+  }
+
+  impl<'b, C> Decode<'b, C> for T {
+      fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> { ... }
+  }
+  ```
+- Several new methods have been added to `Decoder` and `Encoder` to work with contexts:
+
+    - `Decoder::decode_with`
+    - `Decoder::array_iter_with`
+    - `Decoder::map_iter_with`
+    - `Encoder::encode_with`
+
+  These correspond to the existing variants without the `_with` suffix which do not accept a context
+  and fix the context type to `()`. Note that generic implementations of `Decode` and `Encoder` must
+  therefore use the versions which accept a context parameter.
+
+  Other additions include the crate-level functions:
+
+    - `encode_with`
+    - `decode_with`
+    - `to_vec_with`
+
 ## `0.15.0`
 
 - ⚠️ **Breaking** ⚠️: The encoding of IP addresses changed (see commit fac39d5a). This affects the
@@ -190,6 +239,12 @@
 
 # minicbor-derive
 
+## `0.10.0`
+
+- Depends on `minicbor-0.16.0`.
+- A new attribute `context_bound` has been added to allow constraining the generic context type of
+  the derived `Encode` or `Decode` trait impl with a set of trait bounds.
+
 ## `0.9.0`
 
 - Depends on `minicbor-0.14.0`.
@@ -257,6 +312,19 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.11.0`
+
+- Depends on `minicbor-0.16.0`.
+- The following new methods have been added:
+
+    - `Reader::read_with`
+    - `AsyncReader::read_with`
+    - `Writer::write_with`
+    - `AsyncWriter::write_with`
+
+  These accept an additional context parameter and the existing variants fix the context to the
+  unit type.
 
 ## `0.10.0`
 
