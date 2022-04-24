@@ -74,14 +74,14 @@ impl AsMut<[u8]> for ByteSlice {
     }
 }
 
-impl<'a, 'b: 'a> Decode<'b> for &'a ByteSlice {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
+impl<'a, 'b: 'a, C> Decode<'b, C> for &'a ByteSlice {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, decode::Error> {
         d.bytes().map(<&ByteSlice>::from)
     }
 }
 
-impl Encode for ByteSlice {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+impl<C> Encode<C> for ByteSlice {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
         e.bytes(self)?.ok()
     }
 }
@@ -181,8 +181,8 @@ impl<const N: usize> AsMut<[u8; N]> for ByteArray<N> {
     }
 }
 
-impl<'b, const N: usize> Decode<'b> for ByteArray<N> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
+impl<'b, C, const N: usize> Decode<'b, C> for ByteArray<N> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, decode::Error> {
         let pos   = d.position();
         let slice = d.bytes()?;
         let array = <[u8; N]>::try_from(slice).map_err(|_| {
@@ -192,8 +192,8 @@ impl<'b, const N: usize> Decode<'b> for ByteArray<N> {
     }
 }
 
-impl<const N: usize> Encode for ByteArray<N> {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+impl<C, const N: usize> Encode<C> for ByteArray<N> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
         e.bytes(&self.0[..])?.ok()
     }
 }
@@ -237,15 +237,15 @@ impl DerefMut for ByteVec {
 }
 
 #[cfg(feature = "alloc")]
-impl Decode<'_> for ByteVec {
-    fn decode(d: &mut Decoder<'_>) -> Result<Self, decode::Error> {
+impl<C> Decode<'_, C> for ByteVec {
+    fn decode(d: &mut Decoder<'_>, _: &mut C) -> Result<Self, decode::Error> {
         d.bytes().map(|xs| xs.to_vec().into())
     }
 }
 
 #[cfg(feature = "alloc")]
-impl Encode for ByteVec {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+impl<C> Encode<C> for ByteVec {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
         e.bytes(self)?.ok()
     }
 }
@@ -254,8 +254,8 @@ impl Encode for ByteVec {
 
 /// Like [`Encode`] but specific for encoding of byte slices.
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-pub trait EncodeBytes {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>>;
+pub trait EncodeBytes<C> {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>>;
 
     fn is_nil(&self) -> bool {
         false
@@ -264,8 +264,8 @@ pub trait EncodeBytes {
 
 /// Like [`Decode`] but specific for decoding from byte slices.
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-pub trait DecodeBytes<'b>: Sized {
-    fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error>;
+pub trait DecodeBytes<'b, C>: Sized {
+    fn decode_bytes(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, decode::Error>;
 
     fn nil() -> Option<Self> {
         None
@@ -273,101 +273,101 @@ pub trait DecodeBytes<'b>: Sized {
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-impl<'a, T: EncodeBytes + ?Sized> EncodeBytes for &'a T {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
-        (**self).encode_bytes(e)
+impl<'a, C, T: EncodeBytes<C> + ?Sized> EncodeBytes<C> for &'a T {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
+        (**self).encode_bytes(e, ctx)
     }
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-impl EncodeBytes for [u8] {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+impl<C> EncodeBytes<C> for [u8] {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
         e.bytes(self)?.ok()
     }
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-impl<'a, 'b: 'a> DecodeBytes<'b> for &'a [u8] {
-    fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
+impl<'a, 'b: 'a, C> DecodeBytes<'b, C> for &'a [u8] {
+    fn decode_bytes(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, decode::Error> {
         d.bytes()
     }
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-impl<const N: usize> EncodeBytes for [u8; N] {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+impl<C, const N: usize> EncodeBytes<C> for [u8; N] {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
         e.bytes(&self[..])?.ok()
     }
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-impl<'b, const N: usize> DecodeBytes<'b> for [u8; N] {
-    fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
-        ByteArray::decode(d).map(ByteArray::into)
+impl<'b, C, const N: usize> DecodeBytes<'b, C> for [u8; N] {
+    fn decode_bytes(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, decode::Error> {
+        ByteArray::decode(d, ctx).map(ByteArray::into)
     }
 }
 
 #[cfg(all(feature = "alloc", any(feature = "derive", feature = "partial-derive-support")))]
-impl EncodeBytes for Vec<u8> {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+impl<C> EncodeBytes<C> for Vec<u8> {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
         e.bytes(self.as_slice())?.ok()
     }
 }
 
 #[cfg(all(feature = "alloc", any(feature = "derive", feature = "partial-derive-support")))]
-impl<'b> DecodeBytes<'b> for Vec<u8> {
-    fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
+impl<'b, C> DecodeBytes<'b, C> for Vec<u8> {
+    fn decode_bytes(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, decode::Error> {
         d.bytes().map(Vec::from)
     }
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-impl EncodeBytes for ByteSlice {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
-        Self::encode(self, e)
+impl<C> EncodeBytes<C> for ByteSlice {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
+        Self::encode(self, e, ctx)
     }
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-impl<'a, 'b: 'a> DecodeBytes<'b> for &'a ByteSlice {
-    fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
-        Self::decode(d)
+impl<'a, 'b: 'a, C> DecodeBytes<'b, C> for &'a ByteSlice {
+    fn decode_bytes(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, decode::Error> {
+        Self::decode(d, ctx)
     }
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-impl<const N: usize> EncodeBytes for ByteArray<N> {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
-        Self::encode(self, e)
+impl<C, const N: usize> EncodeBytes<C> for ByteArray<N> {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
+        Self::encode(self, e, ctx)
     }
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-impl<'b, const N: usize> DecodeBytes<'b> for ByteArray<N> {
-    fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
-        Self::decode(d)
+impl<'b, C, const N: usize> DecodeBytes<'b, C> for ByteArray<N> {
+    fn decode_bytes(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, decode::Error> {
+        Self::decode(d, ctx)
     }
 }
 
 #[cfg(all(feature = "alloc", any(feature = "derive", feature = "partial-derive-support")))]
-impl EncodeBytes for ByteVec {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
-        Self::encode(self, e)
+impl<C> EncodeBytes<C> for ByteVec {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
+        Self::encode(self, e, ctx)
     }
 }
 
 #[cfg(all(feature = "alloc", any(feature = "derive", feature = "partial-derive-support")))]
-impl<'b> DecodeBytes<'b> for ByteVec {
-    fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
-        Self::decode(d)
+impl<'b, C> DecodeBytes<'b, C> for ByteVec {
+    fn decode_bytes(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, decode::Error> {
+        Self::decode(d, ctx)
     }
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-impl<T: EncodeBytes> EncodeBytes for Option<T> {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+impl<C, T: EncodeBytes<C>> EncodeBytes<C> for Option<T> {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
         if let Some(x) = self {
-            x.encode_bytes(e)
+            x.encode_bytes(e, ctx)
         } else {
             e.null()?.ok()
         }
@@ -379,13 +379,13 @@ impl<T: EncodeBytes> EncodeBytes for Option<T> {
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-impl<'b, T: DecodeBytes<'b>> DecodeBytes<'b> for Option<T> {
-    fn decode_bytes(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
+impl<'b, C, T: DecodeBytes<'b, C>> DecodeBytes<'b, C> for Option<T> {
+    fn decode_bytes(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, decode::Error> {
         if crate::data::Type::Null == d.datatype()? {
             d.skip()?;
             return Ok(None)
         }
-        T::decode_bytes(d).map(Some)
+        T::decode_bytes(d, ctx).map(Some)
     }
 
     fn nil() -> Option<Self> {
@@ -398,17 +398,17 @@ impl<'b, T: DecodeBytes<'b>> DecodeBytes<'b> for Option<T> {
 /// For use in `#[cbor(with = "minicbor::bytes")]` or `#[cbor(decode_with =
 /// "minicbor::bytes::decode")]`.
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-pub fn decode<'b, T>(d: &mut Decoder<'b>) -> Result<T, decode::Error>
+pub fn decode<'b, C, T>(d: &mut Decoder<'b>, ctx: &mut C) -> Result<T, decode::Error>
 where
-    T: DecodeBytes<'b>
+    T: DecodeBytes<'b, C>
 {
-    T::decode_bytes(d)
+    T::decode_bytes(d, ctx)
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-pub fn nil<'b, T>() -> Option<T>
+pub fn nil<'b, C, T>() -> Option<T>
 where
-    T: DecodeBytes<'b>
+    T: DecodeBytes<'b, C>
 {
     T::nil()
 }
@@ -418,18 +418,18 @@ where
 /// For use in `#[cbor(with = "minicbor::bytes")]` or `#[cbor(encode_with =
 /// "minicbor::bytes::encode")]`.
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-pub fn encode<T, W>(xs: &T, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>>
+pub fn encode<C, T, W>(xs: &T, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>>
 where
-    T: EncodeBytes,
+    T: EncodeBytes<C>,
     W: Write
 {
-    T::encode_bytes(xs, e)
+    T::encode_bytes(xs, e, ctx)
 }
 
 #[cfg(any(feature = "derive", feature = "partial-derive-support"))]
-pub fn is_nil<T>(xs: &T) -> bool
+pub fn is_nil<C, T>(xs: &T) -> bool
 where
-    T: EncodeBytes
+    T: EncodeBytes<C>
 {
     T::is_nil(xs)
 }

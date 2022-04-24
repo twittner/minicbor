@@ -6,7 +6,7 @@ mod decoder;
 mod error;
 
 pub use decoder::{Decoder, Probe};
-pub use decoder::{ArrayIter, BytesIter, MapIter, StrIter};
+pub use decoder::{ArrayIterWithCtx, BytesIter, MapIterWithCtx, StrIter};
 pub use error::Error;
 
 #[cfg(feature = "half")]
@@ -16,9 +16,17 @@ mod tokens;
 pub use tokens::{Token, Tokenizer};
 
 /// A type that can be decoded from CBOR.
-pub trait Decode<'b>: Sized {
+pub trait Decode<'b, C>: Sized {
     /// Decode a value using the given `Decoder`.
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error>;
+    ///
+    /// In addition to the decoder a user provided decoding context is given
+    /// as another parameter. Most implementations of this trait do not need
+    /// a decoding context and should be completely generic in the context
+    /// type. In cases where a context is needed and the `Decode` impl type is
+    /// meant to be combined with other types that require a different context
+    /// type it is preferrable to constrain the context type variable `C` with
+    /// a trait bound instead of fixing the type.
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error>;
 
     /// If possible, return a nil value of `Self`.
     ///
@@ -42,50 +50,50 @@ pub trait Decode<'b>: Sized {
 }
 
 #[cfg(feature = "alloc")]
-impl<'b, T: Decode<'b>> Decode<'b> for alloc::boxed::Box<T> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        T::decode(d).map(alloc::boxed::Box::new)
+impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for alloc::boxed::Box<T> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        T::decode(d, ctx).map(alloc::boxed::Box::new)
     }
 }
 
-impl<'a, 'b: 'a> Decode<'b> for &'a str {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'a, 'b: 'a, C> Decode<'b, C> for &'a str {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         d.str()
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<'b, T> Decode<'b> for alloc::borrow::Cow<'_, T>
+impl<'b, C, T> Decode<'b, C> for alloc::borrow::Cow<'_, T>
 where
     T: alloc::borrow::ToOwned + ?Sized,
-    T::Owned: Decode<'b>
+    T::Owned: Decode<'b, C>
 {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        d.decode().map(alloc::borrow::Cow::Owned)
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        d.decode_with(ctx).map(alloc::borrow::Cow::Owned)
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<'b> Decode<'b> for alloc::string::String {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C> Decode<'b, C> for alloc::string::String {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         d.str().map(alloc::string::String::from)
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<'b> Decode<'b> for alloc::boxed::Box<str> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C> Decode<'b, C> for alloc::boxed::Box<str> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         d.str().map(Into::into)
     }
 }
 
-impl<'b, T: Decode<'b>> Decode<'b> for Option<T> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for Option<T> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         if crate::data::Type::Null == d.datatype()? {
             d.limited_skip()?;
             return Ok(None)
         }
-        T::decode(d).map(Some)
+        T::decode(d, ctx).map(Some)
     }
 
     fn nil() -> Option<Self> {
@@ -93,32 +101,32 @@ impl<'b, T: Decode<'b>> Decode<'b> for Option<T> {
     }
 }
 
-impl<'b, T, E> Decode<'b> for Result<T, E>
+impl<'b, C, T, E> Decode<'b, C> for Result<T, E>
 where
-    T: Decode<'b>,
-    E: Decode<'b>
+    T: Decode<'b, C>,
+    E: Decode<'b, C>
 {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(2) != d.array()? {
             return Err(Error::message("expected enum (2-element array)").at(p))
         }
         let p = d.position();
         match d.u32()? {
-            0 => T::decode(d).map(Ok),
-            1 => E::decode(d).map(Err),
+            0 => T::decode(d, ctx).map(Ok),
+            1 => E::decode(d, ctx).map(Err),
             n => Err(Error::unknown_variant(n).at(p))
         }
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<'b, T> Decode<'b> for alloc::collections::BinaryHeap<T>
+impl<'b, C, T> Decode<'b, C> for alloc::collections::BinaryHeap<T>
 where
-    T: Decode<'b> + Ord
+    T: Decode<'b, C> + Ord
 {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        let iter: ArrayIter<T> = d.array_iter()?;
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        let iter: ArrayIterWithCtx<C, T> = d.array_iter_with(ctx)?;
         let mut v = alloc::collections::BinaryHeap::new();
         for x in iter {
             v.push(x?)
@@ -128,13 +136,13 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'b, T, S> Decode<'b> for std::collections::HashSet<T, S>
+impl<'b, C, T, S> Decode<'b, C> for std::collections::HashSet<T, S>
 where
-    T: Decode<'b> + Eq + std::hash::Hash,
+    T: Decode<'b, C> + Eq + std::hash::Hash,
     S: std::hash::BuildHasher + std::default::Default
 {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        let iter: ArrayIter<T> = d.array_iter()?;
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        let iter: ArrayIterWithCtx<C, T> = d.array_iter_with(ctx)?;
         let mut v = std::collections::HashSet::default();
         for x in iter {
             v.insert(x?);
@@ -144,12 +152,12 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<'b, T> Decode<'b> for alloc::collections::BTreeSet<T>
+impl<'b, C, T> Decode<'b, C> for alloc::collections::BTreeSet<T>
 where
-    T: Decode<'b> + Ord
+    T: Decode<'b, C> + Ord
 {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        let iter: ArrayIter<T> = d.array_iter()?;
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        let iter: ArrayIterWithCtx<C, T> = d.array_iter_with(ctx)?;
         let mut v = alloc::collections::BTreeSet::new();
         for x in iter {
             v.insert(x?);
@@ -159,15 +167,15 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'b, K, V, S> Decode<'b> for std::collections::HashMap<K, V, S>
+impl<'b, C, K, V, S> Decode<'b, C> for std::collections::HashMap<K, V, S>
 where
-    K: Decode<'b> + Eq + std::hash::Hash,
-    V: Decode<'b>,
+    K: Decode<'b, C> + Eq + std::hash::Hash,
+    V: Decode<'b, C>,
     S: std::hash::BuildHasher + std::default::Default
 {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let mut m = std::collections::HashMap::default();
-        let iter: MapIter<K, V> = d.map_iter()?;
+        let iter: MapIterWithCtx<C, K, V> = d.map_iter_with(ctx)?;
         for x in iter {
             let (k, v) = x?;
             m.insert(k, v);
@@ -177,14 +185,14 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<'b, K, V> Decode<'b> for alloc::collections::BTreeMap<K, V>
+impl<'b, C, K, V> Decode<'b, C> for alloc::collections::BTreeMap<K, V>
 where
-    K: Decode<'b> + Eq + Ord,
-    V: Decode<'b>
+    K: Decode<'b, C> + Eq + Ord,
+    V: Decode<'b, C>
 {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let mut m = alloc::collections::BTreeMap::new();
-        let iter: MapIter<K, V> = d.map_iter()?;
+        let iter: MapIterWithCtx<C, K, V> = d.map_iter_with(ctx)?;
         for x in iter {
             let (k, v) = x?;
             m.insert(k, v);
@@ -193,8 +201,8 @@ where
     }
 }
 
-impl<'b, T> Decode<'b> for core::marker::PhantomData<T> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C, T> Decode<'b, C> for core::marker::PhantomData<T> {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(0) != d.array()? {
             return Err(Error::message("expected phantom data, i.e. an empty array").at(p))
@@ -203,8 +211,8 @@ impl<'b, T> Decode<'b> for core::marker::PhantomData<T> {
     }
 }
 
-impl<'b> Decode<'b> for () {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C> Decode<'b, C> for () {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(0) != d.array()? {
             return Err(Error::message("expected unit, i.e. an empty array").at(p))
@@ -213,42 +221,42 @@ impl<'b> Decode<'b> for () {
     }
 }
 
-impl<'b, T: Decode<'b>> Decode<'b> for core::num::Wrapping<T> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        d.decode().map(core::num::Wrapping)
+impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::num::Wrapping<T> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        d.decode_with(ctx).map(core::num::Wrapping)
     }
 }
 
 #[cfg(target_pointer_width = "32")]
-impl<'b> Decode<'b> for usize {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C> Decode<'b, C> for usize {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         d.u32().map(|n| n as usize)
     }
 }
 
 #[cfg(target_pointer_width = "64")]
-impl<'b> Decode<'b> for usize {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C> Decode<'b, C> for usize {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         d.u64().map(|n| n as usize)
     }
 }
 
 #[cfg(target_pointer_width = "32")]
-impl<'b> Decode<'b> for isize {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C> Decode<'b, C> for isize {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         d.i32().map(|n| n as isize)
     }
 }
 
 #[cfg(target_pointer_width = "64")]
-impl<'b> Decode<'b> for isize {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C> Decode<'b, C> for isize {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         d.i64().map(|n| n as isize)
     }
 }
 
-impl<'b> Decode<'b> for crate::data::Int {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C> Decode<'b, C> for crate::data::Int {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         d.int()
     }
 }
@@ -256,8 +264,8 @@ impl<'b> Decode<'b> for crate::data::Int {
 macro_rules! decode_basic {
     ($($t:ident)*) => {
         $(
-            impl<'b> Decode<'b> for $t {
-                fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+            impl<'b, C> Decode<'b, C> for $t {
+                fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
                     d.$t()
                 }
             }
@@ -270,10 +278,10 @@ decode_basic!(u8 i8 u16 i16 u32 i32 u64 i64 bool f32 f64 char);
 macro_rules! decode_nonzero {
     ($($t:ty, $msg:expr)*) => {
         $(
-            impl<'b> Decode<'b> for $t {
-                fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+            impl<'b, C> Decode<'b, C> for $t {
+                fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
                     let p = d.position();
-                    <$t>::new(Decode::decode(d)?).ok_or_else(|| Error::message($msg).at(p))
+                    <$t>::new(Decode::decode(d, ctx)?).ok_or_else(|| Error::message($msg).at(p))
                 }
             }
         )*
@@ -295,9 +303,9 @@ decode_nonzero! {
 macro_rules! decode_atomic {
     ($($t:ty)*) => {
         $(
-            impl<'b> Decode<'b> for $t {
-                fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-                    d.decode().map(<$t>::new)
+            impl<'b, C> Decode<'b, C> for $t {
+                fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+                    d.decode_with(ctx).map(<$t>::new)
                 }
             }
         )*
@@ -336,9 +344,9 @@ decode_atomic! {
 macro_rules! decode_sequential {
     ($($t:ty, $push:ident)*) => {
         $(
-            impl<'b, T: Decode<'b>> Decode<'b> for $t {
-                fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-                    let iter: ArrayIter<T> = d.array_iter()?;
+            impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for $t {
+                fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+                    let iter: ArrayIterWithCtx<C, T> = d.array_iter_with(ctx)?;
                     let mut v = <$t>::new();
                     for x in iter {
                         v.$push(x?)
@@ -360,10 +368,10 @@ decode_sequential! {
 macro_rules! decode_arrays {
     ($($n:expr)*) => {
         $(
-            impl<'b, T: Decode<'b> + Default> Decode<'b> for [T; $n] {
-                fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+            impl<'b, C, T: Decode<'b, C> + Default> Decode<'b, C> for [T; $n] {
+                fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
                     let p = d.position();
-                    let iter: ArrayIter<T> = d.array_iter()?;
+                    let iter: ArrayIterWithCtx<C, T> = d.array_iter_with(ctx)?;
                     let mut a: [T; $n] = Default::default();
                     let mut i = 0;
                     for x in iter {
@@ -390,14 +398,14 @@ decode_arrays!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
 macro_rules! decode_tuples {
     ($( $len:expr => { $($T:ident)+ } )+) => {
         $(
-            impl<'b, $($T: Decode<'b>),+> Decode<'b> for ($($T,)+) {
-                fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+            impl<'b, Ctx, $($T: Decode<'b, Ctx>),+> Decode<'b, Ctx> for ($($T,)+) {
+                fn decode(d: &mut Decoder<'b>, ctx: &mut Ctx) -> Result<Self, Error> {
                     let p = d.position();
                     let n = d.array()?;
                     if n != Some($len) {
                         return Err(Error::message(concat!("invalid ", $len, "-tuple length")).at(p))
                     }
-                    Ok(($($T::decode(d)?,)+))
+                    Ok(($($T::decode(d, ctx)?,)+))
                 }
             }
         )+
@@ -424,7 +432,7 @@ decode_tuples! {
 }
 
 macro_rules! decode_fields {
-    ($d:ident | $($n:literal $x:ident => $t:ty ; $msg:literal)*) => {
+    ($d:ident $c:ident | $($n:literal $x:ident => $t:ty ; $msg:literal)*) => {
         $(let mut $x : core::option::Option<$t> = None;)*
 
         let p = $d.position();
@@ -432,7 +440,7 @@ macro_rules! decode_fields {
         match $d.array()? {
             Some(n) => for i in 0 .. n {
                 match i {
-                    $($n => $x = Some(Decode::decode($d)?),)*
+                    $($n => $x = Some(Decode::decode($d, $c)?),)*
                     _    => $d.limited_skip()?
                 }
             }
@@ -440,7 +448,7 @@ macro_rules! decode_fields {
                 let mut i = 0;
                 while $d.datatype()? != crate::data::Type::Break {
                     match i {
-                        $($n => $x = Some(Decode::decode($d)?),)*
+                        $($n => $x = Some(Decode::decode($d, $c)?),)*
                         _    => $d.limited_skip()?
                     }
                     i += 1
@@ -457,9 +465,9 @@ macro_rules! decode_fields {
     }
 }
 
-impl<'b> Decode<'b> for core::time::Duration {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        decode_fields! { d |
+impl<'b, C> Decode<'b, C> for core::time::Duration {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        decode_fields! { d ctx |
             0 secs  => u64 ; "Duration::secs"
             1 nanos => u32 ; "Duration::nanos"
         }
@@ -468,100 +476,100 @@ impl<'b> Decode<'b> for core::time::Duration {
 }
 
 #[cfg(feature = "std")]
-impl<'b> Decode<'b> for std::time::SystemTime {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C> Decode<'b, C> for std::time::SystemTime {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let p = d.position();
         std::time::UNIX_EPOCH
-            .checked_add(d.decode()?)
+            .checked_add(d.decode_with(ctx)?)
             .ok_or_else(|| Error::message("duration value can not represent system time").at(p))
     }
 }
 
-impl<'b, T: Decode<'b>> Decode<'b> for core::cell::Cell<T> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        d.decode().map(core::cell::Cell::new)
+impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::cell::Cell<T> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        d.decode_with(ctx).map(core::cell::Cell::new)
     }
 }
 
-impl<'b, T: Decode<'b>> Decode<'b> for core::cell::RefCell<T> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        d.decode().map(core::cell::RefCell::new)
+impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::cell::RefCell<T> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        d.decode_with(ctx).map(core::cell::RefCell::new)
     }
 }
 
 #[cfg(feature = "std")]
-impl<'a, 'b: 'a> Decode<'b> for &'a std::path::Path {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'a, 'b: 'a, C> Decode<'b, C> for &'a std::path::Path {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         d.str().map(std::path::Path::new)
     }
 }
 
 #[cfg(feature = "std")]
-impl<'b> Decode<'b> for Box<std::path::Path> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        d.decode().map(std::path::PathBuf::into_boxed_path)
+impl<'b, C> Decode<'b, C> for Box<std::path::Path> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        d.decode_with(ctx).map(std::path::PathBuf::into_boxed_path)
     }
 }
 
 #[cfg(feature = "std")]
-impl<'b> Decode<'b> for std::path::PathBuf {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        d.decode().map(std::path::Path::to_path_buf)
+impl<'b, C> Decode<'b, C> for std::path::PathBuf {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        d.decode_with(ctx).map(std::path::Path::to_path_buf)
     }
 }
 
 #[cfg(feature = "std")]
-impl<'b> Decode<'b> for std::net::IpAddr {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C> Decode<'b, C> for std::net::IpAddr {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(2) != d.array()? {
             return Err(Error::message("expected enum (2-element array)").at(p))
         }
         let p = d.position();
         match d.u32()? {
-            0 => Ok(std::net::Ipv4Addr::decode(d)?.into()),
-            1 => Ok(std::net::Ipv6Addr::decode(d)?.into()),
+            0 => Ok(std::net::Ipv4Addr::decode(d, ctx)?.into()),
+            1 => Ok(std::net::Ipv6Addr::decode(d, ctx)?.into()),
             n => Err(Error::unknown_variant(n).at(p))
         }
     }
 }
 
 #[cfg(feature = "std")]
-impl<'b> Decode<'b> for std::net::Ipv4Addr {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        let octets: crate::bytes::ByteArray<4> = Decode::decode(d)?;
+impl<'b, C> Decode<'b, C> for std::net::Ipv4Addr {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        let octets: crate::bytes::ByteArray<4> = Decode::decode(d, ctx)?;
         Ok(<[u8; 4]>::from(octets).into())
     }
 }
 
 #[cfg(feature = "std")]
-impl<'b> Decode<'b> for std::net::Ipv6Addr {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        let octets: crate::bytes::ByteArray<16> = Decode::decode(d)?;
+impl<'b, C> Decode<'b, C> for std::net::Ipv6Addr {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        let octets: crate::bytes::ByteArray<16> = Decode::decode(d, ctx)?;
         Ok(<[u8; 16]>::from(octets).into())
     }
 }
 
 #[cfg(feature = "std")]
-impl<'b> Decode<'b> for std::net::SocketAddr {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C> Decode<'b, C> for std::net::SocketAddr {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(2) != d.array()? {
             return Err(Error::message("expected enum (2-element array)").at(p))
         }
         let p = d.position();
         match d.u32()? {
-            0 => Ok(std::net::SocketAddrV4::decode(d)?.into()),
-            1 => Ok(std::net::SocketAddrV6::decode(d)?.into()),
+            0 => Ok(std::net::SocketAddrV4::decode(d, ctx)?.into()),
+            1 => Ok(std::net::SocketAddrV6::decode(d, ctx)?.into()),
             n => Err(Error::unknown_variant(n).at(p))
         }
     }
 }
 
 #[cfg(feature = "std")]
-impl<'b> Decode<'b> for std::net::SocketAddrV4 {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        decode_fields! { d |
+impl<'b, C> Decode<'b, C> for std::net::SocketAddrV4 {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        decode_fields! { d ctx |
             0 ip   => std::net::Ipv4Addr ; "SocketAddrV4::ip"
             1 port => u16                ; "SocketAddrV4::port"
         }
@@ -570,9 +578,9 @@ impl<'b> Decode<'b> for std::net::SocketAddrV4 {
 }
 
 #[cfg(feature = "std")]
-impl<'b> Decode<'b> for std::net::SocketAddrV6 {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        decode_fields! { d |
+impl<'b, C> Decode<'b, C> for std::net::SocketAddrV6 {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        decode_fields! { d ctx |
             0 ip   => std::net::Ipv6Addr ; "SocketAddrV6::ip"
             1 port => u16                ; "SocketAddrV6::port"
         }
@@ -580,9 +588,9 @@ impl<'b> Decode<'b> for std::net::SocketAddrV6 {
     }
 }
 
-impl<'b, T: Decode<'b>> Decode<'b> for core::ops::Range<T> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        decode_fields! { d |
+impl<'b, C, T: Decode<'b, C>> Decode<'b,C > for core::ops::Range<T> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        decode_fields! { d ctx |
             0 start => T ; "Range::start"
             1 end   => T ; "Range::end"
         }
@@ -590,36 +598,36 @@ impl<'b, T: Decode<'b>> Decode<'b> for core::ops::Range<T> {
     }
 }
 
-impl<'b, T: Decode<'b>> Decode<'b> for core::ops::RangeFrom<T> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        decode_fields! { d |
+impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::ops::RangeFrom<T> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        decode_fields! { d ctx |
             0 start => T ; "RangeFrom::start"
         }
         Ok(core::ops::RangeFrom { start })
     }
 }
 
-impl<'b, T: Decode<'b>> Decode<'b> for core::ops::RangeTo<T> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        decode_fields! { d |
+impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::ops::RangeTo<T> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        decode_fields! { d ctx |
             0 end => T ; "RangeTo::end"
         }
         Ok(core::ops::RangeTo { end })
     }
 }
 
-impl<'b, T: Decode<'b>> Decode<'b> for core::ops::RangeToInclusive<T> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        decode_fields! { d |
+impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::ops::RangeToInclusive<T> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        decode_fields! { d ctx |
             0 end => T ; "RangeToInclusive::end"
         }
         Ok(core::ops::RangeToInclusive { end })
     }
 }
 
-impl<'b, T: Decode<'b>> Decode<'b> for core::ops::RangeInclusive<T> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
-        decode_fields! { d |
+impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::ops::RangeInclusive<T> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        decode_fields! { d ctx |
             0 start => T ; "RangeInclusive::start"
             1 end   => T ; "RangeInclusive::end"
         }
@@ -627,16 +635,16 @@ impl<'b, T: Decode<'b>> Decode<'b> for core::ops::RangeInclusive<T> {
     }
 }
 
-impl<'b, T: Decode<'b>> Decode<'b> for core::ops::Bound<T> {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::ops::Bound<T> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(2) != d.array()? {
             return Err(Error::message("expected enum (2-element array)").at(p))
         }
         let p = d.position();
         match d.u32()? {
-            0 => d.decode().map(core::ops::Bound::Included),
-            1 => d.decode().map(core::ops::Bound::Excluded),
+            0 => d.decode_with(ctx).map(core::ops::Bound::Included),
+            1 => d.decode_with(ctx).map(core::ops::Bound::Excluded),
             2 => d.limited_skip().map(|_| core::ops::Bound::Unbounded),
             n => Err(Error::unknown_variant(n).at(p))
         }

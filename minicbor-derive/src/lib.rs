@@ -153,7 +153,7 @@
 //! ```no_run
 //! use minicbor::decode::{Decoder, Error};
 //!
-//! fn decode<'b, T: 'b>(d: &mut Decoder<'b>) -> Result<T, Error> {
+//! fn decode<'b, C, T: 'b>(d: &mut Decoder<'b>, ctx: &mut C) -> Result<T, Error> {
 //!     todo!()
 //! }
 //! ```
@@ -166,7 +166,7 @@
 //! ```no_run
 //! use minicbor::encode::{Encoder, Error, Write};
 //!
-//! fn encode<T, W: Write>(v: &T, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+//! fn encode<C, T, W: Write>(v: &T, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
 //!     todo!()
 //! }
 //! ```
@@ -529,5 +529,15 @@ where
             p.bounds.push(bound.clone())
         }
     }
+}
+
+fn add_typeparam(g: &syn::Generics, t: syn::TypeParam) -> syn::Generics {
+    let mut g2 = g.clone();
+    g2.params = Some(t.into()).into_iter().chain(g2.params).collect();
+    g2
+}
+
+fn gen_ctx_param() -> syn::Result<syn::TypeParam> {
+    syn::parse_str("__C777")
 }
 

@@ -1,4 +1,4 @@
-use minicbor::{Decode, Decoder, Encoder, data::{Tag, Type}};
+use minicbor::{Decoder, Encoder, data::{Tag, Type}};
 use std::{collections::BTreeMap, iter::FromIterator};
 
 // Test vectors of RFC 7049
@@ -261,7 +261,7 @@ fn rfc_tv_array() {
 
     let x = hex::decode("83010203").unwrap();
     let mut d = Decoder::new(&x);
-    assert_eq!(vec![1, 2, 3], (Decode::decode(&mut d) as Result<Vec<u8>, _>).unwrap());
+    assert_eq!(vec![1, 2, 3], (d.decode() as Result<Vec<u8>, _>).unwrap());
     let y = hex::encode(minicbor::to_vec([1, 2, 3]).unwrap());
     assert_eq!("83010203", y);
 

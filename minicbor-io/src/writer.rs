@@ -47,9 +47,14 @@ impl<W> Writer<W> {
 
 impl<W: io::Write> Writer<W> {
     /// Encode and write a CBOR value and return its size in bytes.
-    pub fn write<T: Encode>(&mut self, val: T) -> Result<usize, Error> {
+    pub fn write<T: Encode<()>>(&mut self, val: T) -> Result<usize, Error> {
+        self.write_with(val, &mut ())
+    }
+
+    /// Like [`Writer::write`] but accepting a user provided encoding context.
+    pub fn write_with<C, T: Encode<C>>(&mut self, val: T, ctx: &mut C) -> Result<usize, Error> {
         self.buffer.resize(4, 0u8);
-        minicbor::encode(val, &mut self.buffer)?;
+        minicbor::encode_with(val, &mut self.buffer, ctx)?;
         if self.buffer.len() - 4 > self.max_len {
             return Err(Error::InvalidLen)
         }
