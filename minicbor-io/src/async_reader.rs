@@ -80,7 +80,12 @@ impl<R: AsyncRead + Unpin> AsyncReader<R> {
     /// The future returned by `AsyncReader::read` can be dropped while still
     /// pending. Subsequent calls to `AsyncReader::read` will resume reading
     /// where the previous future left off.
-    pub async fn read<'a, T: Decode<'a>>(&'a mut self) -> Result<Option<T>, Error> {
+    pub async fn read<'a, T: Decode<'a, ()>>(&'a mut self) -> Result<Option<T>, Error> {
+        self.read_with(&mut ()).await
+    }
+
+    /// Like [`AsyncReader::read`] but accepting a user provided decoding context.
+    pub async fn read_with<'a, C, T: Decode<'a, C>>(&'a mut self, ctx: &mut C) -> Result<Option<T>, Error> {
         loop {
             match self.state {
                 State::ReadLen(buf, 4) => {
@@ -105,7 +110,7 @@ impl<R: AsyncRead + Unpin> AsyncReader<R> {
                 }
                 State::ReadVal(o) if o >= self.buffer.len() => {
                     self.state = State::new();
-                    return minicbor::decode(&self.buffer).map_err(Error::Decode).map(Some)
+                    return minicbor::decode_with(&self.buffer, ctx).map_err(Error::Decode).map(Some)
                 }
                 State::ReadVal(ref mut o) => {
                     let n = self.reader.read(&mut self.buffer[*o ..]).await?;

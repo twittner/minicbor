@@ -24,22 +24,22 @@ impl Arbitrary for C {
     }
 }
 
-impl Encode for C {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+impl<Ctx> Encode<Ctx> for C {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut Ctx) -> Result<(), encode::Error<W::Error>> {
         match self {
             C::E(n)  => e.u32(*n)?.ok(),
-            C::A(xs) => e.encode(xs)?.ok(),
-            C::M(xs) => e.encode(xs)?.ok()
+            C::A(xs) => e.encode_with(xs, ctx)?.ok(),
+            C::M(xs) => e.encode_with(xs, ctx)?.ok()
         }
     }
 }
 
-impl<'b> Decode<'b> for C {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
+impl<'b, Ctx> Decode<'b, Ctx> for C {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut Ctx) -> Result<Self, decode::Error> {
         match d.datatype()? {
-            Type::Array => d.decode().map(C::A),
-            Type::Map   => d.decode().map(C::M),
-            _           => d.decode().map(C::E)
+            Type::Array => d.decode_with(ctx).map(C::A),
+            Type::Map   => d.decode_with(ctx).map(C::M),
+            _           => d.decode_with(ctx).map(C::E)
         }
     }
 }

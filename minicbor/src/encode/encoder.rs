@@ -24,8 +24,14 @@ impl<W: Write> Encoder<W> {
     }
 
     /// Encode any type that implements [`Encode`].
-    pub fn encode<T: Encode>(&mut self, x: T) -> Result<&mut Self, Error<W::Error>> {
-        x.encode(self)?;
+    pub fn encode<T: Encode<()>>(&mut self, x: T) -> Result<&mut Self, Error<W::Error>> {
+        x.encode(self, &mut ())?;
+        Ok(self)
+    }
+
+    /// Encode any type that implements [`Encode`].
+    pub fn encode_with<C, T: Encode<C>>(&mut self, x: T, ctx: &mut C) -> Result<&mut Self, Error<W::Error>> {
+        x.encode(self, ctx)?;
         Ok(self)
     }
 

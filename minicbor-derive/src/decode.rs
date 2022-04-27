@@ -1,5 +1,6 @@
 use crate::Mode;
 use crate::{add_bound_to_type_params, collect_type_params, is_cow, is_option, is_str, is_byte_slice};
+use crate::{add_typeparam, gen_ctx_param};
 use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
 use crate::fields::Fields;
 use crate::variants::Variants;
@@ -61,8 +62,10 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         add_bound_to_type_params(bound, params, &blacklist, &fields.attrs, Mode::Decode);
     }
 
-    let g = add_lifetime(&inp.generics, lifetime);
-    let (impl_generics, ..) = g.split_for_impl();
+    let gen = add_lifetime(&inp.generics, lifetime);
+    let gen = add_typeparam(&gen, gen_ctx_param()?, attrs.context_bound());
+    let impl_generics = gen.split_for_impl().0;
+
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     // If transparent, just forward the decode call to the inner type.
@@ -109,8 +112,8 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     };
 
     Ok(quote! {
-        impl #impl_generics minicbor::Decode<'bytes> for #name #typ_generics #where_clause {
-            fn decode(__d777: &mut minicbor::Decoder<'bytes>) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
+        impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
+            fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 let __p777 = __d777.position();
                 #statements
                 #result
@@ -214,8 +217,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         add_bound_to_type_params(bound, params, &blacklist, &field_attrs, Mode::Decode);
     }
 
-    let g = add_lifetime(&inp.generics, lifetime);
-    let (impl_generics , ..) = g.split_for_impl();
+    let gen = add_lifetime(&inp.generics, lifetime);
+    let gen = add_typeparam(&gen, gen_ctx_param()?, enum_attrs.context_bound());
+    let impl_generics = gen.split_for_impl().0;
+
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     let check = if index_only {
@@ -233,8 +238,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     };
 
     Ok(quote! {
-        impl #impl_generics minicbor::Decode<'bytes> for #name #typ_generics #where_clause {
-            fn decode(__d777: &mut minicbor::Decoder<'bytes>) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
+        impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
+            fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #check
                 match __d777.u32()? {
                     #(#rows)*
@@ -303,7 +308,7 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
                     }
                 } else {
                     quote! {
-                        Err(e) if e.is_unknown_variant() && <#ty>::nil().is_some() => {
+                        Err(e) if e.is_unknown_variant() && <#ty as minicbor::Decode::<Ctx>>::nil().is_some() => {
                             __d777.skip()?
                         }
                     }
@@ -317,7 +322,7 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
                 };
 
             quote! {
-                match #decode_fn(__d777) {
+                match #decode_fn(__d777, __ctx777) {
                     Ok(__v777) => #name = #value,
                     #unknown_var_err
                     Err(e) => return Err(e)
@@ -393,17 +398,17 @@ fn make_transparent_impl
     let call =
         if let Some(id) = &field.ident {
             quote! {
-                Ok(#name { #id: minicbor::Decode::decode(__d777)? })
+                Ok(#name { #id: minicbor::Decode::decode(__d777, __ctx777)? })
             }
         } else {
             quote! {
-                Ok(#name(minicbor::Decode::decode(__d777)?))
+                Ok(#name(minicbor::Decode::decode(__d777, __ctx777)?))
             }
         };
 
     Ok(quote! {
-        impl #impl_generics minicbor::Decode<'bytes> for #name #typ_generics #where_clause {
-            fn decode(__d777: &mut minicbor::Decoder<'bytes>) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
+        impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
+            fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #call
             }
         }
@@ -411,7 +416,7 @@ fn make_transparent_impl
 }
 
 fn gen_decode_bound() -> syn::Result<syn::TypeParamBound> {
-    syn::parse_str("minicbor::Decode<'bytes>")
+    syn::parse_str("minicbor::Decode<'bytes, Ctx>")
 }
 
 fn nils(types: &[syn::Type], decode_fns: &[Option<CustomCodec>]) -> Vec<proc_macro2::TokenStream> {
@@ -426,7 +431,7 @@ fn nils(types: &[syn::Type], decode_fns: &[Option<CustomCodec>]) -> Vec<proc_mac
                     quote!(None)
                 }
             } else {
-                quote!(<#ty>::nil())
+                quote!(<#ty as minicbor::Decode::<Ctx>>::nil())
             }
         })
         .collect()

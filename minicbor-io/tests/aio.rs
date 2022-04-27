@@ -122,7 +122,7 @@ async fn server() -> io::Result<(SocketAddr, TcpListener)> {
 /// `Command::Value`, send back the value.
 async fn echo<T>(l: TcpListener) -> Result<(), Error>
 where
-    T: Encode + for<'a> Decode<'a>
+    T: Encode<()> + for<'a> Decode<'a, ()>
 {
     while let Ok((mut s, _)) = l.accept().await {
         let (r, w) = s.split();

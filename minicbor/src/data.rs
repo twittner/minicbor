@@ -168,8 +168,8 @@ impl core::ops::Deref for Cbor<'_> {
     }
 }
 
-impl crate::Encode for Cbor<'_> {
-    fn encode<W>(&self, e: &mut crate::Encoder<W>) -> Result<(), crate::encode::Error<W::Error>>
+impl<C> crate::Encode<C> for Cbor<'_> {
+    fn encode<W>(&self, e: &mut crate::Encoder<W>, _: &mut C) -> Result<(), crate::encode::Error<W::Error>>
     where
         W: crate::encode::Write
     {
@@ -177,8 +177,8 @@ impl crate::Encode for Cbor<'_> {
     }
 }
 
-impl<'b> crate::Decode<'b> for Cbor<'b> {
-    fn decode(d: &mut crate::Decoder<'b>) -> Result<Self, crate::decode::Error> {
+impl<'b, C> crate::Decode<'b, C> for Cbor<'b> {
+    fn decode(d: &mut crate::Decoder<'b>, _: &mut C) -> Result<Self, crate::decode::Error> {
         d.consume().map(Cbor)
     }
 }

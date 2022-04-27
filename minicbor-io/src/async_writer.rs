@@ -73,9 +73,14 @@ impl<W: AsyncWrite + Unpin> AsyncWriter<W> {
     /// Cancelling a future thus cancels the transfer. However, it is also
     /// possible to resume the transfer by calling [`AsyncWriter::sync`]
     /// after cancellation, which is normally called implicitly by this method.
-    pub async fn write<T: Encode>(&mut self, val: T) -> Result<usize, Error> {
+    pub async fn write<T: Encode<()>>(&mut self, val: T) -> Result<usize, Error> {
+        self.write_with(val, &mut ()).await
+    }
+
+    /// Like [`AsyncWriter::write`] but accepting a user provided encoding context.
+    pub async fn write_with<C, T: Encode<C>>(&mut self, val: T, ctx: &mut C) -> Result<usize, Error> {
         self.buffer.resize(4, 0u8);
-        minicbor::encode(val, &mut self.buffer)?;
+        minicbor::encode_with(val, &mut self.buffer, ctx)?;
         if self.buffer.len() - 4 > self.max_len {
             return Err(Error::InvalidLen)
         }

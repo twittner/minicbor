@@ -3,7 +3,7 @@ use minicbor::data::{Int, Type};
 use quickcheck::quickcheck;
 use std::marker::PhantomData;
 
-fn identity<T: Encode + Eq + for<'a> Decode<'a>>(arg: T) -> bool {
+fn identity<T: Encode<()> + Eq + for<'a> Decode<'a, ()>>(arg: T) -> bool {
     let vec = minicbor::to_vec(&arg).unwrap();
     let mut dec = Decoder::new(&vec);
     let val = dec.decode().unwrap();
