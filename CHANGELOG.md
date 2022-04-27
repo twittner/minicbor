@@ -9,7 +9,8 @@
 ## `0.16.0-rc.1`
 
 - ⚠️ **Breaking** ⚠️: The `Encode` and `Decode` traits are now parameterised by a context type and
-  the context value is passed as another argument to `Encode::encode` and `Decode::decode`.
+  the context value is passed as another argument to `Encode::encode` and `Decode::decode` (see
+  merge request !21 and issue #26 for details).
   Implementations of these traits that do not make use of the context need to be generic in the
   type variable and accept the context parameter, e.g. instead of
 
