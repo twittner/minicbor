@@ -133,63 +133,6 @@ impl Tag {
     }
 }
 
-/// The neutral element w.r.t. [`Encode`](crate::Encode) and [`Decode`](crate::Decode).
-///
-/// This newtype merely wraps a byte slice which is assumed to be a CBOR value
-/// and implements `Encode` and `Decode` as no-ops, i.e. the `Encode` impl
-/// writes the byte slice as is and the `Decode` impl returns the byte slice
-/// as is.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct Cbor<'b>(&'b [u8]);
-
-impl<'b> From<&'b [u8]> for Cbor<'b> {
-    fn from(cbor: &'b [u8]) -> Self {
-        Cbor(cbor)
-    }
-}
-
-impl<'b> From<Cbor<'b>> for &'b [u8] {
-    fn from(cbor: Cbor<'b>) -> Self {
-        cbor.0
-    }
-}
-
-impl AsRef<[u8]> for Cbor<'_> {
-    fn as_ref(&self) -> &[u8] {
-        self.0
-    }
-}
-
-impl core::ops::Deref for Cbor<'_> {
-    type Target = [u8];
-
-    fn deref(&self) -> &Self::Target {
-        self.0
-    }
-}
-
-impl<C> crate::Encode<C> for Cbor<'_> {
-    fn encode<W>(&self, e: &mut crate::Encoder<W>, _: &mut C) -> Result<(), crate::encode::Error<W::Error>>
-    where
-        W: crate::encode::Write
-    {
-        e.put(self.0)?.ok()
-    }
-}
-
-impl<'b, C> crate::Decode<'b, C> for Cbor<'b> {
-    fn decode(d: &mut crate::Decoder<'b>, _: &mut C) -> Result<Self, crate::decode::Error> {
-        d.consume().map(Cbor)
-    }
-}
-
-#[cfg(all(feature = "alloc", feature = "half"))]
-impl fmt::Display for Cbor<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> core::fmt::Result {
-        crate::display(self.0).fmt(f)
-    }
-}
-
 /// CBOR integer type that covers values of [-2<sup>64</sup>, 2<sup>64</sup> - 1]
 ///
 /// CBOR integers keep the sign bit in the major type so there is one extra bit

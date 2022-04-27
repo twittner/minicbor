@@ -46,7 +46,7 @@ quickcheck::quickcheck! {
         for c in &prefix {
             e.encode(c).unwrap();
         }
-        let p = e.as_ref().len();
+        let p = e.writer().len();
         for c in &suffix {
             e.encode(c).unwrap();
         }

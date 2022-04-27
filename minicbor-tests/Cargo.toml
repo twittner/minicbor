@@ -12,7 +12,7 @@ repository  = "https://gitlab.com/twittner/minicbor"
 __test-partial-skip-support = ["minicbor/__test-partial-skip-support"]
 
 [dependencies]
-minicbor = { path = "../minicbor", features = ["std", "half", "derive", "legacy"] }
+minicbor = { path = "../minicbor", features = ["std", "half", "derive"] }
 
 [dev-dependencies]
 criterion  = "0.3"

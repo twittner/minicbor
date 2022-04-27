@@ -6,7 +6,7 @@
 
 # minicbor
 
-## `0.16.0`
+## `0.16.0-rc.1`
 
 - ⚠️ **Breaking** ⚠️: The `Encode` and `Decode` traits are now parameterised by a context type and
   the context value is passed as another argument to `Encode::encode` and `Decode::decode`.
@@ -38,6 +38,11 @@
       fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> { ... }
   }
   ```
+- ⚠️ **Breaking** ⚠️: The type `data::Cbor` has been removed. To write pre-existing CBOR bytes use
+  `Encoder::writer_mut` with `Write::write_all` and to access raw CBOR bytes from the decoder use
+  `Decoder::input`.
+- ⚠️ **Breaking** ⚠️: The `AsRef` impl for `Encoder` has been removed. Use `Encoder::writer` instead.
+- `Decoder::input` has been added to get a reference to the input bytes.
 - Several new methods have been added to `Decoder` and `Encoder` to work with contexts:
 
     - `Decoder::decode_with`

@@ -140,9 +140,6 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(feature = "legacy")]
-pub mod legacy;
-
 pub mod bytes;
 pub mod data;
 pub mod decode;
@@ -208,7 +205,7 @@ where
 {
     let mut e = Encoder::new(Vec::new());
     x.encode(&mut e, &mut ())?;
-    Ok(e.into_inner())
+    Ok(e.into_writer())
 }
 
 /// Encode a type implementing [`Encode`] and return the encoded byte vector.
@@ -221,7 +218,7 @@ where
 {
     let mut e = Encoder::new(Vec::new());
     x.encode(&mut e, ctx)?;
-    Ok(e.into_inner())
+    Ok(e.into_writer())
 }
 
 /// Display the given CBOR bytes in [diagnostic notation][1].

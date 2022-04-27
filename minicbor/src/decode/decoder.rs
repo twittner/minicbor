@@ -39,6 +39,11 @@ impl<'b> Decoder<'b> {
         self.pos = pos
     }
 
+    /// Get a reference to the input bytes.
+    pub fn input(&self) -> &'b [u8] {
+        self.buf
+    }
+
     /// Get a decoding probe to look ahead what is coming next.
     ///
     /// This will not affect the decoding state of `self` and after the
@@ -654,15 +659,6 @@ impl<'b> Decoder<'b> {
         }
 
         Ok(())
-    }
-
-    /// Consume the remaining bytes as is.
-    pub(crate) fn consume(&mut self) -> Result<&'b [u8], Error> {
-        if let Some(b) = self.buf.get(self.pos ..) {
-            self.pos = self.buf.len();
-            return Ok(b)
-        }
-        Err(Error::end_of_input())
     }
 
     /// Decode a `u64` value beginning with `b`.

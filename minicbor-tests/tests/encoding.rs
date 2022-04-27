@@ -204,7 +204,7 @@ fn index_only_enum() {
         .encode(32u8).unwrap()
         .encode("foo").unwrap();
 
-    let mut d = minicbor::Decoder::new(e.as_ref());
+    let mut d = minicbor::Decoder::new(e.writer());
     assert_eq!(Some(4), d.array().unwrap());
     assert_eq!(E::A, d.probe().decode().unwrap());
     assert_eq!(0, d.probe().u32().unwrap());
@@ -242,7 +242,7 @@ fn regular_enum() {
         .encode(32u8).unwrap()
         .encode("foo").unwrap();
 
-    let mut d = minicbor::Decoder::new(e.as_ref());
+    let mut d = minicbor::Decoder::new(e.writer());
     assert_eq!(Some(4), d.array().unwrap());
     assert_eq!(E::A, d.probe().decode().unwrap());
     assert_eq!(Some(2), d.probe().array().unwrap());
