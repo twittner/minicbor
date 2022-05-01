@@ -248,9 +248,9 @@
 
 # minicbor-derive
 
-## `0.10.0`
+## `0.10.0-rc.1`
 
-- Depends on `minicbor-0.16.0`.
+- Depends on `minicbor-0.16.0-rc.1`.
 - A new attribute `context_bound` has been added to allow constraining the generic context type of
   the derived `Encode` or `Decode` trait impl with a set of trait bounds.
 
@@ -322,9 +322,9 @@
 
 # minicbor-io
 
-## `0.11.0`
+## `0.11.0-rc.1`
 
-- Depends on `minicbor-0.16.0`.
+- Depends on `minicbor-0.16.0-rc.1`.
 - The following new methods have been added:
 
     - `Reader::read_with`
