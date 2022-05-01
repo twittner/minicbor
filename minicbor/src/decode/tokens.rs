@@ -84,7 +84,7 @@ impl<'b> Tokenizer<'b> {
         match self.try_token() {
             Ok(tk) => Ok(tk),
             Err(e) => {
-                let _ = self.decoder.consume(); // drain decoder
+                self.decoder.set_position(self.decoder.input().len()); // drain decoder
                 Err(e)
             }
         }

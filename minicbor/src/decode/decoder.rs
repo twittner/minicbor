@@ -20,8 +20,13 @@ impl<'b> Decoder<'b> {
     }
 
     /// Decode any type that implements [`Decode`].
-    pub fn decode<T: Decode<'b>>(&mut self) -> Result<T, Error> {
-        T::decode(self)
+    pub fn decode<T: Decode<'b, ()>>(&mut self) -> Result<T, Error> {
+        T::decode(self, &mut ())
+    }
+
+    /// Decode any type that implements [`Decode`].
+    pub fn decode_with<C, T: Decode<'b, C>>(&mut self, ctx: &mut C) -> Result<T, Error> {
+        T::decode(self, ctx)
     }
 
     /// Get the current decode position.
@@ -32,6 +37,11 @@ impl<'b> Decoder<'b> {
     /// Set the current decode position.
     pub fn set_position(&mut self, pos: usize) {
         self.pos = pos
+    }
+
+    /// Get a reference to the input bytes.
+    pub fn input(&self) -> &'b [u8] {
+        self.buf
     }
 
     /// Get a decoding probe to look ahead what is coming next.
@@ -352,10 +362,23 @@ impl<'b> Decoder<'b> {
     /// homogenous arrays are supported by this method*.
     pub fn array_iter<T>(&mut self) -> Result<ArrayIter<'_, 'b, T>, Error>
     where
-        T: Decode<'b>
+        T: Decode<'b, ()>
     {
         let len = self.array()?;
         Ok(ArrayIter { decoder: self, len, _mark: marker::PhantomData })
+    }
+
+    /// Iterate over all array elements.
+    ///
+    /// This supports indefinite and definite length arrays and uses the
+    /// [`Decode`] trait to decode each element. Consequently *only
+    /// homogenous arrays are supported by this method*.
+    pub fn array_iter_with<'a, C, T>(&'a mut self, ctx: &'a mut C) -> Result<ArrayIterWithCtx<'a, 'b, C, T>, Error>
+    where
+        T: Decode<'b, C>
+    {
+        let len = self.array()?;
+        Ok(ArrayIterWithCtx { decoder: self, ctx, len, _mark: marker::PhantomData })
     }
 
     /// Begin decoding a map.
@@ -384,11 +407,25 @@ impl<'b> Decoder<'b> {
     /// homogenous maps are supported by this method*.
     pub fn map_iter<K, V>(&mut self) -> Result<MapIter<'_, 'b, K, V>, Error>
     where
-        K: Decode<'b>,
-        V: Decode<'b>
+        K: Decode<'b, ()>,
+        V: Decode<'b, ()>
     {
         let len = self.map()?;
         Ok(MapIter { decoder: self, len, _mark: marker::PhantomData })
+    }
+
+    /// Iterate over all map entries.
+    ///
+    /// This supports indefinite and definite length maps and uses the
+    /// [`Decode`] trait to decode each key and value. Consequently *only
+    /// homogenous maps are supported by this method*.
+    pub fn map_iter_with<'a, C, K, V>(&'a mut self, ctx: &'a mut C) -> Result<MapIterWithCtx<'a, 'b, C, K, V>, Error>
+    where
+        K: Decode<'b, C>,
+        V: Decode<'b, C>
+    {
+        let len = self.map()?;
+        Ok(MapIterWithCtx { decoder: self, ctx, len, _mark: marker::PhantomData })
     }
 
     /// Decode a CBOR tag.
@@ -624,15 +661,6 @@ impl<'b> Decoder<'b> {
         Ok(())
     }
 
-    /// Consume the remaining bytes as is.
-    pub(crate) fn consume(&mut self) -> Result<&'b [u8], Error> {
-        if let Some(b) = self.buf.get(self.pos ..) {
-            self.pos = self.buf.len();
-            return Ok(b)
-        }
-        Err(Error::end_of_input())
-    }
-
     /// Decode a `u64` value beginning with `b`.
     fn unsigned(&mut self, b: u8, p: usize) -> Result<u64, Error> {
         match b {
@@ -778,23 +806,53 @@ impl<'a, 'b> Iterator for StrIter<'a, 'b> {
 pub struct ArrayIter<'a, 'b, T> {
     decoder: &'a mut Decoder<'b>,
     len: Option<u64>,
-    _mark: marker::PhantomData<&'a T>
+    _mark: marker::PhantomData<fn(T)>
 }
 
-impl<'a, 'b, T: Decode<'b>> Iterator for ArrayIter<'a, 'b, T> {
+impl<'a, 'b, T: Decode<'b, ()>> Iterator for ArrayIter<'a, 'b, T> {
     type Item = Result<T, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.len {
             None => match self.decoder.current() {
                 Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
-                Ok(_)     => Some(T::decode(self.decoder)),
+                Ok(_)     => Some(T::decode(self.decoder, &mut ())),
                 Err(e)    => Some(Err(e))
             }
             Some(0) => None,
             Some(n) => {
                 self.len = Some(n - 1);
-                Some(T::decode(self.decoder))
+                Some(T::decode(self.decoder, &mut ()))
+            }
+        }
+    }
+}
+
+/// An iterator over array elements.
+///
+/// Returned from [`Decoder::array_iter_with`].
+#[derive(Debug)]
+pub struct ArrayIterWithCtx<'a, 'b, C, T> {
+    decoder: &'a mut Decoder<'b>,
+    ctx: &'a mut C,
+    len: Option<u64>,
+    _mark: marker::PhantomData<fn(T)>
+}
+
+impl<'a, 'b, C, T: Decode<'b, C>> Iterator for ArrayIterWithCtx<'a, 'b, C, T> {
+    type Item = Result<T, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.len {
+            None => match self.decoder.current() {
+                Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
+                Ok(_)     => Some(T::decode(self.decoder, self.ctx)),
+                Err(e)    => Some(Err(e))
+            }
+            Some(0) => None,
+            Some(n) => {
+                self.len = Some(n - 1);
+                Some(T::decode(self.decoder, self.ctx))
             }
         }
     }
@@ -807,23 +865,23 @@ impl<'a, 'b, T: Decode<'b>> Iterator for ArrayIter<'a, 'b, T> {
 pub struct MapIter<'a, 'b, K, V> {
     decoder: &'a mut Decoder<'b>,
     len: Option<u64>,
-    _mark: marker::PhantomData<&'a (K, V)>
+    _mark: marker::PhantomData<fn(K, V)>
 }
 
 impl<'a, 'b, K, V> Iterator for MapIter<'a, 'b, K, V>
 where
-    K: Decode<'b>,
-    V: Decode<'b>
+    K: Decode<'b, ()>,
+    V: Decode<'b, ()>
 {
     type Item = Result<(K, V), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         fn pair<'b, K, V>(d: &mut Decoder<'b>) -> Result<(K, V), Error>
         where
-            K: Decode<'b>,
-            V: Decode<'b>
+            K: Decode<'b, ()>,
+            V: Decode<'b, ()>
         {
-            Ok((K::decode(d)?, V::decode(d)?))
+            Ok((K::decode(d, &mut ())?, V::decode(d, &mut ())?))
         }
         match self.len {
             None => match self.decoder.current() {
@@ -835,6 +893,47 @@ where
             Some(n) => {
                 self.len = Some(n - 1);
                 Some(pair(self.decoder))
+            }
+        }
+    }
+}
+
+/// An iterator over map entries.
+///
+/// Returned from [`Decoder::map_iter_with`].
+#[derive(Debug)]
+pub struct MapIterWithCtx<'a, 'b, C, K, V> {
+    decoder: &'a mut Decoder<'b>,
+    ctx: &'a mut C,
+    len: Option<u64>,
+    _mark: marker::PhantomData<fn(K, V)>
+}
+
+impl<'a, 'b, C, K, V> Iterator for MapIterWithCtx<'a, 'b, C, K, V>
+where
+    K: Decode<'b, C>,
+    V: Decode<'b, C>
+{
+    type Item = Result<(K, V), Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        fn pair<'b, C, K, V>(d: &mut Decoder<'b>, ctx: &mut C) -> Result<(K, V), Error>
+        where
+            K: Decode<'b, C>,
+            V: Decode<'b, C>
+        {
+            Ok((K::decode(d, ctx)?, V::decode(d, ctx)?))
+        }
+        match self.len {
+            None => match self.decoder.current() {
+                Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
+                Ok(_)  => Some(pair(self.decoder, self.ctx)),
+                Err(e) => Some(Err(e))
+            }
+            Some(0) => None,
+            Some(n) => {
+                self.len = Some(n - 1);
+                Some(pair(self.decoder, self.ctx))
             }
         }
     }

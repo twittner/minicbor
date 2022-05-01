@@ -3,6 +3,7 @@
 #![allow(unused)]
 
 use minicbor::{Encode, Encoder, Decode, Decoder, bytes::ByteSlice};
+use minicbor::decode;
 use std::borrow::Cow;
 
 mod bytes;
@@ -140,4 +141,41 @@ struct Trans2<'a>(#[n(0)] Bar<'a>);
 #[derive(Encode, Decode)]
 #[cbor(transparent)]
 struct Trans3<'a>(#[b(0)] Bar<'a>);
+
+#[derive(Encode, Decode)]
+#[cbor(context_bound = "AsMut<AC>")]
+struct A(#[n(0)] u8);
+
+#[derive(Encode, Decode)]
+#[cbor(context_bound = "AsMut<BC>")]
+struct B(#[n(0)] u8);
+
+#[derive(Encode, Decode)]
+#[cbor(context_bound = "AsMut<AC> + AsMut<BC>")]
+struct C {
+    #[n(0)] a: A,
+    #[n(1)] b: B
+}
+
+struct AC { a: u8 }
+
+impl AsMut<AC> for AC {
+    fn as_mut(&mut self) -> &mut AC { self }
+}
+
+struct BC { b: u8 }
+
+impl AsMut<BC> for BC {
+    fn as_mut(&mut self) -> &mut BC { self }
+}
+
+struct CC(AC, BC);
+
+impl AsMut<AC> for CC {
+    fn as_mut(&mut self) -> &mut AC { &mut self.0 }
+}
+
+impl AsMut<BC> for CC {
+    fn as_mut(&mut self) -> &mut BC { &mut self.1 }
+}
 

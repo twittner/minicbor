@@ -6,12 +6,6 @@ use crate::encode::{Encode, Error, Write};
 #[derive(Debug, Clone)]
 pub struct Encoder<W> { writer: W }
 
-impl<W> AsRef<W> for Encoder<W> {
-    fn as_ref(&self) -> &W {
-        &self.writer
-    }
-}
-
 impl<W: Write> Encoder<W> {
     /// Construct an `Encoder` that writes to the given [`Write`] sink.
     pub fn new(writer: W) -> Encoder<W> {
@@ -19,13 +13,35 @@ impl<W: Write> Encoder<W> {
     }
 
     /// Get back the [`Write`] impl.
+    #[deprecated(note = "use Encoder::into_writer instead")]
     pub fn into_inner(self) -> W {
         self.writer
     }
 
+    /// Access the inner writer.
+    pub fn writer(&self) -> &W {
+        &self.writer
+    }
+
+    /// Get mutable access to the inner writer.
+    pub fn writer_mut(&mut self) -> &mut W {
+        &mut self.writer
+    }
+
+    /// Get back the [`Write`] impl.
+    pub fn into_writer(self) -> W {
+        self.writer
+    }
+
     /// Encode any type that implements [`Encode`].
-    pub fn encode<T: Encode>(&mut self, x: T) -> Result<&mut Self, Error<W::Error>> {
-        x.encode(self)?;
+    pub fn encode<T: Encode<()>>(&mut self, x: T) -> Result<&mut Self, Error<W::Error>> {
+        x.encode(self, &mut ())?;
+        Ok(self)
+    }
+
+    /// Encode any type that implements [`Encode`].
+    pub fn encode_with<C, T: Encode<C>>(&mut self, x: T, ctx: &mut C) -> Result<&mut Self, Error<W::Error>> {
+        x.encode(self, ctx)?;
         Ok(self)
     }
 

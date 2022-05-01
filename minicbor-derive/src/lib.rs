@@ -100,6 +100,7 @@
 //! - [`#[cbor(decode_bound)]`](#cbordecode_bound--)
 //! - [`#[cbor(encode_bound)]`](#cborencode_bound--)
 //! - [`#[cbor(bound)]`](#cborbound)
+//! - [`#[cbor(context_bound)]`](#cborcontext_bound--)
 //!
 //! ## `#[n(...)]` and `#[b(...)]` (or `#[cbor(n(...))]` and `#[cbor(b(...))]`)
 //!
@@ -153,7 +154,7 @@
 //! ```no_run
 //! use minicbor::decode::{Decoder, Error};
 //!
-//! fn decode<'b, T: 'b>(d: &mut Decoder<'b>) -> Result<T, Error> {
+//! fn decode<'b, C, T: 'b>(d: &mut Decoder<'b>, ctx: &mut C) -> Result<T, Error> {
 //!     todo!()
 //! }
 //! ```
@@ -166,7 +167,7 @@
 //! ```no_run
 //! use minicbor::encode::{Encoder, Error, Write};
 //!
-//! fn encode<T, W: Write>(v: &T, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> {
+//! fn encode<C, T, W: Write>(v: &T, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
 //!     todo!()
 //! }
 //! ```
@@ -225,6 +226,75 @@
 //! Combines [`#[cbor(encode_bound = "...")]`](#cborencode_bound--) and
 //! [`#[cbor(decode_bound = "...")]`](#cbordecode_bound--), i.e. the bound applies
 //! to the derived `Encode` and `Decode` impl.
+//!
+//! ## `#[cbor(context_bound = "...")]`
+//!
+//! When deriving `Encode` or `Decode` for a type which has parts that constrain the
+//! generic context type parameter, this attribute can be used to add the required
+//! trait bounds to the context type parameter. The attribute can either be repeated
+//! or the bounds can be listed as '+'-separated value, e.g. "A + B + C".
+//!
+//! ```no_run
+//! use minicbor::{Encode, Decode};
+//! use minicbor::decode::{self, Decoder};
+//!
+//! // Some decodable type that uses a custom context.
+//! struct A(u8);
+//!
+//! // `A`'s context type.
+//! struct AC { a: u8 }
+//!
+//! impl AsMut<AC> for AC {
+//!     fn as_mut(&mut self) -> &mut AC { self }
+//! }
+//!
+//! impl<'b, C: AsMut<AC>> Decode<'b, C> for A {
+//!     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, decode::Error> {
+//!         Ok(A(ctx.as_mut().a))
+//!     }
+//! }
+//!
+//! // Another decodable type that uses a different context.
+//! struct B(u8);
+//!
+//! // `B`'s context type.
+//! struct BC { b: u8 }
+//!
+//! impl AsMut<BC> for BC {
+//!     fn as_mut(&mut self) -> &mut BC { self }
+//! }
+//!
+//! impl<'b, C: AsMut<BC>> Decode<'b, C> for B {
+//!     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, decode::Error> {
+//!         Ok(B(ctx.as_mut().b))
+//!     }
+//! }
+//!
+//! // Finally, a type that combines `A` and `B` and therefore also needs to provide
+//! // a context that can be used by both of them.
+//! #[derive(Decode)]
+//! #[cbor(context_bound = "AsMut<AC> + AsMut<BC>")]
+//! struct C {
+//!     #[n(0)] a: A,
+//!     #[n(1)] b: B
+//! }
+//!
+//! // The combined context type.
+//! struct CC(AC, BC);
+//!
+//! impl AsMut<AC> for CC {
+//!     fn as_mut(&mut self) -> &mut AC {
+//!         &mut self.0
+//!     }
+//! }
+//!
+//! impl AsMut<BC> for CC {
+//!     fn as_mut(&mut self) -> &mut BC {
+//!         &mut self.1
+//!     }
+//! }
+//!
+//! ```
 //!
 //! # Implicit borrowing
 //!
@@ -529,5 +599,21 @@ where
             p.bounds.push(bound.clone())
         }
     }
+}
+
+fn add_typeparam<'a, I>(g: &syn::Generics, mut t: syn::TypeParam, b: Option<I>) -> syn::Generics
+where
+    I: Iterator<Item = &'a syn::TraitBound>
+{
+    let mut g2 = g.clone();
+    if let Some(bounds) = b {
+        t.bounds.extend(bounds.cloned().map(syn::TypeParamBound::Trait))
+    }
+    g2.params = Some(t.into()).into_iter().chain(g2.params).collect();
+    g2
+}
+
+fn gen_ctx_param() -> syn::Result<syn::TypeParam> {
+    syn::parse_str("Ctx")
 }
 

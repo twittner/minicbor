@@ -5,7 +5,7 @@ pub mod codec;
 pub mod encoding;
 pub mod idx;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::Hash;
 use std::iter;
@@ -30,7 +30,8 @@ enum Kind {
     TypeParam,
     Nil,
     IsNil,
-    HasNil
+    HasNil,
+    ContextBound
 }
 
 #[derive(Debug, Clone)]
@@ -42,7 +43,8 @@ enum Value {
     TypeParam(TypeParams, proc_macro2::Span),
     Nil(syn::ExprPath, proc_macro2::Span),
     IsNil(syn::ExprPath, proc_macro2::Span),
-    HasNil(proc_macro2::Span)
+    HasNil(proc_macro2::Span),
+    ContextBound(HashSet<syn::TraitBound>, proc_macro2::Span)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -201,6 +203,19 @@ impl Attributes {
                         } else {
                             return Err(syn::Error::new(arg.span(), "string required"))
                         }
+                    } else if arg.path.is_ident("context_bound") {
+                        if let syn::Lit::Str(path) = &arg.lit {
+                            let mut s = HashSet::new();
+                            for b in path.value().split('+') {
+                                if b.is_empty() {
+                                    continue
+                                }
+                                s.insert(syn::parse_str::<syn::TraitBound>(b.trim())?);
+                            }
+                            attrs.try_insert(Kind::ContextBound, Value::ContextBound(s, nested.span()))?
+                        } else {
+                            return Err(syn::Error::new(arg.span(), "string required"))
+                        }
                     } else {
                         return Err(syn::Error::new(nested.span(), "unknown attribute"))
                     }
@@ -247,6 +262,10 @@ impl Attributes {
         self.get(Kind::TypeParam).and_then(|v| v.type_params())
     }
 
+    pub fn context_bound(&self) -> Option<impl Iterator<Item = &syn::TraitBound>> {
+        self.get(Kind::ContextBound).and_then(|v| v.context_bound())
+    }
+
     pub fn transparent(&self) -> bool {
         self.contains_key(Kind::Transparent)
     }
@@ -276,6 +295,7 @@ impl Attributes {
             Level::Struct => match key {
                 | Kind::Encoding
                 | Kind::Transparent
+                | Kind::ContextBound
                 => {}
                 | Kind::TypeParam
                 | Kind::Codec
@@ -300,6 +320,7 @@ impl Attributes {
                 | Kind::Encoding
                 | Kind::IndexOnly
                 | Kind::Transparent
+                | Kind::ContextBound
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -308,6 +329,7 @@ impl Attributes {
             Level::Enum => match key {
                 | Kind::Encoding
                 | Kind::IndexOnly
+                | Kind::ContextBound
                 => {}
                 | Kind::TypeParam
                 | Kind::Codec
@@ -332,6 +354,7 @@ impl Attributes {
                 | Kind::Nil
                 | Kind::IsNil
                 | Kind::HasNil
+                | Kind::ContextBound
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -358,6 +381,13 @@ impl Attributes {
                 let s = val.span();
                 if let Value::TypeParam(p, _) = val {
                     cb.try_merge(s, p)?;
+                    return Ok(())
+                }
+                return Err(syn::Error::new(s, "duplicate attribute"))
+            } else if let Some(Value::ContextBound(cb, _)) = self.get_mut(key) {
+                let s = val.span();
+                if let Value::ContextBound(x, _) = val {
+                    cb.extend(x);
                     return Ok(())
                 }
                 return Err(syn::Error::new(s, "duplicate attribute"))
@@ -461,14 +491,15 @@ impl Attributes {
 impl Value {
     fn span(&self) -> proc_macro2::Span {
         match self {
-            Value::TypeParam(_, s) => *s,
-            Value::Codec(_, s)     => *s,
-            Value::Encoding(_, s)  => *s,
-            Value::Index(_, s)     => *s,
-            Value::Span(s)         => *s,
-            Value::Nil(_, s)       => *s,
-            Value::IsNil(_, s)     => *s,
-            Value::HasNil(s)       => *s
+            Value::TypeParam(_, s)    => *s,
+            Value::Codec(_, s)        => *s,
+            Value::Encoding(_, s)     => *s,
+            Value::Index(_, s)        => *s,
+            Value::Span(s)            => *s,
+            Value::Nil(_, s)          => *s,
+            Value::IsNil(_, s)        => *s,
+            Value::HasNil(s)          => *s,
+            Value::ContextBound(_, s) => *s
         }
     }
 
@@ -499,6 +530,14 @@ impl Value {
     fn type_params(&self) -> Option<&TypeParams> {
         if let Value::TypeParam(t, _) = self {
             Some(t)
+        } else {
+            None
+        }
+    }
+
+    fn context_bound(&self) -> Option<impl Iterator<Item = &syn::TraitBound>> {
+        if let Value::ContextBound(x, _) = self {
+            Some(x.iter())
         } else {
             None
         }

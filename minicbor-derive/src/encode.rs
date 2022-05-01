@@ -1,5 +1,6 @@
 use crate::Mode;
 use crate::{add_bound_to_type_params, collect_type_params, is_option};
+use crate::{add_typeparam, gen_ctx_param};
 use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
 use crate::fields::Fields;
 use crate::variants::Variants;
@@ -54,7 +55,10 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         add_bound_to_type_params(bound, params, &blacklist, &fields.attrs, Mode::Encode);
     }
 
-    let (impl_generics, typ_generics, where_clause) = inp.generics.split_for_impl();
+    let gen = add_typeparam(&inp.generics, gen_ctx_param()?, attrs.context_bound());
+    let impl_generics = gen.split_for_impl().0;
+
+    let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     // If transparent, just forward the encode call to the inner type.
     if attrs.transparent() {
@@ -70,8 +74,8 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let statements = encode_fields(&fields, true, encoding, &custom_enc)?;
 
     Ok(quote! {
-        impl #impl_generics minicbor::Encode for #name #typ_generics #where_clause {
-            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
+        impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {
+            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut Ctx) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
                 __W777: minicbor::encode::Write
             {
@@ -178,7 +182,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         add_bound_to_type_params(bound, params, &blacklist, &field_attrs, Mode::Encode);
     }
 
-    let (impl_generics, typ_generics, where_clause) = inp.generics.split_for_impl();
+    let gen = add_typeparam(&inp.generics, gen_ctx_param()?, enum_attrs.context_bound());
+    let impl_generics = gen.split_for_impl().0;
+
+    let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     let body = if rows.is_empty() {
         quote! {
@@ -193,8 +200,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     };
 
     Ok(quote! {
-        impl #impl_generics minicbor::Encode for #name #typ_generics #where_clause {
-            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
+        impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {
+            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut Ctx) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
                 __W777: minicbor::encode::Write
             {
@@ -331,14 +338,14 @@ fn encode_fields
                     (IS_NAME, HAS_SELF) => quote! {
                         if !#is_nil(&self.#ident) {
                             __e777.u32(#idx)?;
-                            #encode_fn(&self.#ident, __e777)?
+                            #encode_fn(&self.#ident, __e777, __ctx777)?
                         }
                     },
                     // tuple struct
                     (IS_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
                             __e777.u32(#idx)?;
-                            #encode_fn(#ident, __e777)?
+                            #encode_fn(#ident, __e777, __ctx777)?
                         }
                     },
                     // enum struct
@@ -347,7 +354,7 @@ fn encode_fields
                         quote! {
                             if !#is_nil(&self.#i) {
                                 __e777.u32(#idx)?;
-                                #encode_fn(&self.#i, __e777)?
+                                #encode_fn(&self.#i, __e777, __ctx777)?
                             }
                         }
                     }
@@ -355,7 +362,7 @@ fn encode_fields
                     (NO_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
                             __e777.u32(#idx)?;
-                            #encode_fn(#ident, __e777)?
+                            #encode_fn(#ident, __e777, __ctx777)?
                         }
                     }
                 };
@@ -386,12 +393,12 @@ fn encode_fields
                                 for _ in 0 .. #gaps {
                                     __e777.null()?;
                                 }
-                                #encode_fn(&self.#ident, __e777)?
+                                #encode_fn(&self.#ident, __e777, __ctx777)?
                             }
                         },
                         (IS_NAME, HAS_SELF, NO_GAPS) => quote! {
                             if #idx <= __i777 {
-                                #encode_fn(&self.#ident, __e777)?
+                                #encode_fn(&self.#ident, __e777, __ctx777)?
                             }
                         },
                         // enum struct
@@ -400,12 +407,12 @@ fn encode_fields
                                 for _ in 0 .. #gaps {
                                     __e777.null()?;
                                 }
-                                #encode_fn(#ident, __e777)?
+                                #encode_fn(#ident, __e777, __ctx777)?
                             }
                         },
                         (IS_NAME, NO_SELF, NO_GAPS) => quote! {
                             if #idx <= __i777 {
-                                #encode_fn(#ident, __e777)?
+                                #encode_fn(#ident, __e777, __ctx777)?
                             }
                         },
                         // tuple struct
@@ -416,7 +423,7 @@ fn encode_fields
                                     for _ in 0 .. #gaps {
                                         __e777.null()?;
                                     }
-                                    #encode_fn(&self.#i, __e777)?
+                                    #encode_fn(&self.#i, __e777, __ctx777)?
                                 }
                             }
                         }
@@ -424,7 +431,7 @@ fn encode_fields
                             let i = syn::Index::from(*i);
                             quote! {
                                 if #idx <= __i777 {
-                                    #encode_fn(&self.#i, __e777)?
+                                    #encode_fn(&self.#i, __e777, __ctx777)?
                                 }
                             }
                          }
@@ -434,12 +441,12 @@ fn encode_fields
                                 for _ in 0 .. #gaps {
                                     __e777.null()?;
                                 }
-                                #encode_fn(#ident, __e777)?
+                                #encode_fn(#ident, __e777, __ctx777)?
                             }
                         },
                         (NO_NAME, NO_SELF, NO_GAPS) => quote! {
                             if #idx <= __i777 {
-                                #encode_fn(#ident, __e777)?
+                                #encode_fn(#ident, __e777, __ctx777)?
                             }
                         }
                     };
@@ -509,19 +516,19 @@ fn make_transparent_impl
         };
 
     Ok(quote! {
-        impl #impl_generics minicbor::Encode for #name #typ_generics #where_clause {
-            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
+        impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {
+            fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut Ctx) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
                 __W777: minicbor::encode::Write
             {
-                self.#ident.encode(__e777)
+                self.#ident.encode(__e777, __ctx777)
             }
         }
     })
 }
 
 fn gen_encode_bound() -> syn::Result<syn::TypeParamBound> {
-    syn::parse_str("minicbor::Encode")
+    syn::parse_str("minicbor::Encode<Ctx>")
 }
 
 fn is_nil(ty: &syn::Type, codec: &Option<CustomCodec>) -> proc_macro2::TokenStream {
@@ -534,6 +541,6 @@ fn is_nil(ty: &syn::Type, codec: &Option<CustomCodec>) -> proc_macro2::TokenStre
             quote!((|_| false))
         }
     } else {
-        quote!(minicbor::Encode::is_nil)
+        quote!(minicbor::Encode::<Ctx>::is_nil)
     }
 }

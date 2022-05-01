@@ -33,8 +33,8 @@ impl Arbitrary for Cbor {
     }
 }
 
-impl Encode for Cbor {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+impl<C> Encode<C> for Cbor {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
         encode_value(&self.0, e)
     }
 }

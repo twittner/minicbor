@@ -6,6 +6,64 @@
 
 # minicbor
 
+## `0.16.0-rc.1`
+
+- ⚠️ **Breaking** ⚠️: The `Encode` and `Decode` traits are now parameterised by a context type and
+  the context value is passed as another argument to `Encode::encode` and `Decode::decode` (see
+  merge request !21 and issue #26 for details).
+  Implementations of these traits that do not make use of the context need to be generic in the
+  type variable and accept the context parameter, e.g. instead of
+
+  ```rust
+  struct T;
+
+  impl Encode for T {
+      fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), Error<W::Error>> { ... }
+  }
+
+  impl<'b> Decode<'b> for T {
+      fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> { ... }
+  }
+  ```
+
+  one would now write:
+
+  ```rust
+  struct T;
+
+  impl<C> Encode<C> for T {
+      fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> { ... }
+  }
+
+  impl<'b, C> Decode<'b, C> for T {
+      fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> { ... }
+  }
+  ```
+- ⚠️ **Breaking** ⚠️: The type `data::Cbor` has been removed. To write pre-existing CBOR bytes use
+  `Encoder::writer_mut` with `Write::write_all` and to access raw CBOR bytes from the decoder use
+  `Decoder::input`.
+- ⚠️ **Breaking** ⚠️: The `AsRef` impl for `Encoder` has been removed. Use `Encoder::writer` instead.
+- ⚠️ **Breaking** ⚠️: The legacy module and feature flag have been removed.
+- `Decoder::input` has been added to get a reference to the input bytes.
+- The newtypes `minicbor::encode::{ArrayIter, MapIter}` have been added to encode any clonable
+  iterator as a CBOR array or map.
+- Several new methods have been added to `Decoder` and `Encoder` to work with contexts:
+
+    - `Decoder::decode_with`
+    - `Decoder::array_iter_with`
+    - `Decoder::map_iter_with`
+    - `Encoder::encode_with`
+
+  These correspond to the existing variants without the `_with` suffix which do not accept a context
+  and fix the context type to `()`. Note that generic implementations of `Decode` and `Encoder` must
+  therefore use the versions which accept a context parameter.
+
+  Other additions include the crate-level functions:
+
+    - `encode_with`
+    - `decode_with`
+    - `to_vec_with`
+
 ## `0.15.0`
 
 - ⚠️ **Breaking** ⚠️: The encoding of IP addresses changed (see commit fac39d5a). This affects the
@@ -190,6 +248,12 @@
 
 # minicbor-derive
 
+## `0.10.0-rc.1`
+
+- Depends on `minicbor-0.16.0-rc.1`.
+- A new attribute `context_bound` has been added to allow constraining the generic context type of
+  the derived `Encode` or `Decode` trait impl with a set of trait bounds.
+
 ## `0.9.0`
 
 - Depends on `minicbor-0.14.0`.
@@ -257,6 +321,19 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.11.0-rc.1`
+
+- Depends on `minicbor-0.16.0-rc.1`.
+- The following new methods have been added:
+
+    - `Reader::read_with`
+    - `AsyncReader::read_with`
+    - `Writer::write_with`
+    - `AsyncWriter::write_with`
+
+  These accept an additional context parameter and the existing variants fix the context to the
+  unit type.
 
 ## `0.10.0`
 

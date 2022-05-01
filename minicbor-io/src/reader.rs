@@ -53,7 +53,12 @@ impl<R: io::Read> Reader<R> {
     ///
     /// Reading 0 bytes when decoding the length prefix results in `Ok(None)`,
     /// otherwise either `Some` value or an error is returned.
-    pub fn read<'a, T: Decode<'a>>(&'a mut self) -> Result<Option<T>, Error> {
+    pub fn read<'a, T: Decode<'a, ()>>(&'a mut self) -> Result<Option<T>, Error> {
+        self.read_with(&mut ())
+    }
+
+    /// Like [`Reader::read`] but accepting a user provided decoding context.
+    pub fn read_with<'a, C, T: Decode<'a, C>>(&'a mut self, ctx: &mut C) -> Result<Option<T>, Error> {
         let mut buf = [0; 4];
         let mut len = 0;
         while len < 4 {
@@ -77,7 +82,7 @@ impl<R: io::Read> Reader<R> {
         self.buffer.clear();
         self.buffer.resize(len, 0u8);
         self.reader.read_exact(&mut self.buffer)?;
-        minicbor::decode(&self.buffer).map_err(Error::Decode).map(Some)
+        minicbor::decode_with(&self.buffer, ctx).map_err(Error::Decode).map(Some)
     }
 }
 

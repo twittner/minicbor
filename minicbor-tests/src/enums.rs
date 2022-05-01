@@ -3,11 +3,11 @@ use minicbor::{Encode, Encoder, Decode, Decoder, decode, encode::{self, Write}};
 mod unit {
     use super::*;
 
-    pub(super) fn encode<W: Write>(_x: &Unit, _e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+    pub(super) fn encode<C, W: Write>(_x: &Unit, _e: &mut Encoder<W>, _c: &mut C) -> Result<(), encode::Error<W::Error>> {
         unimplemented!()
     }
 
-    pub(super) fn decode(_d: &mut Decoder<'_>) -> Result<Unit, decode::Error> {
+    pub(super) fn decode<C>(_d: &mut Decoder<'_>, _c: &mut C) -> Result<Unit, decode::Error> {
         unimplemented!()
     }
 }
@@ -46,11 +46,11 @@ enum E3 {
 mod generic {
     use super::*;
 
-    pub(super) fn encode<T, W: Write>(_x: &T, _e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+    pub(super) fn encode<C, T, W: Write>(_x: &T, _e: &mut Encoder<W>, _c: &mut C) -> Result<(), encode::Error<W::Error>> {
         unimplemented!()
     }
 
-    pub(super) fn decode<T>(_d: &mut Decoder<'_>) -> Result<T, decode::Error> {
+    pub(super) fn decode<C, T>(_d: &mut Decoder<'_>, _c: &mut C) -> Result<T, decode::Error> {
         unimplemented!()
     }
 }
@@ -95,11 +95,11 @@ enum GE3<T, U, Z> {
 mod borrow {
     use super::*;
 
-    pub(super) fn encode<W: Write>(x: &str, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+    pub(super) fn encode<C, W: Write>(x: &str, e: &mut Encoder<W>, _c: &mut C) -> Result<(), encode::Error<W::Error>> {
         e.str(x)?.ok()
     }
 
-    pub(super) fn decode<'a>(d: &mut Decoder<'a>) -> Result<&'a str, decode::Error> {
+    pub(super) fn decode<'a, C>(d: &mut Decoder<'a>, _c: &mut C) -> Result<&'a str, decode::Error> {
         d.str()
     }
 }

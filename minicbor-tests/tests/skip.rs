@@ -46,7 +46,7 @@ quickcheck::quickcheck! {
         for c in &prefix {
             e.encode(c).unwrap();
         }
-        let p = e.as_ref().len();
+        let p = e.writer().len();
         for c in &suffix {
             e.encode(c).unwrap();
         }
@@ -65,43 +65,43 @@ quickcheck::quickcheck! {
 
 // Trait impls ///////////////////////////////////////////////////////////////////////////////////
 
-impl Encode for Cbor {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+impl<C> Encode<C> for Cbor {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
         match self {
             Cbor::Int(i) => e.u8(*i)?.ok(),
             Cbor::Array(a) => {
                 e.array(a.len() as u64)?;
                 for x in a {
-                    x.encode(e)?;
+                    x.encode(e, ctx)?;
                 }
                 Ok(())
             }
             Cbor::ArrayIndef(a) => {
                 e.begin_array()?;
                 for x in a {
-                    x.encode(e)?;
+                    x.encode(e, ctx)?;
                 }
                 e.end()?.ok()
             }
             Cbor::Map(m) => {
                 e.map(m.len() as u64)?;
                 for (k, v) in m {
-                    k.encode(e)?;
-                    v.encode(e)?;
+                    k.encode(e, ctx)?;
+                    v.encode(e, ctx)?;
                 }
                 Ok(())
             }
             Cbor::MapIndef(m) => {
                 e.begin_map()?;
                 for (k, v) in m {
-                    k.encode(e)?;
-                    v.encode(e)?;
+                    k.encode(e, ctx)?;
+                    v.encode(e, ctx)?;
                 }
                 e.end()?.ok()
             }
             Cbor::Tagged(t, v) => {
                 e.tag(*t)?;
-                e.encode(v)?.ok()
+                e.encode_with(v, ctx)?.ok()
             }
             Cbor::String(s) => e.str(&s)?.ok(),
             Cbor::Bytes(b)  => e.bytes(&b)?.ok(),
@@ -123,15 +123,15 @@ impl Encode for Cbor {
     }
 }
 
-impl<'b> Decode<'b> for Cbor {
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, decode::Error> {
+impl<'b, C> Decode<'b, C> for Cbor {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, decode::Error> {
         match d.datatype()? {
             Type::U8 => d.u8().map(Cbor::Int),
             Type::Array => {
                 if let Some(n) = d.array()? {
                     let mut v = Vec::new();
                     for _ in 0 .. n {
-                        v.push(Self::decode(d)?)
+                        v.push(Self::decode(d, ctx)?)
                     }
                     Ok(Cbor::Array(v))
                 } else {
@@ -142,7 +142,7 @@ impl<'b> Decode<'b> for Cbor {
                 if let None = d.array()? {
                     let mut v = Vec::new();
                     while Type::Break != d.datatype()? {
-                        v.push(Self::decode(d)?)
+                        v.push(Self::decode(d, ctx)?)
                     }
                     d.skip()?;
                     Ok(Cbor::ArrayIndef(v))
@@ -154,8 +154,8 @@ impl<'b> Decode<'b> for Cbor {
                 if let Some(n) = d.map()? {
                     let mut m = BTreeMap::new();
                     for _ in 0 .. n {
-                        let k = Self::decode(d)?;
-                        let v = Self::decode(d)?;
+                        let k = Self::decode(d, ctx)?;
+                        let v = Self::decode(d, ctx)?;
                         m.insert(k, v);
                     }
                     Ok(Cbor::Map(m))
@@ -167,8 +167,8 @@ impl<'b> Decode<'b> for Cbor {
                 if let None = d.map()? {
                     let mut m = BTreeMap::new();
                     while Type::Break != d.datatype()? {
-                        let k = Self::decode(d)?;
-                        let v = Self::decode(d)?;
+                        let k = Self::decode(d, ctx)?;
+                        let v = Self::decode(d, ctx)?;
                         m.insert(k, v);
                     }
                     d.skip()?;
@@ -179,7 +179,7 @@ impl<'b> Decode<'b> for Cbor {
             }
             Type::Tag => {
                 let t = d.tag()?;
-                let v = Self::decode(d)?;
+                let v = Self::decode(d, ctx)?;
                 Ok(Cbor::Tagged(t, Box::new(v)))
             }
             Type::String => {

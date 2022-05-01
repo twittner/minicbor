@@ -1,4 +1,4 @@
-use minicbor::{Decode, Decoder, Encoder, data::{Tag, Type}};
+use minicbor::{Decoder, Encoder, data::{Tag, Type}};
 use std::{collections::BTreeMap, iter::FromIterator};
 
 // Test vectors of RFC 7049
@@ -16,7 +16,7 @@ macro_rules! roundtrip {
 
         let mut e = Encoder::new(Vec::new());
         e.$method(v).unwrap();
-        let y = hex::encode(e.into_inner());
+        let y = hex::encode(e.into_writer());
         assert_eq!($s, y);
     }}
 }
@@ -109,7 +109,7 @@ fn rfc_tv_tagged() {
         let mut e = Encoder::new(Vec::new());
         e.tag(Tag::DateTime).unwrap();
         e.str("2013-03-21T20:04:00Z").unwrap();
-        let y = hex::encode(e.into_inner());
+        let y = hex::encode(e.into_writer());
         assert_eq!(s, y);
     }
 
@@ -125,7 +125,7 @@ fn rfc_tv_tagged() {
         let mut e = Encoder::new(Vec::new());
         e.tag(Tag::Timestamp).unwrap();
         e.u32(1363896240).unwrap();
-        let y = hex::encode(e.into_inner());
+        let y = hex::encode(e.into_writer());
         assert_eq!(s, y);
     }
 
@@ -141,7 +141,7 @@ fn rfc_tv_tagged() {
         let mut e = Encoder::new(Vec::new());
         e.tag(Tag::Timestamp).unwrap();
         e.f64(1363896240.5).unwrap();
-        let y = hex::encode(e.into_inner());
+        let y = hex::encode(e.into_writer());
         assert_eq!(s, y);
     }
 
@@ -157,7 +157,7 @@ fn rfc_tv_tagged() {
         let mut e = Encoder::new(Vec::new());
         e.tag(Tag::ToBase16).unwrap();
         e.bytes(&[1, 2, 3, 4][..]).unwrap();
-        let y = hex::encode(e.into_inner());
+        let y = hex::encode(e.into_writer());
         assert_eq!(s, y);
     }
 
@@ -176,8 +176,8 @@ fn rfc_tv_tagged() {
         e.str("IETF").unwrap();
         let mut f = Encoder::new(Vec::new());
         f.tag(Tag::Cbor).unwrap();
-        f.bytes(e.as_ref()).unwrap();
-        let y = hex::encode(f.into_inner());
+        f.bytes(e.writer()).unwrap();
+        let y = hex::encode(f.into_writer());
         assert_eq!(s, y);
     }
 
@@ -193,7 +193,7 @@ fn rfc_tv_tagged() {
         let mut e = Encoder::new(Vec::new());
         e.tag(Tag::Uri).unwrap();
         e.str("http://www.example.com").unwrap();
-        let y = hex::encode(e.into_inner());
+        let y = hex::encode(e.into_writer());
         assert_eq!(s, y);
     }
 }
@@ -228,7 +228,7 @@ fn rfc_tv_bytes_indef() {
     e.bytes(&[1, 2]).unwrap();
     e.bytes(&[3, 4, 5]).unwrap();
     e.end().unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("5f42010243030405ff", y);
 }
 
@@ -245,7 +245,7 @@ fn rfc_tv_string_indef() {
     e.str("strea").unwrap();
     e.str("ming").unwrap();
     e.end().unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("7f657374726561646d696e67ff", y);
 }
 
@@ -256,12 +256,12 @@ fn rfc_tv_array() {
     assert_eq!(Some(0), d.array().unwrap());
     let mut e = Encoder::new(Vec::new());
     e.array(0).unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("80", y);
 
     let x = hex::decode("83010203").unwrap();
     let mut d = Decoder::new(&x);
-    assert_eq!(vec![1, 2, 3], (Decode::decode(&mut d) as Result<Vec<u8>, _>).unwrap());
+    assert_eq!(vec![1, 2, 3], (d.decode() as Result<Vec<u8>, _>).unwrap());
     let y = hex::encode(minicbor::to_vec([1, 2, 3]).unwrap());
     assert_eq!("83010203", y);
 
@@ -284,7 +284,7 @@ fn rfc_tv_array() {
     e.array(2).unwrap();
     e.u8(4).unwrap();
     e.u8(5).unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("8301820203820405", y);
 
     let x = hex::decode("98190102030405060708090a0b0c0d0e0f101112131415161718181819").unwrap();
@@ -308,7 +308,7 @@ fn rfc_tv_array() {
     e.map(1).unwrap();
     e.str("b").unwrap();
     e.str("c").unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("826161a161626163", y);
 }
 
@@ -321,7 +321,7 @@ fn rfc_tv_array_indef() {
     let mut e = Encoder::new(Vec::new());
     e.begin_array().unwrap();
     e.end().unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("9fff", y);
 
     let x = hex::decode("9f018202039f0405ffff").unwrap();
@@ -349,7 +349,7 @@ fn rfc_tv_array_indef() {
     e.u8(5).unwrap();
     e.end().unwrap();
     e.end().unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("9f018202039f0405ffff", y);
 
     let x = hex::decode("9f01820203820405ff").unwrap();
@@ -374,7 +374,7 @@ fn rfc_tv_array_indef() {
     e.u8(4).unwrap();
     e.u8(5).unwrap();
     e.end().unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("9f01820203820405ff", y);
 
     let x = hex::decode("83018202039f0405ff").unwrap();
@@ -399,7 +399,7 @@ fn rfc_tv_array_indef() {
     e.u8(4).unwrap();
     e.u8(5).unwrap();
     e.end().unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("83018202039f0405ff", y);
 
     let x = hex::decode("83019f0203ff820405").unwrap();
@@ -424,7 +424,7 @@ fn rfc_tv_array_indef() {
     e.array(2).unwrap();
     e.u8(4).unwrap();
     e.u8(5).unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("83019f0203ff820405", y);
 
     let x = hex::decode("9f0102030405060708090a0b0c0d0e0f101112131415161718181819ff").unwrap();
@@ -439,7 +439,7 @@ fn rfc_tv_array_indef() {
             e.u8(i).unwrap();
         }
         e.end().unwrap();
-        e.into_inner()
+        e.into_writer()
     });
     assert_eq!("9f0102030405060708090a0b0c0d0e0f101112131415161718181819ff", y);
 
@@ -459,7 +459,7 @@ fn rfc_tv_array_indef() {
     e.str("b").unwrap();
     e.str("c").unwrap();
     e.end().unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("826161bf61626163ff", y);
 }
 
@@ -471,7 +471,7 @@ fn rfc_tv_map() {
     assert_eq!(Some(0), d.map().unwrap());
     let mut e = Encoder::new(Vec::new());
     e.map(0).unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("a0", y);
 
     let x = hex::decode("a201020304").unwrap();
@@ -497,7 +497,7 @@ fn rfc_tv_map() {
     e.array(2).unwrap();
     e.u8(2).unwrap();
     e.u8(3).unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("a26161016162820203", y);
 
     let x = hex::decode("a56161614161626142616361436164614461656145").unwrap();
@@ -529,7 +529,7 @@ fn rfc_tv_map() {
     e.u8(3).unwrap();
     e.end().unwrap();
     e.end().unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("bf61610161629f0203ffff", y);
 
     let x = hex::decode("bf6346756ef563416d7421ff").unwrap();
@@ -548,7 +548,7 @@ fn rfc_tv_map() {
     e.str("Amt").unwrap();
     e.i8(-2).unwrap();
     e.end().unwrap();
-    let y = hex::encode(e.into_inner());
+    let y = hex::encode(e.into_writer());
     assert_eq!("bf6346756ef563416d7421ff", y);
 }
 
