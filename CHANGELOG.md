@@ -43,7 +43,10 @@
   `Encoder::writer_mut` with `Write::write_all` and to access raw CBOR bytes from the decoder use
   `Decoder::input`.
 - ⚠️ **Breaking** ⚠️: The `AsRef` impl for `Encoder` has been removed. Use `Encoder::writer` instead.
+- ⚠️ **Breaking** ⚠️: The legacy module and feature flag have been removed.
 - `Decoder::input` has been added to get a reference to the input bytes.
+- The newtypes `minicbor::encode::{ArrayIter, MapIter}` have been added to encode any clonable
+  iterator as a CBOR array or map.
 - Several new methods have been added to `Decoder` and `Encoder` to work with contexts:
 
     - `Decoder::decode_with`
