@@ -6,7 +6,7 @@ mod decoder;
 mod error;
 
 pub use decoder::{Decoder, Probe};
-pub use decoder::{ArrayIterWithCtx, BytesIter, MapIterWithCtx, StrIter};
+pub use decoder::{ArrayIter, ArrayIterWithCtx, BytesIter, MapIter, MapIterWithCtx, StrIter};
 pub use error::Error;
 
 #[cfg(feature = "half")]

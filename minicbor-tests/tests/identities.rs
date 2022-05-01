@@ -1,6 +1,8 @@
 use minicbor::{Encode, Encoder, Decode, Decoder};
 use minicbor::data::{Int, Type};
+use minicbor::encode;
 use quickcheck::quickcheck;
+use std::collections::HashMap;
 use std::marker::PhantomData;
 
 fn identity<T: Encode<()> + Eq + for<'a> Decode<'a, ()>>(arg: T) -> bool {
@@ -520,5 +522,45 @@ fn undefined() {
     let mut dec = Decoder::new(buf.as_ref());
     assert!(dec.undefined().is_ok());
     assert_eq!(1, dec.position())
+}
+
+#[test]
+fn array_iter1() {
+    fn property(arg: Vec<u32>) -> bool {
+        let a = minicbor::to_vec(&arg).unwrap();
+        let b = minicbor::to_vec(encode::ArrayIter::new(arg.iter())).unwrap();
+        a == b
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn array_iter2() {
+    fn property(arg: Vec<Vec<u32>>) -> bool {
+        let a = minicbor::to_vec(&arg).unwrap();
+        let b = minicbor::to_vec(encode::ArrayIter::new(arg.iter())).unwrap();
+        a == b
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn map_iter1() {
+    fn property(arg: HashMap<u32, char>) -> bool {
+        let a = minicbor::to_vec(&arg).unwrap();
+        let b = minicbor::to_vec(encode::MapIter::new(arg.iter())).unwrap();
+        a == b
+    }
+    quickcheck(property as fn(_) -> bool)
+}
+
+#[test]
+fn map_iter2() {
+    fn property(arg: HashMap<u32, HashMap<char, u32>>) -> bool {
+        let a = minicbor::to_vec(&arg).unwrap();
+        let b = minicbor::to_vec(encode::MapIter::new(arg.iter())).unwrap();
+        a == b
+    }
+    quickcheck(property as fn(_) -> bool)
 }
 

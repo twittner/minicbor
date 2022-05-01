@@ -120,7 +120,7 @@ where
     S: std::hash::BuildHasher
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
-        e.array(as_u64(self.len()))?;
+        e.array(self.len() as u64)?;
         for x in self {
             x.encode(e, ctx)?
         }
@@ -136,7 +136,7 @@ where
     S: std::hash::BuildHasher
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
-        e.map(as_u64(self.len()))?;
+        e.map(self.len() as u64)?;
         for (k, v) in self {
             k.encode(e, ctx)?;
             v.encode(e, ctx)?;
@@ -152,7 +152,7 @@ where
     V: Encode<C>
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
-        e.map(as_u64(self.len()))?;
+        e.map(self.len() as u64)?;
         for (k, v) in self {
             k.encode(e, ctx)?;
             v.encode(e, ctx)?;
@@ -298,7 +298,7 @@ macro_rules! encode_sequential {
         $(
             impl<C, T: Encode<C>> Encode<C> for $t {
                 fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
-                    e.array(as_u64(self.len()))?;
+                    e.array(self.len() as u64)?;
                     for x in self {
                         x.encode(e, ctx)?
                     }
@@ -533,8 +533,79 @@ impl<C, T: Encode<C>> Encode<C> for core::ops::Bound<T> {
     }
 }
 
-#[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
-fn as_u64(n: usize) -> u64 {
-    n as u64
+/// An encodable iterator writing its items as a CBOR array.
+///
+/// This type wraps any type implementing [`Iterator`] + [`Clone`] and encodes
+/// the items produced by the iterator as a CBOR array.
+#[derive(Debug)]
+pub struct ArrayIter<I>(I);
+
+impl<I> ArrayIter<I> {
+    pub fn new(it: I) -> Self {
+        ArrayIter(it)
+    }
+}
+
+impl<C, I, T> Encode<C> for ArrayIter<I>
+where
+    I: Iterator<Item = T> + Clone,
+    T: Encode<C>
+{
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
+        let iter = self.0.clone();
+        let (low, up) = iter.size_hint();
+        let exact = Some(low) == up;
+        if exact {
+            e.array(low as u64)?;
+        } else {
+            e.begin_array()?;
+        }
+        for item in iter {
+            item.encode(e, ctx)?;
+        }
+        if !exact {
+            e.end()?;
+        }
+        Ok(())
+    }
+}
+
+/// An encodable iterator writing its items as a CBOR map.
+///
+/// This type wraps any type implementing [`Iterator`] + [`Clone`] and encodes
+/// the items produced by the iterator as a CBOR map.
+#[derive(Debug)]
+pub struct MapIter<I>(I);
+
+impl<I> MapIter<I> {
+    pub fn new(it: I) -> Self {
+        MapIter(it)
+    }
+}
+
+impl<C, I, K, V> Encode<C> for MapIter<I>
+where
+    I: Iterator<Item = (K, V)> + Clone,
+    K: Encode<C>,
+    V: Encode<C>
+{
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
+        let iter = self.0.clone();
+        let (low, up) = iter.size_hint();
+        let exact = Some(low) == up;
+        if exact {
+            e.map(low as u64)?;
+        } else {
+            e.begin_map()?;
+        }
+        for (k, v) in iter {
+            k.encode(e, ctx)?;
+            v.encode(e, ctx)?;
+        }
+        if !exact {
+            e.end()?;
+        }
+        Ok(())
+    }
 }
 

@@ -254,3 +254,8 @@ where
 pub fn display<'b>(cbor: &'b [u8]) -> impl core::fmt::Display + 'b {
     decode::Tokenizer::new(cbor)
 }
+
+// Ensure we can safely cast a `usize` to a `u64`.
+const __USIZE_FITS_INTO_U64: () =
+    assert!(core::mem::size_of::<usize>() <= core::mem::size_of::<u64>());
+
