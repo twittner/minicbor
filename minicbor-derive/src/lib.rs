@@ -234,6 +234,10 @@
 //! trait bounds to the context type parameter. The attribute can either be repeated
 //! or the bounds can be listed as '+'-separated value, e.g. "A + B + C".
 //!
+//! ### Example
+//! <details>
+//!     <summary>A combined context.</summary>
+//!
 //! ```no_run
 //! use minicbor::{Encode, Decode};
 //! use minicbor::decode::{self, Decoder};
@@ -295,6 +299,7 @@
 //! }
 //!
 //! ```
+//! </details>
 //!
 //! # Implicit borrowing
 //!
