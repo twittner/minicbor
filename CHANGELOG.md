@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.16.0`
+
+- No change since `0.16.0-rc.1`.
+
 ## `0.16.0-rc.1`
 
 - ⚠️ **Breaking** ⚠️: The `Encode` and `Decode` traits are now parameterised by a context type and
@@ -248,6 +252,10 @@
 
 # minicbor-derive
 
+## `0.10.0`
+
+- Small documentation update.
+
 ## `0.10.0-rc.1`
 
 - Depends on `minicbor-0.16.0-rc.1`.
@@ -321,6 +329,10 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.11.0`
+
+- No change since `0.11.0-rc.1`.
 
 ## `0.11.0-rc.1`
 
