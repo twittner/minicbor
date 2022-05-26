@@ -8,10 +8,11 @@
 //!
 //! If the feature "derive" is present, specialised traits `EncodeBytes` and
 //! `DecodeBytes` are also provided. These are implemented for the
-//! aforementioned newtypes as well as for their `Option` variations and
-//! regular `&[u8]`, `[u8; N]` and `Vec<u8>`. They enable the direct use of
-//! `&[u8]`, `[u8; N]` and `Vec<u8>` in types deriving `Encode` and `Decode`
-//! if used with a `#[cbor(with = "minicbor::bytes")]` annotation.
+//! aforementioned newtypes as well as for their `Option` variations, regular
+//! `&[u8]`, `[u8; N]`, `Vec<u8>` and for `Cow<'_, [u8]>` if the alloc feature
+//! is given. They enable the direct use of `&[u8]`, `[u8; N]`, `Vec<u8>` and
+//! `Cow<'_, [u8]>` in types deriving `Encode` and `Decode` if used with a
+//! `#[cbor(with = "minicbor::bytes")]` annotation.
 
 use crate::decode::{self, Decode, Decoder};
 use crate::encode::{self, Encode, Encoder, Write};
@@ -390,6 +391,21 @@ impl<'b, C, T: DecodeBytes<'b, C>> DecodeBytes<'b, C> for Option<T> {
 
     fn nil() -> Option<Self> {
         Some(None)
+    }
+}
+
+#[cfg(feature = "derive")]
+impl<C> EncodeBytes<C> for Cow<'_, [u8]> {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
+        self.as_ref().encode_bytes(e, ctx)
+    }
+}
+
+#[cfg(feature = "derive")]
+impl<'b, C> DecodeBytes<'b, C> for Cow<'_, [u8]> {
+    fn decode_bytes(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, decode::Error> {
+        let slice = <&'b ByteSlice>::decode_bytes(d, ctx)?;
+        Ok(Cow::Owned(slice.to_owned().into()))
     }
 }
 
