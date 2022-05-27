@@ -110,10 +110,11 @@
 //! decoding input, whereas `n` produces non-borrowed values (but see section
 //! [Implicit borrowing](#implicit-borrowing) below). This means that if a type
 //! is annotated with `#[b(...)]`, all its lifetimes will be constrained to the
-//! input lifetime (`'bytes`). Further, if the type is a `std::borrow::Cow<'_, str>`
-//! or `std::borrow::Cow<'_, minicbor::bytes::ByteSlice>`, the generated code
-//! will decode the `str` or `ByteSlice` and construct a `Cow::Borrowed` variant,
-//! contrary to the regular `Cow` impl of `Decode` which produces owned values.
+//! input lifetime (`'bytes`). Further, if the type is a `Cow<'_, str>`,
+//! `Cow<'_, minicbor::bytes::ByteSlice>` or `Cow<'_, [u8]>` the generated code
+//! will decode the `str`, `ByteSlice` or `[u8]` and construct a `Cow::Borrowed`
+//! variant, contrary to the regular `Cow` impls of `Decode` and `DecodeBytes`
+//! which produce owned values.
 //!
 //! ## `#[cbor(array)]`
 //!
@@ -342,7 +343,10 @@
 //!     field3: Vec<u8>,
 //!
 //!     #[cbor(n(4), with = "minicbor::bytes")]
-//!     field4: [u8; 16]
+//!     field4: [u8; 16],
+//!
+//!     #[cbor(b(5), with = "minicbor::bytes")]
+//!     field5: std::borrow::Cow<'a, [u8]>
 //! }
 //! ```
 //!

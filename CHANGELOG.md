@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.16.1`
+
+- Specialise `Cow<_, [u8]>` by adding implementations of `minicbor::bytes::{EncodeBytes, DecodeBytes}`.
+
 ## `0.16.0`
 
 - No change since `0.16.0-rc.1`.
@@ -251,6 +255,10 @@
 - Added `Encode` and `Decode` impls for tuples (see merge request !1 by @koushiro).
 
 # minicbor-derive
+
+## `0.10.1`
+
+- Update documentation due to changes in `minicbor-0.16.1`.
 
 ## `0.10.0`
 

@@ -23,6 +23,20 @@ struct CowSlice<'a> {
 }
 
 #[derive(Encode, Decode)]
+struct CowSlice2<'a> {
+    #[n(0)]
+    #[cbor(with = "minicbor::bytes")]
+    field: Cow<'a, [u8]>
+}
+
+#[derive(Encode, Decode)]
+struct CowSlice3<'a> {
+    #[b(0)]
+    #[cbor(with = "minicbor::bytes")]
+    field: Cow<'a, [u8]>
+}
+
+#[derive(Encode, Decode)]
 struct Vector {
     #[n(0)]
     #[cbor(with = "minicbor::bytes")]
