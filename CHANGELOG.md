@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.17.0`
+
+- Depend on `minicbor-derive-0.11.0`.
+
 ## `0.16.1`
 
 - Specialise `Cow<_, [u8]>` by adding implementations of `minicbor::bytes::{EncodeBytes, DecodeBytes}`.
@@ -256,6 +260,12 @@
 
 # minicbor-derive
 
+## `0.11.0`
+
+- Improve `#[cbor(transparent)]`: Previously, custom encode/decode functions where not allowed,
+  preventing the use of `with = "minicbor::bytes`. Explicit borrowing from `Cow`s did also not
+  work, creating owned `Cow` values instead.
+
 ## `0.10.1`
 
 - Update documentation due to changes in `minicbor-0.16.1`.
@@ -337,6 +347,10 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.12.0`
+
+- Depend on `minicbor-0.17.0`.
 
 ## `0.11.0`
 
