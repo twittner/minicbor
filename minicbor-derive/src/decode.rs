@@ -1,7 +1,7 @@
 use crate::Mode;
 use crate::{add_bound_to_type_params, collect_type_params, is_cow, is_option, is_str, is_byte_slice};
 use crate::{add_typeparam, gen_ctx_param};
-use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
+use crate::attrs::{Attributes, CustomCodec, Encoding, Idx, Level};
 use crate::fields::Fields;
 use crate::variants::Variants;
 use crate::lifetimes::{gen_lifetime, lifetimes_to_constrain, add_lifetime};
@@ -74,9 +74,11 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             let msg = "#[cbor(transparent)] requires a struct with one field";
             return Err(syn::Error::new(inp.ident.span(), msg))
         }
+        let i = fields.indices.first().expect("struct has 1 field");
+        let t = fields.types.first().expect("struct has 1 field");
         let f = data.fields.iter().next().expect("struct has 1 field");
         let a = fields.attrs.first().expect("struct has 1 field");
-        return make_transparent_impl(&inp.ident, f, a, impl_generics, typ_generics, where_clause)
+        return make_transparent_impl(&inp.ident, f, *i, t, a, impl_generics, typ_generics, where_clause)
     }
 
     let field_str  = fields.idents.iter().map(|n| format!("{}::{}", name, n)).collect::<Vec<_>>();
@@ -383,26 +385,47 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
 fn make_transparent_impl
     ( name: &syn::Ident
     , field: &syn::Field
+    , index: Idx
+    , typ: &syn::Type
     , attrs: &Attributes
     , impl_generics: syn::ImplGenerics
     , typ_generics: syn::TypeGenerics
     , where_clause: Option<&syn::WhereClause>
     ) -> syn::Result<proc_macro2::TokenStream>
 {
-    if attrs.codec().map(CustomCodec::is_decode).unwrap_or(false) {
-        let msg  = "`decode_with` or `with` not allowed with #[cbor(transparent)]";
-        let span = field.ident.as_ref().map(|i| i.span()).unwrap_or_else(|| field.ty.span());
-        return Err(syn::Error::new(span, msg))
-    }
+    let default_decode_fn: syn::ExprPath = syn::parse_str("minicbor::Decode::decode")?;
+
+    let decode_fn = attrs.codec()
+        .filter(|cc| cc.is_decode())
+        .and_then(CustomCodec::to_decode_path)
+        .unwrap_or_else(|| default_decode_fn.clone());
 
     let call =
-        if let Some(id) = &field.ident {
+        if index.is_b() && is_cow(typ, |t| is_str(t) || is_byte_slice(t)) {
+            if let Some(id) = &field.ident {
+                quote! {
+                    Ok(#name {
+                        #id: match #decode_fn(__d777, __ctx777) {
+                            Ok(v)  => minicbor::bytes::Cow::Borrowed(v),
+                            Err(e) => return Err(e)
+                        }
+                    })
+                }
+            } else {
+                quote! {
+                    Ok(#name(match #decode_fn(__d777, __ctx777) {
+                        Ok(v)  => minicbor::bytes::Cow::Borrowed(v),
+                        Err(e) => return Err(e)
+                    }))
+                }
+            }
+        } else if let Some(id) = &field.ident {
             quote! {
-                Ok(#name { #id: minicbor::Decode::decode(__d777, __ctx777)? })
+                Ok(#name { #id: #decode_fn(__d777, __ctx777)? })
             }
         } else {
             quote! {
-                Ok(#name(minicbor::Decode::decode(__d777, __ctx777)?))
+                Ok(#name(#decode_fn(__d777, __ctx777)?))
             }
         };
 
