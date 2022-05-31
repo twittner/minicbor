@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use minicbor::{Encoder, Decoder};
 use minicbor::data::{Int, MAX_INT, MIN_INT};
 use quickcheck::{quickcheck, TestResult};

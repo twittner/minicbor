@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 //! Test forward and backward compatibility.
 
 use minicbor::{Encode, Decode};

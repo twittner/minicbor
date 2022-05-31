@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use minicbor::{Encode, Decode};
 
 const NULL: u8 = 0xf6;

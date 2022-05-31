@@ -18,10 +18,7 @@ features = ["std", "derive", "half"]
 alloc   = []
 std     = ["alloc"]
 derive  = ["minicbor-derive", "alloc"]
-partial-skip-support   = []
-partial-derive-support = ["minicbor-derive", "partial-skip-support"]
-# Internal feature flags used for testing only:
-__test-partial-skip-support = []
+partial-derive-support = ["minicbor-derive"]
 
 [dependencies]
 minicbor-derive = { version = "0.11.0", path = "../minicbor-derive", optional = true }

@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use minicbor::{Encode, Decode};
 use minicbor::bytes::{ByteArray, ByteSlice, ByteVec};
 use std::borrow::Cow;

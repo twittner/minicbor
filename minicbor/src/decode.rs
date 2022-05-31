@@ -90,7 +90,7 @@ impl<'b, C> Decode<'b, C> for alloc::boxed::Box<str> {
 impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for Option<T> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         if crate::data::Type::Null == d.datatype()? {
-            d.limited_skip()?;
+            d.skip()?;
             return Ok(None)
         }
         T::decode(d, ctx).map(Some)
@@ -441,7 +441,7 @@ macro_rules! decode_fields {
             Some(n) => for i in 0 .. n {
                 match i {
                     $($n => $x = Some(Decode::decode($d, $c)?),)*
-                    _    => $d.limited_skip()?
+                    _    => $d.skip()?
                 }
             }
             None => {
@@ -449,11 +449,11 @@ macro_rules! decode_fields {
                 while $d.datatype()? != crate::data::Type::Break {
                     match i {
                         $($n => $x = Some(Decode::decode($d, $c)?),)*
-                        _    => $d.limited_skip()?
+                        _    => $d.skip()?
                     }
                     i += 1
                 }
-                $d.limited_skip()?
+                $d.skip()?
             }
         }
 
@@ -645,7 +645,7 @@ impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::ops::Bound<T> {
         match d.u32()? {
             0 => d.decode_with(ctx).map(core::ops::Bound::Included),
             1 => d.decode_with(ctx).map(core::ops::Bound::Excluded),
-            2 => d.limited_skip().map(|_| core::ops::Bound::Unbounded),
+            2 => d.skip().map(|_| core::ops::Bound::Unbounded),
             n => Err(Error::unknown_variant(n).at(p))
         }
     }

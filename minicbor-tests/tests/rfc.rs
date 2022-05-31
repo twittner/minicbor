@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use minicbor::{Decoder, Encoder, data::{Tag, Type}};
 use std::{collections::BTreeMap, iter::FromIterator};
 
