@@ -8,6 +8,9 @@
 
 ## `0.17.0`
 
+- Remove cargo feature `partial-skip-support`. The method `Decoder::skip` is now always available.
+  With cargo feature `alloc`, every CBOR item can be skipped over, otherwise attempting to skip
+  over indefinite-length arrays or maps inside of regular arrays or maps will result in an error.
 - Depend on `minicbor-derive-0.11.0`.
 
 ## `0.16.1`
