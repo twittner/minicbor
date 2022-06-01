@@ -9,10 +9,12 @@ description = "minicbor test suite"
 repository  = "https://gitlab.com/twittner/minicbor"
 
 [features]
-__test-partial-skip-support = ["minicbor/__test-partial-skip-support"]
+alloc                  = []
+std                    = ["alloc", "minicbor/std", "minicbor/derive"]
+partial-derive-support = ["alloc", "minicbor/partial-derive-support"]
 
 [dependencies]
-minicbor = { path = "../minicbor", features = ["std", "half", "derive"] }
+minicbor = { path = "../minicbor", features = ["half"] }
 
 [dev-dependencies]
 criterion  = "0.3"

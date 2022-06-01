@@ -501,18 +501,18 @@ fn make_transparent_impl
     , where_clause: Option<&syn::WhereClause>
     ) -> syn::Result<proc_macro2::TokenStream>
 {
-    if attrs.codec().map(CustomCodec::is_encode).unwrap_or(false) {
-        let msg  = "`encode_with` or `with` not allowed with #[cbor(transparent)]";
-        let span = field.ident.as_ref().map(|i| i.span()).unwrap_or_else(|| field.ty.span());
-        return Err(syn::Error::new(span, msg))
-    }
+    let default_encode_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::encode")?;
 
-    let ident =
+    let encode_fn = attrs.codec()
+        .filter(|cc| cc.is_encode())
+        .and_then(CustomCodec::to_encode_path)
+        .unwrap_or_else(|| default_encode_fn.clone());
+
+    let call =
         if let Some(id) = &field.ident {
-            quote!(#id)
+            quote!(#encode_fn(&self.#id, __e777, __ctx777))
         } else {
-            let id = syn::Index::from(0);
-            quote!(#id)
+            quote!(#encode_fn(&self.0, __e777, __ctx777))
         };
 
     Ok(quote! {
@@ -521,7 +521,7 @@ fn make_transparent_impl
             where
                 __W777: minicbor::encode::Write
             {
-                self.#ident.encode(__e777, __ctx777)
+                #call
             }
         }
     })

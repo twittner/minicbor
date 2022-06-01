@@ -1,6 +1,6 @@
 [package]
 name          = "minicbor"
-version       = "0.16.1"
+version       = "0.17.0"
 authors       = ["Toralf Wittner <tw@dtex.org>"]
 license       = "BlueOak-1.0.0"
 edition       = "2021"
@@ -18,13 +18,10 @@ features = ["std", "derive", "half"]
 alloc   = []
 std     = ["alloc"]
 derive  = ["minicbor-derive", "alloc"]
-partial-skip-support   = []
-partial-derive-support = ["minicbor-derive", "partial-skip-support"]
-# Internal feature flags used for testing only:
-__test-partial-skip-support = []
+partial-derive-support = ["minicbor-derive"]
 
 [dependencies]
-minicbor-derive = { version = "0.10.1", path = "../minicbor-derive", optional = true }
+minicbor-derive = { version = "0.11.0", path = "../minicbor-derive", optional = true }
 half            = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]

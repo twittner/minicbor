@@ -1,9 +1,14 @@
+#![cfg(feature = "alloc")]
+
+extern crate alloc;
+
+use alloc::collections::btree_map::BTreeMap;
+use alloc::vec::Vec;
 use minicbor::{Decode, Decoder, Encode, Encoder};
 use minicbor::data::{Tag, Type};
 use minicbor::decode;
 use minicbor::encode::{self, Write};
 use quickcheck::{Arbitrary, Gen};
-use std::collections::BTreeMap;
 
 /// A simplified CBOR data model.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -33,24 +38,24 @@ enum Cbor {
 quickcheck::quickcheck! {
     // Basic check to test encode-decode identity.
     fn identity(item: Cbor) -> bool {
-        let bytes = minicbor::to_vec(&item).unwrap();
-        let cbor: Cbor = minicbor::decode(&bytes).unwrap();
+        let mut e = Encoder::new(Buf(Vec::new()));
+        e.encode(&item).unwrap();
+        let cbor: Cbor = minicbor::decode(&e.writer().0).unwrap();
         cbor == item
     }
 
     // Encode prefix and suffix and when decoding, skip over the prefix and
     // check that the remainder matches the suffix.
     fn skip_prefix(prefix: Vec<Cbor>, suffix: Vec<Cbor>) -> bool {
-        let mut bytes = Vec::new();
-        let mut e = Encoder::new(&mut bytes);
+        let mut e = Encoder::new(Buf(Vec::new()));
         for c in &prefix {
             e.encode(c).unwrap();
         }
-        let p = e.writer().len();
+        let p = e.writer().0.len();
         for c in &suffix {
             e.encode(c).unwrap();
         }
-        let mut d = Decoder::new(&bytes);
+        let mut d = Decoder::new(&e.writer().0);
         for _ in 0 .. prefix.len() {
             d.skip().unwrap()
         }
@@ -60,6 +65,18 @@ quickcheck::quickcheck! {
             v.push(d.decode().unwrap())
         }
         suffix == v
+    }
+}
+
+// Custom impl to not require "alloc" feature in minicbor.
+struct Buf(Vec<u8>);
+
+impl encode::Write for Buf {
+    type Error = core::convert::Infallible;
+
+    fn write_all(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
+        self.0.extend_from_slice(bytes);
+        Ok(())
     }
 }
 
@@ -101,7 +118,7 @@ impl<C> Encode<C> for Cbor {
             }
             Cbor::Tagged(t, v) => {
                 e.tag(*t)?;
-                e.encode_with(v, ctx)?.ok()
+                e.encode_with(&**v, ctx)?.ok()
             }
             Cbor::String(s) => e.str(&s)?.ok(),
             Cbor::Bytes(b)  => e.bytes(&b)?.ok(),
@@ -211,7 +228,7 @@ impl<'b, C> Decode<'b, C> for Cbor {
 
 impl Arbitrary for Cbor {
     fn arbitrary(g: &mut Gen) -> Self {
-        if cfg!(feature = "__test-partial-skip-support") {
+        if cfg!(feature = "partial-derive-support") {
             gen_cbor(g, false, 3)
         } else {
             gen_cbor(g, true, 3)

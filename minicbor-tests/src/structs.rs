@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use minicbor::{Encode, Encoder, Decode, Decoder, decode, encode::{self, Write}};
 
 mod unit {

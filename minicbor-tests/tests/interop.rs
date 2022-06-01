@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use minicbor::{data, decode, Decoder, encode::{self, Write}, Encode, Encoder};
 use quickcheck::{Arbitrary, Gen};
 use rand::Rng;

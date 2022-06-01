@@ -1,6 +1,6 @@
 [package]
 name          = "minicbor-derive"
-version       = "0.10.1"
+version       = "0.11.0"
 authors       = ["Toralf Wittner <tw@dtex.org>"]
 license       = "BlueOak-1.0.0"
 edition       = "2021"

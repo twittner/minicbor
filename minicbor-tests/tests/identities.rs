@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use minicbor::{Encode, Encoder, Decode, Decoder};
 use minicbor::data::{Int, Type};
 use minicbor::encode;
