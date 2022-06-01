@@ -21,6 +21,9 @@ use core::ops::{Deref, DerefMut};
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
+#[cfg(feature = "derive")]
+use alloc::borrow::ToOwned;
+
 /// Re-export of `alloc::borrow::Cow`.
 #[cfg(feature = "alloc")]
 pub use alloc::borrow::Cow;
