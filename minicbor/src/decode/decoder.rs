@@ -591,8 +591,10 @@ impl<'b> Decoder<'b> {
         Ok(())
     }
 
-    /// Skip over any CBOR item as long as it is not an indefinite-length
-    /// map or array inside of a regular array or map.
+    /// Skip over the current CBOR value.
+    ///
+    /// Without feature `alloc`, skipping over maps or arrays that contain an
+    /// indefinite-length map or array will return an error.
     #[cfg(not(feature = "alloc"))]
     pub fn skip(&mut self) -> Result<(), Error> {
         let mut nrounds = 1u64; // number of iterations over array and map elements
