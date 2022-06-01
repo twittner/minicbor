@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.17.1`
+
+- Fix missing import for cargo feature `derive`.
+
 ## `0.17.0`
 
 - Remove cargo feature `partial-skip-support`. The method `Decoder::skip` is now always available.
