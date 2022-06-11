@@ -36,12 +36,7 @@
 //! - `"std"`: Implies `"alloc"` and enables more functionality that depends
 //!   on the `std` crate.
 //!
-//! - `"derive"`: Implies `"alloc"` and allows deriving [`Encode`] and
-//!   [`Decode`] traits.
-//!
-//! - `"partial-derive-support"`: Allows deriving [`Encode`] and [`Decode`]
-//!   traits, but does not support indefinite-length CBOR maps and arrays
-//!   inside of regular CBOR maps and arrays.
+//! - `"derive"`: Allows deriving [`Encode`] and [`Decode`] traits.
 //!
 //! # Example: generic encoding and decoding
 //!
@@ -151,7 +146,7 @@ const BREAK: u8    = 0xff;
 pub use decode::{Decode, Decoder};
 pub use encode::{Encode, Encoder};
 
-#[cfg(any(feature = "derive", feature = "partial-derive-support"))]
+#[cfg(feature = "derive")]
 pub use minicbor_derive::*;
 
 /// Decode a type implementing [`Decode`] from the given byte slice.

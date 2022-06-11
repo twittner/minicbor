@@ -9,9 +9,9 @@ description = "minicbor test suite"
 repository  = "https://gitlab.com/twittner/minicbor"
 
 [features]
-alloc                  = []
-std                    = ["alloc", "minicbor/std", "minicbor/derive"]
-partial-derive-support = ["alloc", "minicbor/partial-derive-support"]
+alloc  = []
+std    = ["alloc", "minicbor/std", "minicbor/derive"]
+derive = ["alloc", "minicbor/derive"]
 
 [dependencies]
 minicbor = { path = "../minicbor", features = ["half"] }

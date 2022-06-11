@@ -343,10 +343,7 @@
 //!     field3: Vec<u8>,
 //!
 //!     #[cbor(n(4), with = "minicbor::bytes")]
-//!     field4: [u8; 16],
-//!
-//!     #[cbor(b(5), with = "minicbor::bytes")]
-//!     field5: std::borrow::Cow<'a, [u8]>
+//!     field4: [u8; 16]
 //! }
 //! ```
 //!
