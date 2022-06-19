@@ -36,12 +36,7 @@
 //! - `"std"`: Implies `"alloc"` and enables more functionality that depends
 //!   on the `std` crate.
 //!
-//! - `"derive"`: Implies `"alloc"` and allows deriving [`Encode`] and
-//!   [`Decode`] traits.
-//!
-//! - `"partial-derive-support"`: Allows deriving [`Encode`] and [`Decode`]
-//!   traits, but does not support indefinite-length CBOR maps and arrays
-//!   inside of regular CBOR maps and arrays.
+//! - `"derive"`: Allows deriving [`Encode`] and [`Decode`] traits.
 //!
 //! # Example: generic encoding and decoding
 //!
@@ -151,8 +146,14 @@ const BREAK: u8    = 0xff;
 pub use decode::{Decode, Decoder};
 pub use encode::{Encode, Encoder};
 
-#[cfg(any(feature = "derive", feature = "partial-derive-support"))]
+#[cfg(feature = "derive")]
 pub use minicbor_derive::*;
+
+#[cfg(feature = "alloc")]
+use core::convert::Infallible;
+
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 
 /// Decode a type implementing [`Decode`] from the given byte slice.
 pub fn decode<'b, T>(b: &'b [u8]) -> Result<T, decode::Error>
@@ -190,9 +191,9 @@ where
 
 /// Encode a type implementing [`Encode`] and return the encoded byte vector.
 ///
-/// *Requires feature* `"std"`.
-#[cfg(feature = "std")]
-pub fn to_vec<T>(x: T) -> Result<Vec<u8>, encode::Error<std::io::Error>>
+/// *Requires feature* `"alloc"`.
+#[cfg(feature = "alloc")]
+pub fn to_vec<T>(x: T) -> Result<Vec<u8>, encode::Error<Infallible>>
 where
     T: Encode<()>
 {
@@ -203,9 +204,9 @@ where
 
 /// Encode a type implementing [`Encode`] and return the encoded byte vector.
 ///
-/// *Requires feature* `"std"`.
-#[cfg(feature = "std")]
-pub fn to_vec_with<C, T>(x: T, ctx: &mut C) -> Result<Vec<u8>, encode::Error<std::io::Error>>
+/// *Requires feature* `"alloc"`.
+#[cfg(feature = "alloc")]
+pub fn to_vec_with<C, T>(x: T, ctx: &mut C) -> Result<Vec<u8>, encode::Error<Infallible>>
 where
     T: Encode<C>
 {

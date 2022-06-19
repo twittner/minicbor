@@ -317,8 +317,15 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
                 };
 
             let value =
-                if ix.is_b() && is_cow(ty, |t| is_str(t) || is_byte_slice(t)) {
-                    quote!(Some(minicbor::bytes::Cow::Borrowed(__v777)))
+                if cfg!(any(feature = "alloc", feature = "std"))
+                    && ix.is_b()
+                    && is_cow(ty, |t| is_str(t) || is_byte_slice(t))
+                {
+                    if cfg!(feature = "std") {
+                        quote!(Some(std::borrow::Cow::Borrowed(__v777)))
+                    } else {
+                        quote!(Some(alloc::borrow::Cow::Borrowed(__v777)))
+                    }
                 } else {
                     quote!(Some(__v777))
                 };
@@ -382,6 +389,7 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
 }
 
 /// Forward the decoding because of a `#[cbor(transparent)]` attribute.
+#[allow(clippy::too_many_arguments)]
 fn make_transparent_impl
     ( name: &syn::Ident
     , field: &syn::Field
@@ -401,12 +409,21 @@ fn make_transparent_impl
         .unwrap_or_else(|| default_decode_fn.clone());
 
     let call =
-        if index.is_b() && is_cow(typ, |t| is_str(t) || is_byte_slice(t)) {
+        if cfg!(any(feature = "alloc", feature = "std"))
+            && index.is_b()
+            && is_cow(typ, |t| is_str(t) || is_byte_slice(t))
+        {
+            let cow =
+                if cfg!(feature = "std") {
+                    quote!(std::borrow::Cow::Borrowed(v))
+                } else {
+                    quote!(alloc::borrow::Cow::Borrowed(v))
+                };
             if let Some(id) = &field.ident {
                 quote! {
                     Ok(#name {
                         #id: match #decode_fn(__d777, __ctx777) {
-                            Ok(v)  => minicbor::bytes::Cow::Borrowed(v),
+                            Ok(v)  => #cow,
                             Err(e) => return Err(e)
                         }
                     })
@@ -414,7 +431,7 @@ fn make_transparent_impl
             } else {
                 quote! {
                     Ok(#name(match #decode_fn(__d777, __ctx777) {
-                        Ok(v)  => minicbor::bytes::Cow::Borrowed(v),
+                        Ok(v)  => #cow,
                         Err(e) => return Err(e)
                     }))
                 }
