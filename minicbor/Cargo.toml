@@ -15,10 +15,9 @@ build         = "build.rs"
 features = ["std", "derive", "half"]
 
 [features]
-alloc   = []
-std     = ["alloc"]
-derive  = ["minicbor-derive", "alloc"]
-partial-derive-support = ["minicbor-derive"]
+alloc  = ["minicbor-derive?/alloc"]
+std    = ["alloc", "minicbor-derive?/std"]
+derive = ["minicbor-derive"]
 
 [dependencies]
 minicbor-derive = { version = "0.11.0", path = "../minicbor-derive", optional = true }

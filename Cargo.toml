@@ -1,5 +1,5 @@
 [workspace]
-members = ["minicbor", "minicbor-derive", "minicbor-io", "minicbor-tests"]
+members = ["minicbor", "minicbor-derive", "minicbor-io", "minicbor-tests", "minicbor-tests-client"]
 exclude = ["minicbor-tests-nostd"]
 
 [profile.bench]

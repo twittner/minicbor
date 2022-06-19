@@ -1,0 +1,14 @@
+[package]
+publish = false
+name    = "minicbor-tests-client"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+alloc  = ["minicbor/alloc"]
+derive = ["minicbor/derive"]
+half   = ["minicbor/half"]
+std    = ["minicbor/std"]
+
+[dependencies]
+minicbor = { path = "../minicbor" }

@@ -19,12 +19,14 @@ test-stable:
   stage: test
   image: "rust:latest"
   script:
+    - make check
     - make test
 
 test-nightly:
   stage: test
   image: "rustlang/rust:nightly"
   script:
+    - make check
     - make test
 
 pages:
