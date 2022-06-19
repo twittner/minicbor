@@ -6,6 +6,17 @@
 
 # minicbor
 
+## `0.18.0`
+
+- Remove feature `partial-derive-support`. `Encode` and `Decode` can always be derived. See
+  commits 21060b3272d4d09af88aa8543f682c8c4477a886 and 9038d3cced197588ae4d8d2c891d6f51029a9e7d
+  for details.
+- Rework `encode::Write` impls. The blanket impl for types implementing `std::io::Write` has
+  been removed. The impl for `Vec<u8>` now always uses `Infallible` as its error type and
+  `minicbor::{to_vec, to_vec_with}` no longer require feature "std". See commit
+  498043ddce69e3da0dcc66593afdeea0dd058fb8 for details.
+- Depend on `minicbor-derive-0.12.0`.
+
 ## `0.17.1`
 
 - Fix missing import for cargo feature `derive`.
@@ -267,6 +278,13 @@
 
 # minicbor-derive
 
+## `0.12.0`
+
+- Add features "alloc" and "std" to import the correct `Cow` depending on feature use.
+  (See commit 21060b3272d4d09af88aa8543f682c8c4477a886 for details.)
+- Clarify what ignoring fields means and how it relates to the "alloc" feature.
+  (See commit 9038d3cced197588ae4d8d2c891d6f51029a9e7d for details.)
+
 ## `0.11.0`
 
 - Improve `#[cbor(transparent)]`: Previously, custom encode/decode functions where not allowed,
@@ -354,6 +372,12 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.13.0`
+
+- Depend on `minicbor-0.18.0`.
+- `minicbor_io::Error::Encode` now contains a `minicbor::encode::Error<Infallible>`.
+  (See commit 498043ddce69e3da0dcc66593afdeea0dd058fb8 for details.)
 
 ## `0.12.0`
 
