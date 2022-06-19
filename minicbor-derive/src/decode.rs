@@ -389,6 +389,7 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
 }
 
 /// Forward the decoding because of a `#[cbor(transparent)]` attribute.
+#[allow(clippy::too_many_arguments)]
 fn make_transparent_impl
     ( name: &syn::Ident
     , field: &syn::Field

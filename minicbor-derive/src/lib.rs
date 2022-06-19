@@ -16,7 +16,7 @@
 //! or variant names. Instead, every field and every constructor needs to be
 //! annotated with an (unsigned) index number, e.g. `#[n(1)]`.
 //!
-//! 2. Unknown fields are ignored during decoding.
+//! 2. Unknown fields are ignored during decoding.[^1]
 //!
 //! 3. Optional types default to `None` if their value is not present during
 //! decoding.
@@ -423,6 +423,12 @@
 //! as they may turn a dense type into a sparse one over time. This also applies
 //! to [`#[cbor(index_only)]`](#cborindex_only) which should be used only with
 //! enums which are not expected to ever have fields in their variants.
+//!
+//! [^1]: CBOR items are ignored using `Decoder::skip`. This method requires
+//! feature "alloc" to work for all possible CBOR items. Without "alloc",
+//! indefinite maps or arrays inside of regular maps or arrays can not be skipped
+//! over. If such a combination occurs and `Decoder::skip` was compiled without
+//! feature "alloc", a decoding error is returned.
 
 #![allow(clippy::many_single_char_names)]
 
