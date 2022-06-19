@@ -1,3 +1,4 @@
+use core::convert::Infallible;
 use std::{fmt, io};
 
 /// Possible read/write errors.
@@ -9,7 +10,7 @@ pub enum Error {
     /// A decoding error occured.
     Decode(minicbor::decode::Error),
     /// An encoding error occured.
-    Encode(minicbor::encode::Error<io::Error>),
+    Encode(minicbor::encode::Error<Infallible>),
     /// The length preceding the CBOR value is not valid.
     InvalidLen
 }
@@ -42,8 +43,8 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<minicbor::encode::Error<io::Error>> for Error {
-    fn from(e: minicbor::encode::Error<io::Error>) -> Self {
+impl From<minicbor::encode::Error<Infallible>> for Error {
+    fn from(e: minicbor::encode::Error<Infallible>) -> Self {
         Error::Encode(e)
     }
 }
