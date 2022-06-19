@@ -7,11 +7,11 @@ mod derive {
 
     #[derive(Encode, Decode)]
     struct S<'a> {
-        #[b(0)] foo: &'a str,
+        #[b(0)] a: &'a str,
         #[cfg(feature = "alloc")]
-        #[b(1)] bar: alloc::borrow::Cow<'a, str>,
+        #[b(1)] b: alloc::borrow::Cow<'a, str>,
         #[cfg(feature = "std")]
-        #[b(2)] baz: std::borrow::Cow<'a, str>
+        #[b(2)] c: std::borrow::Cow<'a, str>
     }
 }
 
