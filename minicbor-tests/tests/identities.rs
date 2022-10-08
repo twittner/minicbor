@@ -1,14 +1,16 @@
 #![cfg(feature = "std")]
 
-use minicbor::{Encode, Encoder, Decode, Decoder};
+use minicbor::{Encode, Encoder, CborLen, Decode, Decoder};
 use minicbor::data::{Int, Type};
 use minicbor::encode;
 use quickcheck::quickcheck;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-fn identity<T: Encode<()> + Eq + for<'a> Decode<'a, ()>>(arg: T) -> bool {
+fn identity<T: CborLen + Encode<()> + Eq + for<'a> Decode<'a, ()>>(arg: T) -> bool {
+    let len = arg.cbor_len();
     let vec = minicbor::to_vec(&arg).unwrap();
+    assert_eq!(len, vec.len());
     let mut dec = Decoder::new(&vec);
     let val = dec.decode().unwrap();
     assert_eq!(dec.position(), vec.len());
