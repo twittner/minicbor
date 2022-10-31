@@ -2,45 +2,8 @@
 
 use core::fmt;
 use crate::Decoder;
-use crate::data::{Int, Tag, Type};
+use crate::data::Token;
 use crate::decode::Error;
-
-/// Representation of possible CBOR tokens.
-///
-/// *Requires feature* `"half"`.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Token<'b> {
-    Bool(bool),
-    U8(u8),
-    U16(u16),
-    U32(u32),
-    U64(u64),
-    I8(i8),
-    I16(i16),
-    I32(i32),
-    I64(i64),
-    Int(Int),
-    F16(f32),
-    F32(f32),
-    F64(f64),
-    Bytes(&'b [u8]),
-    String(&'b str),
-    Array(u64),
-    Map(u64),
-    Tag(Tag),
-    Simple(u8),
-    Break,
-    Null,
-    Undefined,
-    /// Start of indefinite byte string.
-    BeginBytes,
-    /// Start of indefinite text string.
-    BeginString,
-    /// Start of indefinite array.
-    BeginArray,
-    /// Start of indefinite map.
-    BeginMap
-}
 
 /// An [`Iterator`] over CBOR tokens.
 ///
@@ -81,65 +44,13 @@ impl<'b> Tokenizer<'b> {
     /// Note that a sequence of tokens may not necessarily represent
     /// well-formed CBOR items.
     pub fn token(&mut self) -> Result<Token<'b>, Error> {
-        match self.try_token() {
+        match self.decoder.token() {
             Ok(tk) => Ok(tk),
             Err(e) => {
                 self.decoder.set_position(self.decoder.input().len()); // drain decoder
                 Err(e)
             }
         }
-    }
-
-    fn try_token(&mut self) -> Result<Token<'b>, Error> {
-        match self.decoder.datatype()? {
-            Type::Bool         => self.decoder.bool().map(Token::Bool),
-            Type::U8           => self.decoder.u8().map(Token::U8),
-            Type::U16          => self.decoder.u16().map(Token::U16),
-            Type::U32          => self.decoder.u32().map(Token::U32),
-            Type::U64          => self.decoder.u64().map(Token::U64),
-            Type::I8           => self.decoder.i8().map(Token::I8),
-            Type::I16          => self.decoder.i16().map(Token::I16),
-            Type::I32          => self.decoder.i32().map(Token::I32),
-            Type::I64          => self.decoder.i64().map(Token::I64),
-            Type::Int          => self.decoder.int().map(Token::Int),
-            Type::F16          => self.decoder.f16().map(Token::F16),
-            Type::F32          => self.decoder.f32().map(Token::F32),
-            Type::F64          => self.decoder.f64().map(Token::F64),
-            Type::Bytes        => self.decoder.bytes().map(Token::Bytes),
-            Type::String       => self.decoder.str().map(Token::String),
-            Type::Tag          => self.decoder.tag().map(Token::Tag),
-            Type::Simple       => self.decoder.simple().map(Token::Simple),
-            Type::Array        => {
-                let p = self.decoder.position();
-                if let Some(n) = self.decoder.array()? {
-                    Ok(Token::Array(n))
-                } else {
-                    Err(Error::type_mismatch(Type::Array).at(p).with_message("missing array length"))
-                }
-            }
-            Type::Map          => {
-                let p = self.decoder.position();
-                if let Some(n) = self.decoder.map()? {
-                    Ok(Token::Map(n))
-                } else {
-                    Err(Error::type_mismatch(Type::Array).at(p).with_message("missing map length"))
-                }
-            }
-            Type::BytesIndef   => { self.skip_byte(); Ok(Token::BeginBytes)  }
-            Type::StringIndef  => { self.skip_byte(); Ok(Token::BeginString) }
-            Type::ArrayIndef   => { self.skip_byte(); Ok(Token::BeginArray)  }
-            Type::MapIndef     => { self.skip_byte(); Ok(Token::BeginMap)    }
-            Type::Null         => { self.skip_byte(); Ok(Token::Null)        }
-            Type::Undefined    => { self.skip_byte(); Ok(Token::Undefined)   }
-            Type::Break        => { self.skip_byte(); Ok(Token::Break)       }
-            t@Type::Unknown(_) => Err(Error::type_mismatch(t)
-                .at(self.decoder.position())
-                .with_message("unknown cbor type"))
-        }
-    }
-
-    fn skip_byte(&mut self) {
-        self.decoder.set_position(self.decoder.position() + 1)
     }
 }
 

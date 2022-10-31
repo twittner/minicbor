@@ -1,5 +1,5 @@
 use crate::{SIGNED, BYTES, TEXT, ARRAY, MAP, TAGGED, SIMPLE};
-use crate::data::{Int, Tag};
+use crate::data::{Int, Tag, Token};
 use crate::encode::{Encode, Error, Write};
 
 /// A non-allocating CBOR encoder writing encoded bytes to the given [`Write`] sink.
@@ -273,6 +273,39 @@ impl<W: Write> Encoder<W> {
     /// Syntactic sugar for `Ok(())`.
     pub fn ok(&mut self) -> Result<(), Error<W::Error>> {
         Ok(())
+    }
+
+    /// Encode a CBOR token.
+    pub fn token(&mut self, t: Token) -> Result<(), Error<W::Error>> {
+        match t {
+            Token::U8(n)       => self.u8(n)?.ok(),
+            Token::U16(n)      => self.u16(n)?.ok(),
+            Token::U32(n)      => self.u32(n)?.ok(),
+            Token::U64(n)      => self.u64(n)?.ok(),
+            Token::I8(n)       => self.i8(n)?.ok(),
+            Token::I16(n)      => self.i16(n)?.ok(),
+            Token::I32(n)      => self.i32(n)?.ok(),
+            Token::I64(n)      => self.i64(n)?.ok(),
+            Token::Int(n)      => self.int(n)?.ok(),
+            Token::Bytes(x)    => self.bytes(x)?.ok(),
+            Token::String(s)   => self.str(s)?.ok(),
+            Token::BeginBytes  => self.begin_bytes()?.ok(),
+            Token::BeginString => self.begin_str()?.ok(),
+            Token::Array(n)    => self.array(n)?.ok(),
+            Token::Map(n)      => self.map(n)?.ok(),
+            Token::BeginArray  => self.begin_array()?.ok(),
+            Token::BeginMap    => self.begin_map()?.ok(),
+            Token::Bool(b)     => self.bool(b)?.ok(),
+            Token::Null        => self.null()?.ok(),
+            Token::Undefined   => self.undefined()?.ok(),
+            Token::Simple(n)   => self.simple(n)?.ok(),
+            Token::Tag(x)      => self.tag(x)?.ok(),
+            #[cfg(feature = "half")]
+            Token::F16(x)      => self.f16(x)?.ok(),
+            Token::F32(x)      => self.f32(x)?.ok(),
+            Token::F64(x)      => self.f64(x)?.ok(),
+            Token::Break       => self.end()?.ok()
+        }
     }
 
     /// Write the encoded byte slice.

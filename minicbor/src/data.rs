@@ -68,6 +68,76 @@ impl fmt::Display for Type {
     }
 }
 
+/// Representation of possible CBOR tokens.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Token<'b> {
+    Bool(bool),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    Int(Int),
+    #[cfg(feature = "half")]
+    F16(f32),
+    F32(f32),
+    F64(f64),
+    Bytes(&'b [u8]),
+    String(&'b str),
+    Array(u64),
+    Map(u64),
+    Tag(Tag),
+    Simple(u8),
+    Break,
+    Null,
+    Undefined,
+    /// Start of indefinite byte string.
+    BeginBytes,
+    /// Start of indefinite text string.
+    BeginString,
+    /// Start of indefinite array.
+    BeginArray,
+    /// Start of indefinite map.
+    BeginMap
+}
+
+impl Token<'_> {
+    pub fn type_of(&self) -> Type {
+        match self {
+            Token::Bool(_)     => Type::Bool,
+            Token::U8(_)       => Type::U8,
+            Token::U16(_)      => Type::U16,
+            Token::U32(_)      => Type::U32,
+            Token::U64(_)      => Type::U64,
+            Token::I8(_)       => Type::I8,
+            Token::I16(_)      => Type::I16,
+            Token::I32(_)      => Type::I32,
+            Token::I64(_)      => Type::I64,
+            Token::Int(_)      => Type::Int,
+            #[cfg(feature = "half")]
+            Token::F16(_)      => Type::F16,
+            Token::F32(_)      => Type::F32,
+            Token::F64(_)      => Type::F64,
+            Token::Bytes(_)    => Type::Bytes,
+            Token::String(_)   => Type::String,
+            Token::Array(_)    => Type::Array,
+            Token::Map(_)      => Type::Map,
+            Token::Tag(_)      => Type::Tag,
+            Token::Simple(_)   => Type::Simple,
+            Token::Break       => Type::Break,
+            Token::Null        => Type::Null,
+            Token::Undefined   => Type::Undefined,
+            Token::BeginBytes  => Type::BytesIndef,
+            Token::BeginString => Type::StringIndef,
+            Token::BeginArray  => Type::ArrayIndef,
+            Token::BeginMap    => Type::MapIndef
+        }
+    }
+}
+
 /// CBOR data item tag.
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum Tag {

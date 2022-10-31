@@ -13,7 +13,7 @@ pub use error::Error;
 mod tokens;
 
 #[cfg(feature = "half")]
-pub use tokens::{Token, Tokenizer};
+pub use tokens::Tokenizer;
 
 /// A type that can be decoded from CBOR.
 pub trait Decode<'b, C>: Sized {

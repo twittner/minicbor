@@ -1,7 +1,7 @@
 #![allow(clippy::unusual_byte_groupings)]
 
 use crate::{ARRAY, BREAK, BYTES, MAP, SIMPLE, TAGGED, TEXT, SIGNED, UNSIGNED};
-use crate::data::{Int, Tag, Type};
+use crate::data::{Int, Tag, Token, Type};
 use crate::decode::{Decode, Error};
 use core::{char, f32, i8, i16, i32, i64};
 use core::{convert::TryInto, marker, str};
@@ -647,6 +647,100 @@ impl<'b> Decoder<'b> {
         }
 
         Ok(())
+    }
+
+    /// Decode the next CBOR token.
+    ///
+    /// Note that a sequence of tokens may not necessarily represent
+    /// well-formed CBOR items.
+    pub fn token(&mut self) -> Result<Token<'b>, Error> {
+        let p = self.pos;
+        match self.read()? {
+            n @ 0 ..= 0x17    => Ok(Token::U8(n)),
+            0x18              => self.read().map(Token::U8),
+            0x19              => self.read_slice(2).map(read_u16).map(Token::U16),
+            0x1a              => self.read_slice(4).map(read_u32).map(Token::U32),
+            0x1b              => self.read_slice(8).map(read_u64).map(Token::U64),
+            n @ 0x20 ..= 0x37 => Ok(Token::I8(-1 - (n - 0x20) as i8)),
+            0x38 => {
+                let n = self.read()?;
+                Ok(if n < 0x80 {
+                    Token::I8(-1 - (n as i8))
+                } else {
+                    Token::I16(-1 - i16::from(n))
+                })
+            }
+            0x39 => {
+                let n = self.read_slice(2)?;
+                Ok(if n[0] < 0x80 {
+                    Token::I16(-1 - (read_u16(n) as i16))
+                } else {
+                    Token::I32(-1 - i32::from(read_u16(n)))
+                })
+            }
+            0x3a => {
+                let n = self.read_slice(4)?;
+                Ok(if n[0] < 0x80 {
+                    Token::I32(-1 - (read_u32(n) as i32))
+                } else {
+                    Token::I64(-1 - i64::from(read_u32(n)))
+                })
+            }
+            0x3b => {
+                let n = self.read_slice(8)?;
+                Ok(if n[0] < 0x80 {
+                    Token::I64(-1 - (read_u64(n) as i64))
+                } else {
+                    Token::Int(Int::neg(read_u64(n)))
+                })
+            }
+            n @ 0x40 ..= 0x5b => {
+                let n = u64_to_usize(self.unsigned(info_of(n), p)?, p)?;
+                let x = self.read_slice(n)?;
+                Ok(Token::Bytes(x))
+            }
+            0x5f              => Ok(Token::BeginBytes),
+            n @ 0x60 ..= 0x7b => {
+                let n = u64_to_usize(self.unsigned(info_of(n), p)?, p)?;
+                let x = self.read_slice(n)?;
+                let s = str::from_utf8(x).map_err(|e| Error::utf8(e).at(p))?;
+                Ok(Token::String(s))
+            }
+            0x7f              => Ok(Token::BeginString),
+            n @ 0x80 ..= 0x9b => self.unsigned(info_of(n), p).map(Token::Array),
+            0x9f              => Ok(Token::BeginArray),
+            n @ 0xa0 ..= 0xbb => self.unsigned(info_of(n), p).map(Token::Map),
+            0xbf              => Ok(Token::BeginMap),
+            n @ 0xc0 ..= 0xdb => self.unsigned(info_of(n), p).map(|n| Token::Tag(Tag::from(n))),
+            n @ 0xe0 ..= 0xf3 => Ok(Token::Simple(n - SIMPLE)),
+            0xf4              => Ok(Token::Bool(false)),
+            0xf5              => Ok(Token::Bool(true)),
+            0xf6              => Ok(Token::Null),
+            0xf7              => Ok(Token::Undefined),
+            0xf8              => self.read().map(Token::Simple),
+            #[cfg(feature = "half")]
+            0xf9 => {
+                let mut n = [0; 2];
+                n.copy_from_slice(self.read_slice(2)?);
+                let f = half::f16::from_bits(u16::from_be_bytes(n));
+                Ok(Token::F16(f.to_f32()))
+            }
+            0xfa => {
+                let mut n = [0; 4];
+                n.copy_from_slice(self.read_slice(4)?);
+                Ok(Token::F32(f32::from_be_bytes(n)))
+            }
+            0xfb => {
+                let mut n = [0; 8];
+                n.copy_from_slice(self.read_slice(8)?);
+                Ok(Token::F64(f64::from_be_bytes(n)))
+            }
+            0xff => Ok(Token::Break),
+            n    => {
+                let t = Type::Unknown(n);
+                Err(Error::type_mismatch(t).at(p).with_message("unknown cbor type"))
+            }
+        }
     }
 
     /// Decode a `u64` value beginning with `b`.
