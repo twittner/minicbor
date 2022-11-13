@@ -436,6 +436,7 @@ extern crate proc_macro;
 
 mod decode;
 mod encode;
+mod cbor_len;
 
 pub(crate) mod attrs;
 pub(crate) mod fields;
@@ -464,6 +465,14 @@ pub fn derive_encode(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 enum Mode {
     Encode,
     Decode
+}
+
+/// Derive the `minicbor::CborLen` trait for a struct or enum.
+///
+/// See the [crate] documentation for details.
+#[proc_macro_derive(CborLen, attributes(n, b, cbor))]
+pub fn derive_cbor_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    cbor_len::derive_from(input)
 }
 
 // Helpers ////////////////////////////////////////////////////////////////////

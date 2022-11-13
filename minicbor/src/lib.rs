@@ -249,6 +249,14 @@ pub fn display<'b>(cbor: &'b [u8]) -> impl core::fmt::Display + 'b {
     decode::Tokenizer::new(cbor)
 }
 
+/// Calculate the length in bytes of the given value's CBOR representation.
+pub fn len<T>(x: T) -> usize
+where
+    T: CborLen<()>
+{
+    x.cbor_len()
+}
+
 // Ensure we can safely cast a `usize` to a `u64`.
 const __USIZE_FITS_INTO_U64: () =
     assert!(core::mem::size_of::<usize>() <= core::mem::size_of::<u64>());

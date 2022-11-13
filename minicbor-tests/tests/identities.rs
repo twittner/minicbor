@@ -7,7 +7,7 @@ use quickcheck::quickcheck;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-fn identity<T: CborLen + Encode<()> + Eq + for<'a> Decode<'a, ()>>(arg: T) -> bool {
+fn identity<T: CborLen<()> + Encode<()> + Eq + for<'a> Decode<'a, ()>>(arg: T) -> bool {
     let len = arg.cbor_len();
     let vec = minicbor::to_vec(&arg).unwrap();
     assert_eq!(len, vec.len());
