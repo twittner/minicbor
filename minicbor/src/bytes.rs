@@ -15,7 +15,7 @@
 //! `#[cbor(with = "minicbor::bytes")]` annotation.
 
 use crate::decode::{self, Decode, Decoder};
-use crate::encode::{self, Encode, Encoder, Write};
+use crate::encode::{self, Encode, Encoder, Write, CborLen};
 use core::ops::{Deref, DerefMut};
 
 #[cfg(feature = "alloc")]
@@ -83,6 +83,13 @@ impl<'a, 'b: 'a, C> Decode<'b, C> for &'a ByteSlice {
 impl<C> Encode<C> for ByteSlice {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
         e.bytes(self)?.ok()
+    }
+}
+
+impl<C> CborLen<C> for ByteSlice {
+    fn cbor_len(&self) -> usize {
+        let n = self.len();
+        <_ as CborLen<C>>::cbor_len(&n) + n
     }
 }
 
@@ -198,6 +205,12 @@ impl<C, const N: usize> Encode<C> for ByteArray<N> {
     }
 }
 
+impl<C, const N: usize> CborLen<C> for ByteArray<N> {
+    fn cbor_len(&self) -> usize {
+        <_ as CborLen<C>>::cbor_len(&N) + N
+    }
+}
+
 /// Newtype for `Vec<u8>`.
 ///
 /// Used to implement `Encode` and `Decode` which translate to
@@ -247,6 +260,14 @@ impl<C> Decode<'_, C> for ByteVec {
 impl<C> Encode<C> for ByteVec {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
         e.bytes(self)?.ok()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<C> CborLen<C> for ByteVec {
+    fn cbor_len(&self) -> usize {
+        let n = self.len();
+        <_ as CborLen<C>>::cbor_len(&n) + n
     }
 }
 

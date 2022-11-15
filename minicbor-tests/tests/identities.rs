@@ -186,6 +186,7 @@ fn byte_slice() {
     fn property(arg: Vec<u8>) -> bool {
         let arg: &ByteSlice = arg.as_slice().into();
         let vec = minicbor::to_vec(arg).unwrap();
+        assert_eq!(minicbor::len(arg), vec.len());
         let mut dec = Decoder::new(&vec);
         assert_eq!(Some(Type::Bytes), dec.datatype().ok());
         dec.set_position(0);
@@ -203,6 +204,7 @@ fn byte_array() {
 
     let arg = ByteArray::from([1,2,3,4,5,6,7,8]);
     let vec = minicbor::to_vec(&arg).unwrap();
+    assert_eq!(minicbor::len(&arg), vec.len());
     let mut dec = Decoder::new(&vec);
     assert_eq!(Some(Type::Bytes), dec.datatype().ok());
     dec.set_position(0);
@@ -218,6 +220,7 @@ fn byte_vec() {
     fn property(arg: Vec<u8>) -> bool {
         let arg = ByteVec::from(arg);
         let vec = minicbor::to_vec(&arg).unwrap();
+        assert_eq!(minicbor::len(&arg), vec.len());
         let mut dec = Decoder::new(&vec);
         assert_eq!(Some(Type::Bytes), dec.datatype().ok());
         dec.set_position(0);

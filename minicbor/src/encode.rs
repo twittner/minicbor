@@ -58,7 +58,7 @@ impl<C, T: Encode<C> + ?Sized> Encode<C> for &T {
     }
 }
 
-impl<C, T: CborLen<C>> CborLen<C> for &T {
+impl<C, T: CborLen<C> + ?Sized> CborLen<C> for &T {
     fn cbor_len(&self) -> usize {
         (**self).cbor_len()
     }
@@ -70,7 +70,7 @@ impl<C, T: Encode<C> + ?Sized> Encode<C> for &mut T {
     }
 }
 
-impl<C, T: CborLen<C>> CborLen<C> for &mut T {
+impl<C, T: CborLen<C> + ?Sized> CborLen<C> for &mut T {
     fn cbor_len(&self) -> usize {
         (**self).cbor_len()
     }
@@ -84,7 +84,7 @@ impl<C, T: Encode<C> + ?Sized> Encode<C> for alloc::boxed::Box<T> {
 }
 
 #[cfg(feature = "alloc")]
-impl<C, T: CborLen<C>> CborLen<C> for alloc::boxed::Box<T> {
+impl<C, T: CborLen<C> + ?Sized> CborLen<C> for alloc::boxed::Box<T> {
     fn cbor_len(&self) -> usize {
         (**self).cbor_len()
     }

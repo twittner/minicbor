@@ -25,15 +25,9 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             unreachable!("`derive_from` matched against `syn::Data::Struct`")
         };
 
-    let name     = &inp.ident;
-    let attrs    = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let fields   = Fields::try_from(name.span(), data.fields.iter())?;
-
-    // TODO: Add `cbor_len` attribute to allow custom calculation of encoding length.
-    if fields.attrs.iter().find(|a| a.codec().map(|c| c.is_encode()).unwrap_or(false)).is_some() {
-        let msg = "`CborLen` can currently not be derived when `#[cbor(encode_with)]` is used";
-        return Err(syn::Error::new(inp.ident.span(), msg))
-    }
+    let name   = &inp.ident;
+    let attrs  = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
+    let fields = Fields::try_from(name.span(), data.fields.iter())?;
 
     let cbor_len_bound = gen_cbor_len_bound()?;
     let encode_bound   = gen_encode_bound()?;
@@ -41,6 +35,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         p.bounds.push(cbor_len_bound.clone());
         p.bounds.push(encode_bound.clone())
     }
+
     let gen = add_typeparam(&inp.generics, gen_ctx_param()?, attrs.context_bound());
     let impl_generics = gen.split_for_impl().0;
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
