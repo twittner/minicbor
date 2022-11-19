@@ -314,7 +314,7 @@ impl<C> Encode<C> for usize {
 #[cfg(target_pointer_width = "32")]
 impl<C> CborLen<C> for usize {
     fn cbor_len(&self) -> usize {
-        (*self as u32).cbor_len()
+        <_ as CborLen<C>>::cbor_len(&(*self as u32))
     }
 }
 
@@ -342,7 +342,7 @@ impl<C> Encode<C> for isize {
 #[cfg(target_pointer_width = "32")]
 impl<C> CborLen<C> for isize {
     fn cbor_len(&self) -> usize {
-        (*self as i32).cbor_len()
+        <_ as CborLen<C>>::cbor_len(&(*self as i32))
     }
 }
 
