@@ -1,4 +1,4 @@
-use crate::{attrs::{Attributes, Level, Encoding, CustomCodec}, fields::Fields, add_typeparam, gen_ctx_param, variants::Variants};
+use crate::{attrs::{Attributes, Level, Encoding, CustomCodec}, fields::Fields, add_typeparam, gen_ctx_param, variants::Variants, encode::is_nil};
 use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
 
@@ -30,7 +30,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let fields = Fields::try_from(name.span(), data.fields.iter())?;
 
     let custom_enc: Vec<Option<CustomCodec>> = fields.attrs.iter()
-        .map(|a| a.codec().cloned().filter(CustomCodec::is_module))
+        .map(|a| a.codec().cloned())
         .collect();
 
     let cbor_len_bound = gen_cbor_len_bound()?;
@@ -73,7 +73,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields   = Fields::try_from(var.ident.span(), var.fields.iter())?;
         let custom_enc: Vec<Option<CustomCodec>> = fields.attrs.iter()
-            .map(|a| a.codec().cloned().filter(CustomCodec::is_module))
+            .map(|a| a.codec().cloned())
             .collect();
         let con      = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
@@ -176,18 +176,20 @@ fn on_fields
             .zip(fields.idents.iter()
                 .zip(fields.is_name.iter()
                     .zip(fields.attrs.iter()
-                        .zip(custom_enc)))));
+                        .zip(fields.types.iter()
+                            .zip(custom_enc))))));
 
     let steps = match encoding {
         Encoding::Map => {
             let mut steps = Vec::new();
             steps.push(quote!(<_ as minicbor::CborLen<Ctx>>::cbor_len(&#num_fields)));
-            for (i, (idx, (ident, (&is_name, (attrs, encode))))) in iter {
+            for (i, (idx, (ident, (&is_name, (attrs, (ty, encode)))))) in iter {
                 let cbor_len = cbor_len(attrs.cbor_len(), encode);
+                let is_nil   = is_nil(ty, encode);
                 if has_self {
                     if is_name {
                         steps.push(quote! {
-                            + if <_ as minicbor::Encode<Ctx>>::is_nil(&self.#ident) {
+                            + if #is_nil(&self.#ident) {
                                 0
                             } else {
                                 <_ as minicbor::CborLen<Ctx>>::cbor_len(&#idx) +
@@ -197,7 +199,7 @@ fn on_fields
                     } else {
                         let i = syn::Index::from(*i);
                         steps.push(quote! {
-                            + if <_ as minicbor::Encode<Ctx>>::is_nil(&self.#i) {
+                            + if #is_nil(&self.#i) {
                                 0
                             } else {
                                 <_ as minicbor::CborLen<Ctx>>::cbor_len(&#idx) +
@@ -207,7 +209,7 @@ fn on_fields
                     }
                 } else {
                     steps.push(quote! {
-                        + if <_ as minicbor::Encode<Ctx>>::is_nil(&#ident) {
+                        + if #is_nil(&#ident) {
                             0
                         } else {
                             <_ as minicbor::CborLen<Ctx>>::cbor_len(&#idx) +
@@ -224,13 +226,14 @@ fn on_fields
                 let mut __num777 = 0;
                 let mut __len777 = 0;
             });
-            for (i, (idx, (ident, (&is_name, (attrs, encode))))) in iter {
+            for (i, (idx, (ident, (&is_name, (attrs, (ty, encode)))))) in iter {
                 let n = idx.val();
                 let cbor_len = cbor_len(attrs.cbor_len(), encode);
+                let is_nil   = is_nil(ty, encode);
                 if has_self {
                     if is_name {
                         steps.push(quote! {
-                            if !<_ as minicbor::Encode<Ctx>>::is_nil(&self.#ident) {
+                            if !#is_nil(&self.#ident) {
                                 __len777 += (#n - __num777) +
                                     #cbor_len(&self.#ident) as u32;
                                 __num777 = #n + 1
@@ -239,7 +242,7 @@ fn on_fields
                     } else {
                         let i = syn::Index::from(*i);
                         steps.push(quote! {
-                            if !<_ as minicbor::Encode<Ctx>>::is_nil(&self.#i) {
+                            if !#is_nil(&self.#i) {
                                 __len777 += (#n - __num777) +
                                     #cbor_len(&self.#i) as u32;
                                 __num777 = #n + 1
@@ -248,7 +251,7 @@ fn on_fields
                     }
                 } else {
                     steps.push(quote! {
-                        if !<_ as minicbor::Encode<Ctx>>::is_nil(&#ident) {
+                        if !#is_nil(&#ident) {
                             __len777 += (#n - __num777) +
                                 #cbor_len(&#ident) as u32;
                             __num777 = #n + 1
