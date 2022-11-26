@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 fn identity<T: CborLen<()> + Encode<()> + Eq + for<'a> Decode<'a, ()>>(arg: T) -> bool {
-    let len = arg.cbor_len();
+    let len = minicbor::len(&arg);
     let vec = minicbor::to_vec(&arg).unwrap();
     assert_eq!(len, vec.len());
     let mut dec = Decoder::new(&vec);

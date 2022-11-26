@@ -254,7 +254,15 @@ pub fn len<T>(x: T) -> usize
 where
     T: CborLen<()>
 {
-    x.cbor_len()
+    x.cbor_len(&mut ())
+}
+
+/// Calculate the length in bytes of the given value's CBOR representation.
+pub fn len_with<C, T>(x: T, ctx: &mut C) -> usize
+where
+    T: CborLen<C>
+{
+    x.cbor_len(ctx)
 }
 
 // Ensure we can safely cast a `usize` to a `u64`.

@@ -49,7 +49,7 @@ pub trait Encode<C> {
 /// A type that can calculate its own CBOR encoding length.
 pub trait CborLen<C> {
     /// Compute the CBOR encoding length in bytes of this value.
-    fn cbor_len(&self) -> usize;
+    fn cbor_len(&self, ctx: &mut C) -> usize;
 }
 
 impl<C, T: Encode<C> + ?Sized> Encode<C> for &T {
@@ -59,8 +59,8 @@ impl<C, T: Encode<C> + ?Sized> Encode<C> for &T {
 }
 
 impl<C, T: CborLen<C> + ?Sized> CborLen<C> for &T {
-    fn cbor_len(&self) -> usize {
-        (**self).cbor_len()
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        (**self).cbor_len(ctx)
     }
 }
 
@@ -71,8 +71,8 @@ impl<C, T: Encode<C> + ?Sized> Encode<C> for &mut T {
 }
 
 impl<C, T: CborLen<C> + ?Sized> CborLen<C> for &mut T {
-    fn cbor_len(&self) -> usize {
-        (**self).cbor_len()
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        (**self).cbor_len(ctx)
     }
 }
 
@@ -85,8 +85,8 @@ impl<C, T: Encode<C> + ?Sized> Encode<C> for alloc::boxed::Box<T> {
 
 #[cfg(feature = "alloc")]
 impl<C, T: CborLen<C> + ?Sized> CborLen<C> for alloc::boxed::Box<T> {
-    fn cbor_len(&self) -> usize {
-        (**self).cbor_len()
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        (**self).cbor_len(ctx)
     }
 }
 
@@ -97,9 +97,9 @@ impl<C> Encode<C> for str {
 }
 
 impl<C> CborLen<C> for str {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
         let n = self.len();
-        <_ as CborLen<C>>::cbor_len(&n) + n
+        n.cbor_len(ctx) + n
     }
 }
 
@@ -119,9 +119,9 @@ impl<C, T: Encode<C>> Encode<C> for Option<T> {
 }
 
 impl<C, T: CborLen<C>> CborLen<C> for Option<T> {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
         if let Some(x) = self {
-            x.cbor_len()
+            x.cbor_len(ctx)
         } else {
             1
         }
@@ -139,10 +139,10 @@ impl<C, T: Encode<C>, E: Encode<C>> Encode<C> for Result<T, E> {
 }
 
 impl<C, T: CborLen<C>, E: CborLen<C>> CborLen<C> for Result<T, E> {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
         1 + match self {
-            Ok(x)  => 1 + x.cbor_len(),
-            Err(e) => 1 + e.cbor_len()
+            Ok(x)  => 1 + x.cbor_len(ctx),
+            Err(e) => 1 + e.cbor_len(ctx)
         }
     }
 }
@@ -156,9 +156,9 @@ impl<C> Encode<C> for alloc::string::String {
 
 #[cfg(feature = "alloc")]
 impl<C> CborLen<C> for alloc::string::String {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
         let n = self.len();
-        <_ as CborLen<C>>::cbor_len(&n) + n
+        n.cbor_len(ctx) + n
     }
 }
 
@@ -177,8 +177,8 @@ impl<C, T> CborLen<C> for alloc::borrow::Cow<'_, T>
 where
     T: CborLen<C> + alloc::borrow::ToOwned + ?Sized
 {
-    fn cbor_len(&self) -> usize {
-        self.as_ref().cbor_len()
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        self.as_ref().cbor_len(ctx)
     }
 }
 
@@ -203,8 +203,8 @@ where
     T: CborLen<C>,
     S: std::hash::BuildHasher
 {
-    fn cbor_len(&self) -> usize {
-        <_ as CborLen<C>>::cbor_len(&self.len()) + self.iter().map(|x| x.cbor_len()).sum::<usize>()
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        self.len().cbor_len(ctx) + self.iter().map(|x| x.cbor_len(ctx)).sum::<usize>()
     }
 }
 
@@ -232,9 +232,9 @@ where
     V: CborLen<C>,
     S: std::hash::BuildHasher
 {
-    fn cbor_len(&self) -> usize {
-        <_ as CborLen<C>>::cbor_len(&self.len()) + self.iter()
-            .map(|(k, v)| k.cbor_len() + v.cbor_len())
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        self.len().cbor_len(ctx) + self.iter()
+            .map(|(k, v)| k.cbor_len(ctx) + v.cbor_len(ctx))
             .sum::<usize>()
     }
 }
@@ -261,9 +261,9 @@ where
     K: CborLen<C>,
     V: CborLen<C>,
 {
-    fn cbor_len(&self) -> usize {
-        <_ as CborLen<C>>::cbor_len(&self.len()) + self.iter()
-            .map(|(k, v)| k.cbor_len() + v.cbor_len())
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        self.len().cbor_len(ctx) + self.iter()
+            .map(|(k, v)| k.cbor_len(ctx) + v.cbor_len(ctx))
             .sum::<usize>()
     }
 }
@@ -275,7 +275,7 @@ impl<C, T> Encode<C> for core::marker::PhantomData<T> {
 }
 
 impl<C, T> CborLen<C> for core::marker::PhantomData<T> {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, _: &mut C) -> usize {
         1
     }
 }
@@ -287,7 +287,7 @@ impl<C> Encode<C> for () {
 }
 
 impl<C> CborLen<C> for () {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, _: &mut C) -> usize {
         1
     }
 }
@@ -299,8 +299,8 @@ impl<C, T: Encode<C>> Encode<C> for core::num::Wrapping<T> {
 }
 
 impl<C, T: CborLen<C>> CborLen<C> for core::num::Wrapping<T> {
-    fn cbor_len(&self) -> usize {
-        self.0.cbor_len()
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        self.0.cbor_len(ctx)
     }
 }
 
@@ -313,8 +313,8 @@ impl<C> Encode<C> for usize {
 
 #[cfg(target_pointer_width = "32")]
 impl<C> CborLen<C> for usize {
-    fn cbor_len(&self) -> usize {
-        <_ as CborLen<C>>::cbor_len(&(*self as u32))
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        (*self as u32).cbor_len(ctx)
     }
 }
 
@@ -327,8 +327,8 @@ impl<C> Encode<C> for usize {
 
 #[cfg(target_pointer_width = "64")]
 impl<C> CborLen<C> for usize {
-    fn cbor_len(&self) -> usize {
-        <_ as CborLen<C>>::cbor_len(&(*self as u64))
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        (*self as u64).cbor_len(ctx)
     }
 }
 
@@ -341,8 +341,8 @@ impl<C> Encode<C> for isize {
 
 #[cfg(target_pointer_width = "32")]
 impl<C> CborLen<C> for isize {
-    fn cbor_len(&self) -> usize {
-        <_ as CborLen<C>>::cbor_len(&(*self as i32))
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        (*self as i32).cbor_len(ctx)
     }
 }
 
@@ -355,8 +355,8 @@ impl<C> Encode<C> for isize {
 
 #[cfg(target_pointer_width = "64")]
 impl<C> CborLen<C> for isize {
-    fn cbor_len(&self) -> usize {
-        <_ as CborLen<C>>::cbor_len(&(*self as i64))
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        (*self as i64).cbor_len(ctx)
     }
 }
 
@@ -367,8 +367,8 @@ impl<C> Encode<C> for crate::data::Int {
 }
 
 impl<C> CborLen<C> for crate::data::Int {
-    fn cbor_len(&self) -> usize {
-        <_ as CborLen<C>>::cbor_len(&self.value())
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        self.value().cbor_len(ctx)
     }
 }
 
@@ -388,25 +388,25 @@ macro_rules! encode_basic {
 encode_basic!(u8 i8 u16 i16 u32 i32 u64 i64 bool f32 f64 char);
 
 impl<C> CborLen<C> for bool {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, _: &mut C) -> usize {
         1
     }
 }
 
 impl<C> CborLen<C> for char {
-    fn cbor_len(&self) -> usize {
-        <_ as CborLen<C>>::cbor_len(&(*self as u32))
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        (*self as u32).cbor_len(ctx)
     }
 }
 
 impl<C> CborLen<C> for u8 {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, _: &mut C) -> usize {
         if let 0 ..= 0x17 = self { 1 } else { 2 }
     }
 }
 
 impl<C> CborLen<C> for u16 {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, _: &mut C) -> usize {
         match self {
             0    ..= 0x17 => 1,
             0x18 ..= 0xff => 2,
@@ -416,7 +416,7 @@ impl<C> CborLen<C> for u16 {
 }
 
 impl<C> CborLen<C> for u32 {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, _: &mut C) -> usize {
         match self {
             0     ..= 0x17   => 1,
             0x18  ..= 0xff   => 2,
@@ -427,7 +427,7 @@ impl<C> CborLen<C> for u32 {
 }
 
 impl<C> CborLen<C> for u64 {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, _: &mut C) -> usize {
         match self {
             0        ..= 0x17        => 1,
             0x18     ..= 0xff        => 2,
@@ -439,41 +439,41 @@ impl<C> CborLen<C> for u64 {
 }
 
 impl<C> CborLen<C> for i8 {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
         let x = if *self >= 0 { *self as u8 } else { (-1 - self) as u8 };
-        <_ as CborLen<C>>::cbor_len(&x)
+        x.cbor_len(ctx)
     }
 }
 
 impl<C> CborLen<C> for i16 {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
         let x = if *self >= 0 { *self as u16 } else { (-1 - self) as u16 };
-        <_ as CborLen<C>>::cbor_len(&x)
+        x.cbor_len(ctx)
     }
 }
 
 impl<C> CborLen<C> for i32 {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
         let x = if *self >= 0 { *self as u32 } else { (-1 - self) as u32 };
-        <_ as CborLen<C>>::cbor_len(&x)
+        x.cbor_len(ctx)
     }
 }
 
 impl<C> CborLen<C> for i64 {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
         let x = if *self >= 0 { *self as u64 } else { (-1 - self) as u64 };
-        <_ as CborLen<C>>::cbor_len(&x)
+        x.cbor_len(ctx)
     }
 }
 
 impl<C> CborLen<C> for f32 {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, _: &mut C) -> usize {
         5
     }
 }
 
 impl<C> CborLen<C> for f64 {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, _: &mut C) -> usize {
         9
     }
 }
@@ -488,8 +488,8 @@ macro_rules! encode_nonzero {
             }
 
             impl<C> CborLen<C> for $t {
-                fn cbor_len(&self) -> usize {
-                    <_ as CborLen<C>>::cbor_len(&self.get())
+                fn cbor_len(&self, ctx: &mut C) -> usize {
+                    self.get().cbor_len(ctx)
                 }
             }
         )*
@@ -519,9 +519,8 @@ macro_rules! encode_atomic {
             }
 
             impl<C> CborLen<C> for $t {
-                fn cbor_len(&self) -> usize {
-                    let x = self.load(core::sync::atomic::Ordering::SeqCst);
-                    <_ as CborLen<C>>::cbor_len(&x)
+                fn cbor_len(&self, ctx: &mut C) -> usize {
+                    self.load(core::sync::atomic::Ordering::SeqCst).cbor_len(ctx)
                 }
             }
         )*
@@ -570,9 +569,9 @@ macro_rules! encode_sequential {
             }
 
             impl<C, T: CborLen<C>> CborLen<C> for $t {
-                fn cbor_len(&self) -> usize {
+                fn cbor_len(&self, ctx: &mut C) -> usize {
                     let n = self.len();
-                    <_ as CborLen<C>>::cbor_len(&n) + self.iter().map(|x| x.cbor_len()).sum::<usize>()
+                    n.cbor_len(ctx) + self.iter().map(|x| x.cbor_len(ctx)).sum::<usize>()
                 }
             }
         )*
@@ -604,9 +603,9 @@ macro_rules! encode_arrays {
             }
 
             impl<C, T: CborLen<C>> CborLen<C> for [T; $n] {
-                fn cbor_len(&self) -> usize {
+                fn cbor_len(&self, ctx: &mut C) -> usize {
                     let n = self.len();
-                    <_ as CborLen<C>>::cbor_len(&n) + self.iter().map(|x| x.cbor_len()).sum::<usize>()
+                    n.cbor_len(ctx) + self.iter().map(|x| x.cbor_len(ctx)).sum::<usize>()
                 }
             }
         )*
@@ -627,8 +626,8 @@ macro_rules! encode_tuples {
             }
 
             impl<Ctx, $($T: CborLen<Ctx>),+> CborLen<Ctx> for ($($T,)+) {
-                fn cbor_len(&self) -> usize {
-                    <_ as CborLen<Ctx>>::cbor_len(&$len) $(+ self.$idx.cbor_len())+
+                fn cbor_len(&self, ctx: &mut Ctx) -> usize {
+                    $len.cbor_len(ctx) $(+ self.$idx.cbor_len(ctx))+
                 }
             }
         )+
@@ -664,9 +663,8 @@ impl<C> Encode<C> for core::time::Duration {
 }
 
 impl<C> CborLen<C> for core::time::Duration {
-    fn cbor_len(&self) -> usize {
-        1 + <_ as CborLen<C>>::cbor_len(&self.as_secs())
-          + <_ as CborLen<C>>::cbor_len(&self.subsec_nanos())
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        1 + self.as_secs().cbor_len(ctx) + self.subsec_nanos().cbor_len(ctx)
     }
 }
 
@@ -682,9 +680,9 @@ impl<C> Encode<C> for std::time::SystemTime {
 
 #[cfg(feature = "std")]
 impl<C> CborLen<C> for std::time::SystemTime{
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
         self.duration_since(std::time::UNIX_EPOCH)
-            .map(|d| <_ as CborLen<C>>::cbor_len(&d))
+            .map(|d| d.cbor_len(ctx))
             .unwrap_or(0)
     }
 }
@@ -696,8 +694,8 @@ impl<C, T: Encode<C> + Copy> Encode<C> for core::cell::Cell<T> {
 }
 
 impl<C, T: CborLen<C> + Copy> CborLen<C> for core::cell::Cell<T> {
-    fn cbor_len(&self) -> usize {
-        self.get().cbor_len()
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        self.get().cbor_len(ctx)
     }
 }
 
@@ -712,8 +710,8 @@ impl<C, T: Encode<C>> Encode<C> for core::cell::RefCell<T> {
 }
 
 impl<C, T: CborLen<C>> CborLen<C> for core::cell::RefCell<T> {
-    fn cbor_len(&self) -> usize {
-        self.borrow().cbor_len()
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        self.borrow().cbor_len(ctx)
     }
 }
 
@@ -730,8 +728,8 @@ impl<C> Encode<C> for std::path::Path {
 
 #[cfg(feature = "std")]
 impl<C> CborLen<C> for std::path::Path {
-    fn cbor_len(&self) -> usize {
-        self.to_str().map(|s| <_ as CborLen<C>>::cbor_len(s)).unwrap_or(0)
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        self.to_str().map(|s| s.cbor_len(ctx)).unwrap_or(0)
     }
 }
 
@@ -744,8 +742,8 @@ impl<C> Encode<C> for std::path::PathBuf {
 
 #[cfg(feature = "std")]
 impl<C> CborLen<C> for std::path::PathBuf {
-    fn cbor_len(&self) -> usize {
-        <_ as CborLen<C>>::cbor_len(self.as_path())
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        self.as_path().cbor_len(ctx)
     }
 }
 
@@ -762,10 +760,10 @@ impl<C> Encode<C> for std::net::IpAddr {
 
 #[cfg(feature = "std")]
 impl<C> CborLen<C> for std::net::IpAddr {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
         1 + match self {
-            std::net::IpAddr::V4(a) => 1 + <_ as CborLen<C>>::cbor_len(a),
-            std::net::IpAddr::V6(a) => 1 + <_ as CborLen<C>>::cbor_len(a),
+            std::net::IpAddr::V4(a) => 1 + a.cbor_len(ctx),
+            std::net::IpAddr::V6(a) => 1 + a.cbor_len(ctx),
         }
     }
 }
@@ -779,7 +777,7 @@ impl<C> Encode<C> for std::net::Ipv4Addr {
 
 #[cfg(feature = "std")]
 impl<C> CborLen<C> for std::net::Ipv4Addr {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, _: &mut C) -> usize {
         5
     }
 }
@@ -793,7 +791,7 @@ impl<C> Encode<C> for std::net::Ipv6Addr {
 
 #[cfg(feature = "std")]
 impl<C> CborLen<C> for std::net::Ipv6Addr {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, _: &mut C) -> usize {
         17
     }
 }
@@ -811,10 +809,10 @@ impl<C> Encode<C> for std::net::SocketAddr {
 
 #[cfg(feature = "std")]
 impl<C> CborLen<C> for std::net::SocketAddr {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
         1 + match self {
-            std::net::SocketAddr::V4(a) => 1 + <_ as CborLen<C>>::cbor_len(a),
-            std::net::SocketAddr::V6(a) => 1 + <_ as CborLen<C>>::cbor_len(a),
+            std::net::SocketAddr::V4(a) => 1 + a.cbor_len(ctx),
+            std::net::SocketAddr::V6(a) => 1 + a.cbor_len(ctx),
         }
     }
 }
@@ -831,8 +829,8 @@ impl<C> Encode<C> for std::net::SocketAddrV4 {
 
 #[cfg(feature = "std")]
 impl<C> CborLen<C> for std::net::SocketAddrV4 {
-    fn cbor_len(&self) -> usize {
-        1 + <_ as CborLen<C>>::cbor_len(&self.ip()) + <_ as CborLen<C>>::cbor_len(&self.port())
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        1 + self.ip().cbor_len(ctx) + self.port().cbor_len(ctx)
     }
 }
 
@@ -848,8 +846,8 @@ impl<C> Encode<C> for std::net::SocketAddrV6 {
 
 #[cfg(feature = "std")]
 impl<C> CborLen<C> for std::net::SocketAddrV6 {
-    fn cbor_len(&self) -> usize {
-        1 + <_ as CborLen<C>>::cbor_len(&self.ip()) + <_ as CborLen<C>>::cbor_len(&self.port())
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        1 + self.ip().cbor_len(ctx) + self.port().cbor_len(ctx)
     }
 }
 
@@ -863,8 +861,8 @@ impl<C, T: Encode<C>> Encode<C> for core::ops::Range<T> {
 }
 
 impl<C, T: CborLen<C>> CborLen<C> for core::ops::Range<T> {
-    fn cbor_len(&self) -> usize {
-        1 + self.start.cbor_len() + self.end.cbor_len()
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        1 + self.start.cbor_len(ctx) + self.end.cbor_len(ctx)
     }
 }
 
@@ -877,8 +875,8 @@ impl<C, T: Encode<C>> Encode<C> for core::ops::RangeFrom<T> {
 }
 
 impl<C, T: CborLen<C>> CborLen<C> for core::ops::RangeFrom<T> {
-    fn cbor_len(&self) -> usize {
-        1 + self.start.cbor_len()
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        1 + self.start.cbor_len(ctx)
     }
 }
 
@@ -891,8 +889,8 @@ impl<C, T: Encode<C>> Encode<C> for core::ops::RangeTo<T> {
 }
 
 impl<C, T: CborLen<C>> CborLen<C> for core::ops::RangeTo<T> {
-    fn cbor_len(&self) -> usize {
-        1 + self.end.cbor_len()
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        1 + self.end.cbor_len(ctx)
     }
 }
 
@@ -905,8 +903,8 @@ impl<C, T: Encode<C>> Encode<C> for core::ops::RangeToInclusive<T> {
 }
 
 impl<C, T: CborLen<C>> CborLen<C> for core::ops::RangeToInclusive<T> {
-    fn cbor_len(&self) -> usize {
-        1 + self.end.cbor_len()
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        1 + self.end.cbor_len(ctx)
     }
 }
 
@@ -920,8 +918,8 @@ impl<C, T: Encode<C>> Encode<C> for core::ops::RangeInclusive<T> {
 }
 
 impl<C, T: CborLen<C>> CborLen<C> for core::ops::RangeInclusive<T> {
-    fn cbor_len(&self) -> usize {
-        1 + self.start().cbor_len() + self.end().cbor_len()
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        1 + self.start().cbor_len(ctx) + self.end().cbor_len(ctx)
     }
 }
 
@@ -937,10 +935,10 @@ impl<C, T: Encode<C>> Encode<C> for core::ops::Bound<T> {
 }
 
 impl<C, T: CborLen<C>> CborLen<C> for core::ops::Bound<T> {
-    fn cbor_len(&self) -> usize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
         1 + match self {
-            core::ops::Bound::Included(v) => 1 + v.cbor_len(),
-            core::ops::Bound::Excluded(v) => 1 + v.cbor_len(),
+            core::ops::Bound::Included(v) => 1 + v.cbor_len(ctx),
+            core::ops::Bound::Excluded(v) => 1 + v.cbor_len(ctx),
             core::ops::Bound::Unbounded   => 2
         }
     }

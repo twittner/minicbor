@@ -48,7 +48,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     Ok(quote! {
         impl #impl_generics minicbor::CborLen<Ctx> for #name #typ_generics #where_clause {
-            fn cbor_len(&self) -> usize {
+            fn cbor_len(&self, __ctx777: &mut Ctx) -> usize {
                 #(#steps)*
             }
         }
@@ -80,11 +80,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let row = match &var.fields {
             syn::Fields::Unit => if index_only {
                 quote! {
-                    #name::#con => { <_ as minicbor::CborLen<Ctx>>::cbor_len(&#idx) }
+                    #name::#con => { #idx.cbor_len(__ctx777) }
                 }
             } else {
                 quote! {
-                    #name::#con => { 1 + <_ as minicbor::CborLen<Ctx>>::cbor_len(&#idx) + 1 }
+                    #name::#con => { 1 + #idx.cbor_len(__ctx777) + 1 }
                 }
             }
             syn::Fields::Named(f) if index_only => {
@@ -95,14 +95,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 let Fields { idents, .. } = fields;
                 match encoding {
                     Encoding::Map => quote! {
-                        #name::#con{#(#idents,)*} => {
-                            1 + <_ as minicbor::CborLen<Ctx>>::cbor_len(&#idx) + #(#steps)*
-                        }
+                        #name::#con{#(#idents,)*} => { 1 + #idx.cbor_len(__ctx777) + #(#steps)* }
                     },
                     Encoding::Array => quote! {
-                        #name::#con{#(#idents,)*} => {
-                            #(#steps)* + 1 + <_ as minicbor::CborLen<Ctx>>::cbor_len(&#idx)
-                        }
+                        #name::#con{#(#idents,)*} => { #(#steps)* + 1 + #idx.cbor_len(__ctx777) }
                     }
                 }
             }
@@ -114,14 +110,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 let Fields { idents, .. } = fields;
                 match encoding {
                     Encoding::Map => quote! {
-                        #name::#con(#(#idents,)*) => {
-                            1 + <_ as minicbor::CborLen<Ctx>>::cbor_len(&#idx) + #(#steps)*
-                        }
+                        #name::#con(#(#idents,)*) => { 1 + #idx.cbor_len(__ctx777) + #(#steps)* }
                     },
                     Encoding::Array => quote! {
-                        #name::#con(#(#idents,)*) => {
-                            #(#steps)* + 1 + <_ as minicbor::CborLen<Ctx>>::cbor_len(&#idx)
-                        }
+                        #name::#con(#(#idents,)*) => { #(#steps)* + 1 + #idx.cbor_len(__ctx777) }
                     }
                 }
             }
@@ -153,7 +145,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     Ok(quote! {
         impl #impl_generics minicbor::CborLen<Ctx> for #name #typ_generics #where_clause {
-            fn cbor_len(&self) -> usize {
+            fn cbor_len(&self, __ctx777: &mut Ctx) -> usize {
                 #body
             }
         }
@@ -182,7 +174,7 @@ fn on_fields
     let steps = match encoding {
         Encoding::Map => {
             let mut steps = Vec::new();
-            steps.push(quote!(<_ as minicbor::CborLen<Ctx>>::cbor_len(&#num_fields)));
+            steps.push(quote!(#num_fields.cbor_len(__ctx777)));
             for (i, (idx, (ident, (&is_name, (attrs, (ty, encode)))))) in iter {
                 let cbor_len = cbor_len(attrs.cbor_len(), encode);
                 let is_nil   = is_nil(ty, encode);
@@ -192,8 +184,7 @@ fn on_fields
                             + if #is_nil(&self.#ident) {
                                 0
                             } else {
-                                <_ as minicbor::CborLen<Ctx>>::cbor_len(&#idx) +
-                                #cbor_len(&self.#ident)
+                                #idx.cbor_len(__ctx777) + #cbor_len(&self.#ident, __ctx777)
                             }
                         })
                     } else {
@@ -202,8 +193,7 @@ fn on_fields
                             + if #is_nil(&self.#i) {
                                 0
                             } else {
-                                <_ as minicbor::CborLen<Ctx>>::cbor_len(&#idx) +
-                                #cbor_len(&self.#i)
+                                #idx.cbor_len(__ctx777) + #cbor_len(&self.#i, __ctx777)
                             }
                         })
                     }
@@ -212,8 +202,7 @@ fn on_fields
                         + if #is_nil(&#ident) {
                             0
                         } else {
-                            <_ as minicbor::CborLen<Ctx>>::cbor_len(&#idx) +
-                            #cbor_len(&#ident)
+                            #idx.cbor_len(__ctx777) + #cbor_len(&#ident, __ctx777)
                         }
                     })
                 }
@@ -227,15 +216,16 @@ fn on_fields
                 let mut __len777 = 0;
             });
             for (i, (idx, (ident, (&is_name, (attrs, (ty, encode)))))) in iter {
-                let n = idx.val();
+                let n: usize = idx.val()
+                    .try_into()
+                    .map_err(|_| syn::Error::new(idx.span(), "index does not fit into usize"))?;
                 let cbor_len = cbor_len(attrs.cbor_len(), encode);
                 let is_nil   = is_nil(ty, encode);
                 if has_self {
                     if is_name {
                         steps.push(quote! {
                             if !#is_nil(&self.#ident) {
-                                __len777 += (#n - __num777) +
-                                    #cbor_len(&self.#ident) as u32;
+                                __len777 += (#n - __num777) + #cbor_len(&self.#ident, __ctx777);
                                 __num777 = #n + 1
                             }
                         })
@@ -243,8 +233,7 @@ fn on_fields
                         let i = syn::Index::from(*i);
                         steps.push(quote! {
                             if !#is_nil(&self.#i) {
-                                __len777 += (#n - __num777) +
-                                    #cbor_len(&self.#i) as u32;
+                                __len777 += (#n - __num777) + #cbor_len(&self.#i, __ctx777);
                                 __num777 = #n + 1
                             }
                         })
@@ -252,16 +241,13 @@ fn on_fields
                 } else {
                     steps.push(quote! {
                         if !#is_nil(&#ident) {
-                            __len777 += (#n - __num777) +
-                                #cbor_len(&#ident) as u32;
+                            __len777 += (#n - __num777) + #cbor_len(&#ident, __ctx777);
                             __num777 = #n + 1
                         }
                     })
                 }
             }
-            steps.push(quote! {
-                <_ as minicbor::CborLen<Ctx>>::cbor_len(&__num777) + __len777 as usize
-            });
+            steps.push(quote! { __num777.cbor_len(__ctx777) + __len777 });
             steps
         }
     };
@@ -279,7 +265,7 @@ fn cbor_len(custom: Option<&syn::ExprPath>, codec: &Option<CustomCodec>) -> proc
             return p.to_token_stream()
         }
     }
-    quote!(<_ as minicbor::CborLen::<Ctx>>::cbor_len)
+    quote!(minicbor::CborLen::<Ctx>::cbor_len)
 }
 
 fn gen_cbor_len_bound() -> syn::Result<syn::TypeParamBound> {
