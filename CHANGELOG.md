@@ -6,6 +6,12 @@
 
 # minicbor
 
+## `0.19.0`
+
+- Added the trait `CborLen` and functions `minicbor::len` and `minicbor::len_with` to allow client
+  code to calculate the length in bytes of a value's CBOR representation. See issue #32 and merge
+  request !23 for details.
+
 ## `0.18.0`
 
 - Remove feature `partial-derive-support`. `Encode` and `Decode` can always be derived. See
@@ -278,6 +284,11 @@
 
 # minicbor-derive
 
+## `0.13.0`
+
+- Added the ability to derive the `CborLen` trait on structs and enums.
+- Requires `minicbor-0.19.0`.
+
 ## `0.12.0`
 
 - Add features "alloc" and "std" to import the correct `Cow` depending on feature use.
@@ -372,6 +383,10 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.14.0`
+
+- Require at least `minicbor-0.19.0`.
 
 ## `0.13.0`
 
