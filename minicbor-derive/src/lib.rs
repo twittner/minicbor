@@ -157,10 +157,13 @@
 //! ```no_run
 //! use minicbor::decode::{Decoder, Error};
 //!
-//! fn decode<'b, C, T: 'b>(d: &mut Decoder<'b>, ctx: &mut C) -> Result<T, Error> {
+//! fn decode<'b, Ctx, T: 'b>(d: &mut Decoder<'b>, ctx: &mut Ctx) -> Result<T, Error> {
 //!     todo!()
 //! }
 //! ```
+//!
+//! Please note that if the decode function is generic in its context parameter that the
+//! derive macro uses the type variable name `Ctx`.
 //!
 //! ## `#[cbor(encode_with = "<path>")]`
 //!
@@ -170,10 +173,13 @@
 //! ```no_run
 //! use minicbor::encode::{Encoder, Error, Write};
 //!
-//! fn encode<C, T, W: Write>(v: &T, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
+//! fn encode<Ctx, T, W: Write>(v: &T, e: &mut Encoder<W>, ctx: &mut Ctx) -> Result<(), Error<W::Error>> {
 //!     todo!()
 //! }
 //! ```
+//!
+//! Please note that if the encode function is generic in its context parameter that the
+//! derive macro uses the type variable name `Ctx`.
 //!
 //! ## `#[cbor(with = "<path>")]`
 //!
@@ -217,6 +223,21 @@
 //! }
 //! ```
 //!
+//! ## `#[cbor(cbor_len = "<path>")]`
+//!
+//! Only applicable when deriving `CborLen`. When applied to a field of type `T`, the
+//! function denoted by `<path>` will be used to calculate the CBOR length in bytes.
+//! The function needs to be equivalent to the following type:
+//!
+//! ```no_run
+//! fn cbor_len<Ctx, T>(val: &T, ctx: &mut Ctx) -> usize {
+//!     todo!()
+//! }
+//! ```
+//!
+//! Please note that if the cbor_len function is generic in its context parameter that the
+//! derive macro uses the type variable name `Ctx`.
+//!
 //! ## `#[cbor(decode_bound = "...")]`
 //!
 //! When applied to a generic field, this attribute overrides any implicit type
@@ -239,18 +260,6 @@
 //! generic context type parameter, this attribute can be used to add the required
 //! trait bounds to the context type parameter. The attribute can either be repeated
 //! or the bounds can be listed as '+'-separated value, e.g. "A + B + C".
-//!
-//! ## `#[cbor(cbor_len = "<path>")]`
-//!
-//! Only applicable when deriving `CborLen`. When applied to a field of type `T`, the
-//! function denoted by `<path>` will be used to calculate the CBOR length in bytes.
-//! The function needs to be equivalent to the following type:
-//!
-//! ```no_run
-//! fn cbor_len<C, T>(val: &T, ctx: &mut C) -> usize {
-//!     todo!()
-//! }
-//! ```
 //!
 //! ### Example
 //! <details>
