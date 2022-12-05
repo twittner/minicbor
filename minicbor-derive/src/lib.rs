@@ -1,4 +1,5 @@
-//! Procedural macros to derive minicbor's `Encode` and `Decode` traits.
+//! Procedural macros to derive minicbor's `Encode`, `Decode`, and `CborLen`
+//! traits.
 //!
 //! Deriving is supported for `struct`s and `enum`s. The encoding is optimised
 //! for forward and backward compatibility and the overall approach is
@@ -101,6 +102,7 @@
 //! - [`#[cbor(encode_bound)]`](#cborencode_bound--)
 //! - [`#[cbor(bound)]`](#cborbound)
 //! - [`#[cbor(context_bound)]`](#cborcontext_bound--)
+//! - [`#[cbor(cbor_len)]`](#cborcbor_len--path)
 //!
 //! ## `#[n(...)]` and `#[b(...)]` (or `#[cbor(n(...))]` and `#[cbor(b(...))]`)
 //!
@@ -179,6 +181,9 @@
 //! [`#[cbor(encode_with = "...")]`](#cborencode_with--path). Here, `<path>` denotes
 //! a module that contains functions named `encode` and `decode` that satisfy the
 //! respective type signatures mentioned in `encode_with` and `decode_with`.
+//! If `CborLen` is also derived, the module is assumed to contain a function named
+//! `cbor_len` with a signature matching the one described in
+//! [`#[cbor(cbor_len = "...")]`](#cborcbor_len--path) below.
 //!
 //! ## `#[cbor(nil = "<path>")]`
 //!
@@ -234,6 +239,18 @@
 //! generic context type parameter, this attribute can be used to add the required
 //! trait bounds to the context type parameter. The attribute can either be repeated
 //! or the bounds can be listed as '+'-separated value, e.g. "A + B + C".
+//!
+//! ## `#[cbor(cbor_len = "<path>")]`
+//!
+//! Only applicable when deriving `CborLen`. When applied to a field of type `T`, the
+//! function denoted by `<path>` will be used to calculate the CBOR length in bytes.
+//! The function needs to be equivalent to the following type:
+//!
+//! ```no_run
+//! fn cbor_len<C, T>(val: &T, ctx: &mut C) -> usize {
+//!     todo!()
+//! }
+//! ```
 //!
 //! ### Example
 //! <details>

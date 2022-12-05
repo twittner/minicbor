@@ -17,7 +17,9 @@
 //! [`data::Type`] that can represent every possible CBOR type and decoding
 //! can thus proceed based on this information. It is also possible to just
 //! tokenize the input bytes using a [`Tokenizer`](decode::Tokenizer), i.e.
-//! an `Iterator` over CBOR [`Token`](decode::Token)s.
+//! an `Iterator` over CBOR [`Token`](decode::Token)s. Finally, the length
+//! in bytes of a value's CBOR representation can be calculated if the
+//! value's type implements the [`CborLen`] trait.
 //!
 //! Optionally, `Encode` and `Decode` can be derived for structs and enums
 //! using the respective derive macros (*requires feature* `"derive"`).
