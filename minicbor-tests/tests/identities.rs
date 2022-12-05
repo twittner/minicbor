@@ -1,14 +1,16 @@
 #![cfg(feature = "std")]
 
-use minicbor::{Encode, Encoder, Decode, Decoder};
+use minicbor::{Encode, Encoder, CborLen, Decode, Decoder};
 use minicbor::data::{Int, Type};
 use minicbor::encode;
 use quickcheck::quickcheck;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-fn identity<T: Encode<()> + Eq + for<'a> Decode<'a, ()>>(arg: T) -> bool {
+fn identity<T: CborLen<()> + Encode<()> + Eq + for<'a> Decode<'a, ()>>(arg: T) -> bool {
+    let len = minicbor::len(&arg);
     let vec = minicbor::to_vec(&arg).unwrap();
+    assert_eq!(len, vec.len());
     let mut dec = Decoder::new(&vec);
     let val = dec.decode().unwrap();
     assert_eq!(dec.position(), vec.len());
@@ -184,6 +186,7 @@ fn byte_slice() {
     fn property(arg: Vec<u8>) -> bool {
         let arg: &ByteSlice = arg.as_slice().into();
         let vec = minicbor::to_vec(arg).unwrap();
+        assert_eq!(minicbor::len(arg), vec.len());
         let mut dec = Decoder::new(&vec);
         assert_eq!(Some(Type::Bytes), dec.datatype().ok());
         dec.set_position(0);
@@ -201,6 +204,7 @@ fn byte_array() {
 
     let arg = ByteArray::from([1,2,3,4,5,6,7,8]);
     let vec = minicbor::to_vec(&arg).unwrap();
+    assert_eq!(minicbor::len(&arg), vec.len());
     let mut dec = Decoder::new(&vec);
     assert_eq!(Some(Type::Bytes), dec.datatype().ok());
     dec.set_position(0);
@@ -216,6 +220,7 @@ fn byte_vec() {
     fn property(arg: Vec<u8>) -> bool {
         let arg = ByteVec::from(arg);
         let vec = minicbor::to_vec(&arg).unwrap();
+        assert_eq!(minicbor::len(&arg), vec.len());
         let mut dec = Decoder::new(&vec);
         assert_eq!(Some(Type::Bytes), dec.datatype().ok());
         dec.set_position(0);
