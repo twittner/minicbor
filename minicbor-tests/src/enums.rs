@@ -1,4 +1,4 @@
-use minicbor::{Encode, Encoder, Decode, Decoder, decode, encode::{self, Write}};
+use minicbor::{CborLen, Encode, Encoder, Decode, Decoder, decode, encode::{self, Write}};
 
 mod unit {
     use super::*;
@@ -10,33 +10,37 @@ mod unit {
     pub(super) fn decode<C>(_d: &mut Decoder<'_>, _c: &mut C) -> Result<Unit, decode::Error> {
         unimplemented!()
     }
+
+    pub(super) fn cbor_len<C>(x: &Unit, ctx: &mut C) -> usize {
+        x.cbor_len(ctx)
+    }
 }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 struct Unit (#[n(0)] ());
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum E0 {
     #[n(0)] A { #[n(0)] field: Unit },
     #[n(1)] B,
     #[n(2)] C(#[n(0)] Unit)
 }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum E1 {
     #[n(0)] A { #[n(0)] #[cbor(with = "unit")] field: Unit },
     #[n(1)] B,
     #[n(2)] C(#[n(0)] #[cbor(with = "unit")] Unit)
 }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum E2 {
     #[n(0)] A { #[n(0)] #[cbor(encode_with = "unit::encode")] field: Unit },
     #[n(1)] B,
     #[n(2)] C(#[n(0)] #[cbor(encode_with = "unit::encode")] Unit)
 }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum E3 {
     #[n(0)] A { #[n(0)] #[cbor(decode_with = "unit::decode")] field: Unit },
     #[n(1)] B,
@@ -53,19 +57,23 @@ mod generic {
     pub(super) fn decode<C, T>(_d: &mut Decoder<'_>, _c: &mut C) -> Result<T, decode::Error> {
         unimplemented!()
     }
+
+    pub(super) fn cbor_len<C, T: CborLen<C>>(x: &T, ctx: &mut C) -> usize {
+        x.cbor_len(ctx)
+    }
 }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum Gen<T> { #[n(0)] A(#[n(0)] T) }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum GE0<T> {
     #[n(0)] A { #[n(0)] field: Gen<T> },
     #[n(1)] B,
     #[n(2)] C(#[n(0)] Gen<T>)
 }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum GE1<T, U, Z> {
     #[n(0)] A { #[n(0)] #[cbor(with = "generic")] field: Gen<T> },
     #[n(1)] B,
@@ -74,7 +82,7 @@ enum GE1<T, U, Z> {
     #[n(4)] E { #[n(0)] field: Z }
 }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum GE2<T, U, Z> {
     #[n(0)] A { #[n(0)] #[cbor(encode_with = "generic::encode")] field: Gen<T> },
     #[n(1)] B,
@@ -83,7 +91,7 @@ enum GE2<T, U, Z> {
     #[n(4)] E { #[n(0)] field: Z }
 }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum GE3<T, U, Z> {
     #[n(0)] A { #[n(0)] #[cbor(decode_with = "generic::decode")] field: Gen<T> },
     #[n(1)] B,
@@ -102,12 +110,16 @@ mod borrow {
     pub(super) fn decode<'a, C>(d: &mut Decoder<'a>, _c: &mut C) -> Result<&'a str, decode::Error> {
         d.str()
     }
+
+    pub(super) fn cbor_len<C>(x: &str, ctx: &mut C) -> usize {
+        x.cbor_len(ctx)
+    }
 }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum Borrowed<'a> { #[n(0)] A(#[b(0)] &'a str) }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum BE0<'a, T, U> {
     #[n(0)] A { #[b(0)] field: Borrowed<'a> },
     #[n(1)] B,
@@ -116,7 +128,7 @@ enum BE0<'a, T, U> {
     #[n(4)] E { #[n(0)] field: U }
 }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum BE1<'a, T, U> {
     #[n(0)] A {
         #[b(0)] #[cbor(with = "generic")] field1: Borrowed<'a>,
@@ -131,7 +143,7 @@ enum BE1<'a, T, U> {
     #[n(4)] E { #[n(0)] field: U }
 }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum BE2<'a, T, U> {
     #[n(0)] A {
         #[b(0)] #[cbor(encode_with = "generic::encode")] field1: Borrowed<'a>,
@@ -146,7 +158,7 @@ enum BE2<'a, T, U> {
     #[n(4)] E { #[n(0)] field: U }
 }
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, CborLen)]
 enum BE3<'a, T, U> {
     #[n(0)] A {
         #[b(0)] #[cbor(decode_with = "generic::decode")] field1: Borrowed<'a>,
