@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.19.1`
+
+- Bugfix release (see merge request !26 by @jeandudey for details).
+
 ## `0.19.0`
 
 - Added the trait `CborLen` and functions `minicbor::len` and `minicbor::len_with` to allow client
