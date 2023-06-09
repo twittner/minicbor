@@ -80,6 +80,22 @@ impl<'b, C> Decode<'b, C> for alloc::string::String {
     }
 }
 
+impl<'a, 'b: 'a, C> Decode<'b, C> for &'a core::ffi::CStr {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
+        let p = d.position();
+        let b = d.bytes()?;
+        core::ffi::CStr::from_bytes_with_nul(b).map_err(|_| Error::message("invalid c-string").at(p))
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'b, C> Decode<'b, C> for alloc::ffi::CString {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
+        let c: &core::ffi::CStr = d.decode()?;
+        Ok(Self::from(c))
+    }
+}
+
 #[cfg(feature = "alloc")]
 impl<'b, C> Decode<'b, C> for alloc::boxed::Box<str> {
     fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {

@@ -162,6 +162,33 @@ impl<C> CborLen<C> for alloc::string::String {
     }
 }
 
+impl<C> Encode<C> for core::ffi::CStr {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), Error<W::Error>> {
+        e.bytes(self.to_bytes_with_nul())?.ok()
+    }
+}
+
+impl<C> CborLen<C> for core::ffi::CStr {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        let n = self.to_bytes_with_nul().len();
+        n.cbor_len(ctx) + n
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<C> Encode<C> for alloc::ffi::CString {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
+        self.as_c_str().encode(e, ctx)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<C> CborLen<C> for alloc::ffi::CString {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        self.as_c_str().cbor_len(ctx)
+    }
+}
+
 #[cfg(feature = "alloc")]
 impl<C, T> Encode<C> for alloc::borrow::Cow<'_, T>
 where
