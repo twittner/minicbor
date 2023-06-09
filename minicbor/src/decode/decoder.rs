@@ -644,7 +644,7 @@ impl<'b> Decoder<'b> {
     }
 
     /// Decode a `u64` value beginning with `b`.
-    fn unsigned(&mut self, b: u8, p: usize) -> Result<u64, Error> {
+    pub(crate) fn unsigned(&mut self, b: u8, p: usize) -> Result<u64, Error> {
         match b {
             n @ 0 ..= 0x17 => Ok(u64::from(n)),
             0x18 => self.read().map(u64::from),
@@ -962,12 +962,12 @@ impl<'b> core::ops::DerefMut for Probe<'_, 'b> {
 }
 
 /// Get the major type info of the given byte (highest 3 bits).
-fn type_of(b: u8) -> u8 {
+pub(crate) fn type_of(b: u8) -> u8 {
     b & 0b111_00000
 }
 
 /// Get the additionl type info of the given byte (lowest 5 bits).
-fn info_of(b: u8) -> u8 {
+pub(crate) fn info_of(b: u8) -> u8 {
     b & 0b000_11111
 }
 

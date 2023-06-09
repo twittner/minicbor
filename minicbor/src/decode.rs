@@ -4,6 +4,7 @@
 
 mod decoder;
 mod error;
+pub mod info;
 
 pub use decoder::{Decoder, Probe};
 pub use decoder::{ArrayIter, ArrayIterWithCtx, BytesIter, MapIter, MapIterWithCtx, StrIter};
