@@ -2,6 +2,8 @@
 //!
 //! This module defines the trait [`Decode`] and the actual [`Decoder`].
 
+use core::mem::MaybeUninit;
+
 mod decoder;
 mod error;
 pub mod info;
@@ -382,35 +384,78 @@ decode_sequential! {
     alloc::collections::LinkedList<T>, push_back
 }
 
-macro_rules! decode_arrays {
-    ($($n:expr)*) => {
-        $(
-            impl<'b, C, T: Decode<'b, C> + Default> Decode<'b, C> for [T; $n] {
-                fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
-                    let p = d.position();
-                    let iter: ArrayIterWithCtx<C, T> = d.array_iter_with(ctx)?;
-                    let mut a: [T; $n] = Default::default();
-                    let mut i = 0;
-                    for x in iter {
-                        if i >= a.len() {
-                            let msg = concat!("array has more than ", $n, " elements");
-                            return Err(Error::message(msg).at(p))
-                        }
-                        a[i] = x?;
-                        i += 1;
-                    }
-                    if i < a.len() {
-                        let msg = concat!("array has less than ", $n, " elements");
-                        return Err(Error::message(msg).at(p))
-                    }
-                    Ok(a)
-                }
-            }
-        )*
+struct ArrayVec<T, const N: usize>{
+    len: usize,
+    buffer: [MaybeUninit<T>; N],
+}
+
+impl <T, const N: usize> ArrayVec<T, N> {
+    const ELEM: MaybeUninit<T> = MaybeUninit::uninit();
+    const INIT: [MaybeUninit<T>; N] = [Self::ELEM; N];
+
+    fn new() -> Self {
+        Self {
+            len: 0,
+            buffer: Self::INIT,
+        }
+    }
+
+    fn into_array(self) -> Result<[T; N], Self> {
+        if self.len == N {
+            // This is how the unstable `MaybeUninit::array_assume_init` method does it
+            let array = unsafe { (&self.buffer as *const _ as *const [T; N]).read() };
+
+            // We don't want `self`'s destructor to be called because that would drop all the
+            // items in the array
+            core::mem::forget(self);
+
+            Ok(array)
+        } else {
+            Err(self)
+        }
+    }
+
+    fn push(&mut self, item: T) -> Result<(), T> {
+        if let Some(slot) = self.buffer.get_mut(self.len) {
+            *slot = MaybeUninit::new(item);
+            self.len += 1;
+
+            Ok(())
+        } else {
+            Err(item)
+        }
     }
 }
 
-decode_arrays!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
+impl <T, const N: usize> core::ops::Drop for ArrayVec<T, N> {
+    fn drop(&mut self) {
+        unsafe { core::ptr::drop_in_place(core::slice::from_raw_parts_mut(self.buffer.as_mut_ptr() as *mut T, self.len)) }
+    }
+}
+
+impl<'b, C, T: Decode<'b, C>, const N: usize> Decode<'b, C> for [T; N] {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        let p = d.position();
+        let iter: ArrayIterWithCtx<C, T> = d.array_iter_with(ctx)?;
+        let mut a = ArrayVec::<T, N>::new();
+        for x in iter {
+            a.push(x?).map_err(|_| {
+                #[cfg(feature = "std")]
+                let msg = &format!("array has more than {N} elements");
+                #[cfg(not(feature = "std"))]
+                let msg = "array has too many elements";
+                Error::message(msg).at(p)
+            })?;
+        }
+        a.into_array().map_err(|_| {
+            #[cfg(feature = "std")]
+            let msg = &format!("array has less than {N} elements");
+            #[cfg(not(feature = "std"))]
+            let msg = "array has too few elements";
+            Error::message(msg).at(p)
+        })
+    }
+}
 
 macro_rules! decode_tuples {
     ($( $len:expr => { $($T:ident)+ } )+) => {
