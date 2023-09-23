@@ -391,19 +391,19 @@ struct ArrayVec<T, const N: usize>{
 
 impl <T, const N: usize> ArrayVec<T, N> {
     const ELEM: MaybeUninit<T> = MaybeUninit::uninit();
-    const INIT: [MaybeUninit<T>; N] = [Self::ELEM; N];
 
     fn new() -> Self {
         Self {
             len: 0,
-            buffer: Self::INIT,
+            buffer: [Self::ELEM; N]
         }
     }
 
     fn into_array(self) -> Result<[T; N], Self> {
         if self.len == N {
-            // This is how the unstable `MaybeUninit::array_assume_init` method does it
-            let array = unsafe { (&self.buffer as *const _ as *const [T; N]).read() };
+            let array = unsafe {
+                (&self.buffer as *const [MaybeUninit<T>; N] as *const [T; N]).read()
+            };
 
             // We don't want `self`'s destructor to be called because that would drop all the
             // items in the array
@@ -417,9 +417,8 @@ impl <T, const N: usize> ArrayVec<T, N> {
 
     fn push(&mut self, item: T) -> Result<(), T> {
         if let Some(slot) = self.buffer.get_mut(self.len) {
-            *slot = MaybeUninit::new(item);
+            slot.write(item);
             self.len += 1;
-
             Ok(())
         } else {
             Err(item)
@@ -429,7 +428,10 @@ impl <T, const N: usize> ArrayVec<T, N> {
 
 impl <T, const N: usize> core::ops::Drop for ArrayVec<T, N> {
     fn drop(&mut self) {
-        unsafe { core::ptr::drop_in_place(core::slice::from_raw_parts_mut(self.buffer.as_mut_ptr() as *mut T, self.len)) }
+        unsafe {
+            let s = core::slice::from_raw_parts_mut(self.buffer.as_mut_ptr() as *mut T, self.len);
+            core::ptr::drop_in_place(s)
+        }
     }
 }
 
@@ -440,17 +442,17 @@ impl<'b, C, T: Decode<'b, C>, const N: usize> Decode<'b, C> for [T; N] {
         let mut a = ArrayVec::<T, N>::new();
         for x in iter {
             a.push(x?).map_err(|_| {
-                #[cfg(feature = "std")]
-                let msg = &format!("array has more than {N} elements");
-                #[cfg(not(feature = "std"))]
+                #[cfg(feature = "alloc")]
+                let msg = &alloc::format!("array has more than {N} elements");
+                #[cfg(not(feature = "alloc"))]
                 let msg = "array has too many elements";
                 Error::message(msg).at(p)
             })?;
         }
         a.into_array().map_err(|_| {
-            #[cfg(feature = "std")]
-            let msg = &format!("array has less than {N} elements");
-            #[cfg(not(feature = "std"))]
+            #[cfg(feature = "alloc")]
+            let msg = &alloc::format!("array has less than {N} elements");
+            #[cfg(not(feature = "alloc"))]
             let msg = "array has too few elements";
             Error::message(msg).at(p)
         })
