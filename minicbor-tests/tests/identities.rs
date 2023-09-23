@@ -175,6 +175,11 @@ fn string() {
 }
 
 #[test]
+fn cstring() {
+    quickcheck(identity as fn(std::ffi::CString) -> bool)
+}
+
+#[test]
 fn bytes() {
     quickcheck(identity as fn(Vec<u8>) -> bool)
 }

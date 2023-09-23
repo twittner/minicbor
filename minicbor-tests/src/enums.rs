@@ -1,3 +1,5 @@
+#![cfg(feature = "derive")]
+
 use minicbor::{CborLen, Encode, Encoder, Decode, Decoder, decode, encode::{self, Write}};
 
 mod unit {

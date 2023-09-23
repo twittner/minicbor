@@ -6,6 +6,13 @@
 
 # minicbor
 
+## `0.20.0`
+
+- Support for decoding arrays of arbitrary length has been added (cf. merge request !31 by @samuelmhicks).
+- Added `Encode` and `Decode` impls for `CStr` and `CString` (cf. merge request !29).
+- Added `decode::info::Size` to allow length introspection of CBOR values (see merge requests !25
+  and !28 for details).
+
 ## `0.19.1`
 
 - Bugfix release (see merge request !26 by @jeandudey for details).
@@ -387,6 +394,10 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.15.0`
+
+- Require at least `minicbor-0.20.0`.
 
 ## `0.14.0`
 
