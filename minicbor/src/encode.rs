@@ -616,30 +616,21 @@ encode_sequential! {
     alloc::collections::BTreeSet<T>
 }
 
-macro_rules! encode_arrays {
-    ($($n:expr)*) => {
-        $(
-            impl<C, T: Encode<C>> Encode<C> for [T; $n] {
-                fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
-                    e.array($n)?;
-                    for x in self {
-                        x.encode(e, ctx)?
-                    }
-                    Ok(())
-                }
-            }
-
-            impl<C, T: CborLen<C>> CborLen<C> for [T; $n] {
-                fn cbor_len(&self, ctx: &mut C) -> usize {
-                    let n = self.len();
-                    n.cbor_len(ctx) + self.iter().map(|x| x.cbor_len(ctx)).sum::<usize>()
-                }
-            }
-        )*
+impl <C, T: Encode<C>, const N: usize> Encode<C> for [T; N] {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
+        e.array(N as u64)?;
+        for x in self {
+            x.encode(e, ctx)?
+        }
+        Ok(())
     }
 }
 
-encode_arrays!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
+impl<C, T: CborLen<C>, const N: usize> CborLen<C> for [T; N] {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        N.cbor_len(ctx) + self.iter().map(|x| x.cbor_len(ctx)).sum::<usize>()
+    }
+}
 
 macro_rules! encode_tuples {
     ($( $len:expr => { $($T:ident ($idx:tt))+ } )+) => {
