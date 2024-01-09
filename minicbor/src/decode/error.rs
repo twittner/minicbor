@@ -277,6 +277,88 @@ impl fmt::Display for Error {
     }
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for Error {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        use defmt::write;
+
+        match &self.err {
+            ErrorImpl::EndOfInput =>
+                match (self.msg.as_ref(), self.pos) {
+                    ("", None)    => write!(f, "end of input bytes"),
+                    ("", Some(p)) => write!(f, "end of input bytes at position {}", p),
+                    (m, None)     => write!(f, "end of input bytes: {}", m),
+                    (m, Some(p))  => write!(f, "end of input bytes at position {}: {}", p, m)
+                }
+            ErrorImpl::InvalidChar(n) =>
+                match (self.msg.as_ref(), self.pos) {
+                    ("", None)    => write!(f, "invalid char {}", n),
+                    ("", Some(p)) => write!(f, "invalid char {} at position {}", n, p),
+                    (m, None)     => write!(f, "invalid char {}: {}", n, m),
+                    (m, Some(p))  => write!(f, "invalid char {} at position {}: {}", n, p, m)
+                }
+            #[cfg(not(feature = "std"))]
+            ErrorImpl::Utf8(_) =>
+                match (self.msg.as_ref(), self.pos) {
+                    ("", None)    => write!(f, "invalid utf-8"),
+                    ("", Some(p)) => write!(f, "invalid utf-8 at position {}", p),
+                    (m, None)     => write!(f, "invalid utf-8: {}", m),
+                    (m, Some(p))  => write!(f, "invalid utf-8 at position {}: {}", p, m)
+                }
+            #[cfg(feature = "std")]
+            ErrorImpl::Utf8(_) =>
+                match (self.msg.as_ref(), self.pos) {
+                    ("", None)    => write!(f, "invalid utf-8"),
+                    ("", Some(p)) => write!(f, "invalid utf-8 at position {}", p),
+                    (m, None)     => write!(f, "invalid utf-8: {}", m),
+                    (m, Some(p))  => write!(f, "invalid utf-8 at position {}: {}", p, m)
+                }
+            ErrorImpl::Overflow(n) =>
+                match (self.msg.as_ref(), self.pos) {
+                    ("", None)    => write!(f, "{} overflows target type", n),
+                    ("", Some(p)) => write!(f, "{} overflows target type at position {}", n, p),
+                    (m, None)     => write!(f, "{} overflows target type: {}", n, m),
+                    (m, Some(p))  => write!(f, "{} overflows target type at position {}: {}", n, p, m)
+                }
+            ErrorImpl::TypeMismatch(t) =>
+                match (self.msg.as_ref(), self.pos) {
+                    ("", None)    => write!(f, "unexpected type {}", t),
+                    ("", Some(p)) => write!(f, "unexpected type {} at position {}", t, p),
+                    (m, None)     => write!(f, "unexpected type {}: {}", t, m),
+                    (m, Some(p))  => write!(f, "unexpected type {} at position {}: {}", t, p, m)
+                }
+            ErrorImpl::UnknownVariant(n) =>
+                match (self.msg.as_ref(), self.pos) {
+                    ("", None)    => write!(f, "unknown enum variant {}", n),
+                    ("", Some(p)) => write!(f, "unknown enum variant {} at position {}", n, p),
+                    (m, None)     => write!(f, "unknown enum variant {}: {}", n, m),
+                    (m, Some(p))  => write!(f, "unknown enum variant {} at position {}: {}", n, p, m)
+                }
+            ErrorImpl::MissingValue(n) =>
+                match (self.msg.as_ref(), self.pos) {
+                    ("", None)    => write!(f, "missing value at index {}", n),
+                    ("", Some(p)) => write!(f, "missing value at index {} in map or array starting at position {}", n, p),
+                    (m, None)     => write!(f, "missing value at index {} ({})", n, m),
+                    (m, Some(p))  => write!(f, "missing value at index {} ({}) in map or array starting at position {}", n, m, p)
+                }
+            ErrorImpl::Message =>
+                if let Some(p) = self.pos {
+                    write!(f, "decode error at position {}: {}", p, self.msg.as_str())
+                } else {
+                    write!(f, "decode error: {}", self.msg.as_str())
+                }
+            #[cfg(feature = "std")]
+            ErrorImpl::Custom(_) =>
+                match (self.msg.as_ref(), self.pos) {
+                    ("", None)    => write!(f, "decode error"),
+                    ("", Some(p)) => write!(f, "decode error at position {}", p),
+                    (m, None)     => write!(f, "decode error: {}", m),
+                    (m, Some(p))  => write!(f, "decode error at position {}: {}", p, m)
+                }
+        }
+    }
+}
+
 #[cfg(feature = "std")]
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {

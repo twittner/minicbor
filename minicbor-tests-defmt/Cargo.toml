@@ -1,0 +1,14 @@
+[package]
+publish = false
+name    = "minicbor-tests-defmt"
+version = "0.1.0"
+authors = ["Christian Amsüss <chrysn@fsfe.org>"]
+edition = "2021"
+
+[dependencies]
+minicbor = { path = "../minicbor", features = [ "defmt" ] }
+defmt = "0.3"
+defmt-rtt = "0.4"
+cortex-m = { version = "0.7.6", features = ["critical-section-single-core"]}
+panic-halt = "0.2.0"
+cortex-m-rt = "0.7.3"

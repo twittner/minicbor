@@ -2,6 +2,7 @@
 
 build:
 	cd minicbor-tests-nostd && cargo rustc -- -C link-arg=-nostartfiles
+	cd minicbor-tests-defmt && cargo build
 	cargo build -p minicbor
 	cargo build -p minicbor-io
 	cargo build --all --features="derive"

@@ -3,6 +3,7 @@
 use core::fmt;
 
 /// CBOR data types.
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum Type {
     Bool,
