@@ -1,6 +1,6 @@
 #![cfg(feature = "std")]
 
-use minicbor::{Decoder, Encoder, data::{Tag, Type}};
+use minicbor::{Decoder, Encoder, data::{IanaTag, Type}};
 use std::{collections::BTreeMap, iter::FromIterator};
 
 // Test vectors of RFC 7049
@@ -105,11 +105,11 @@ fn rfc_tv_tagged() {
         let s = "c074323031332d30332d32315432303a30343a30305a";
         let x = hex::decode(s).unwrap();
         let mut d = Decoder::new(&x);
-        assert_eq!(Tag::DateTime, d.tag().unwrap());
+        assert_eq!(IanaTag::DateTime.tag(), d.tag().unwrap());
         assert_eq!("2013-03-21T20:04:00Z", d.str().unwrap());
 
         let mut e = Encoder::new(Vec::new());
-        e.tag(Tag::DateTime).unwrap();
+        e.tag(IanaTag::DateTime).unwrap();
         e.str("2013-03-21T20:04:00Z").unwrap();
         let y = hex::encode(e.into_writer());
         assert_eq!(s, y);
@@ -120,12 +120,12 @@ fn rfc_tv_tagged() {
         let s = "c11a514b67b0";
         let x = hex::decode(s).unwrap();
         let mut d = Decoder::new(&x);
-        assert_eq!(Tag::Timestamp, d.tag().unwrap());
+        assert_eq!(IanaTag::Timestamp.tag(), d.tag().unwrap());
         assert_eq!(Type::U32, d.datatype().unwrap());
         assert_eq!(1363896240, d.u32().unwrap());
 
         let mut e = Encoder::new(Vec::new());
-        e.tag(Tag::Timestamp).unwrap();
+        e.tag(IanaTag::Timestamp).unwrap();
         e.u32(1363896240).unwrap();
         let y = hex::encode(e.into_writer());
         assert_eq!(s, y);
@@ -136,12 +136,12 @@ fn rfc_tv_tagged() {
         let s = "c1fb41d452d9ec200000";
         let x = hex::decode(s).unwrap();
         let mut d = Decoder::new(&x);
-        assert_eq!(Tag::Timestamp, d.tag().unwrap());
+        assert_eq!(IanaTag::Timestamp.tag(), d.tag().unwrap());
         assert_eq!(Type::F64, d.datatype().unwrap());
         assert_eq!(1363896240.5, d.f64().unwrap());
 
         let mut e = Encoder::new(Vec::new());
-        e.tag(Tag::Timestamp).unwrap();
+        e.tag(IanaTag::Timestamp).unwrap();
         e.f64(1363896240.5).unwrap();
         let y = hex::encode(e.into_writer());
         assert_eq!(s, y);
@@ -152,12 +152,12 @@ fn rfc_tv_tagged() {
         let s = "d74401020304";
         let x = hex::decode(s).unwrap();
         let mut d = Decoder::new(&x);
-        assert_eq!(Tag::ToBase16, d.tag().unwrap());
+        assert_eq!(IanaTag::ToBase16.tag(), d.tag().unwrap());
         assert_eq!(Type::Bytes, d.datatype().unwrap());
         assert_eq!([1, 2, 3, 4], d.bytes().unwrap());
 
         let mut e = Encoder::new(Vec::new());
-        e.tag(Tag::ToBase16).unwrap();
+        e.tag(IanaTag::ToBase16).unwrap();
         e.bytes(&[1, 2, 3, 4][..]).unwrap();
         let y = hex::encode(e.into_writer());
         assert_eq!(s, y);
@@ -168,7 +168,7 @@ fn rfc_tv_tagged() {
         let s = "d818456449455446";
         let x = hex::decode(s).unwrap();
         let mut d = Decoder::new(&x);
-        assert_eq!(Tag::Cbor, d.tag().unwrap());
+        assert_eq!(IanaTag::Cbor.tag(), d.tag().unwrap());
         assert_eq!(Type::Bytes, d.datatype().unwrap());
         let mut g = Decoder::new(d.bytes().unwrap());
         assert_eq!(Type::String, g.datatype().unwrap());
@@ -177,7 +177,7 @@ fn rfc_tv_tagged() {
         let mut e = Encoder::new(Vec::new());
         e.str("IETF").unwrap();
         let mut f = Encoder::new(Vec::new());
-        f.tag(Tag::Cbor).unwrap();
+        f.tag(IanaTag::Cbor).unwrap();
         f.bytes(e.writer()).unwrap();
         let y = hex::encode(f.into_writer());
         assert_eq!(s, y);
@@ -188,12 +188,12 @@ fn rfc_tv_tagged() {
         let s = "d82076687474703a2f2f7777772e6578616d706c652e636f6d";
         let x = hex::decode(s).unwrap();
         let mut d = Decoder::new(&x);
-        assert_eq!(Tag::Uri, d.tag().unwrap());
+        assert_eq!(IanaTag::Uri.tag(), d.tag().unwrap());
         assert_eq!(Type::String, d.datatype().unwrap());
         assert_eq!("http://www.example.com", d.str().unwrap());
 
         let mut e = Encoder::new(Vec::new());
-        e.tag(Tag::Uri).unwrap();
+        e.tag(IanaTag::Uri).unwrap();
         e.str("http://www.example.com").unwrap();
         let y = hex::encode(e.into_writer());
         assert_eq!(s, y);

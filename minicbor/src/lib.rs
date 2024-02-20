@@ -79,7 +79,7 @@
 //!
 //! ```
 //! use minicbor::Decoder;
-//! use minicbor::data::Tag;
+//! use minicbor::data::IanaTag;
 //!
 //! let input = [
 //!     0xc0, 0x74, 0x32, 0x30, 0x31, 0x33, 0x2d, 0x30,
@@ -88,7 +88,7 @@
 //! ];
 //!
 //! let mut decoder = Decoder::new(&input);
-//! assert_eq!(Tag::DateTime, decoder.tag()?);
+//! assert_eq!(IanaTag::DateTime.tag(), decoder.tag()?);
 //! assert_eq!("2013-03-21T20:04:00Z", decoder.str()?);
 //! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```
