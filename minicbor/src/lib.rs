@@ -123,7 +123,7 @@
 //! [CBOR]: https://tools.ietf.org/html/rfc7049
 //! [serde]: https://serde.rs
 
-#![forbid(unused_imports, unused_variables)]
+#![forbid(unused_variables)]
 #![allow(clippy::needless_lifetimes)]
 #![cfg_attr(not(feature = "std"), no_std)]
 

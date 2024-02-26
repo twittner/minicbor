@@ -399,6 +399,30 @@ impl<C> CborLen<C> for crate::data::Int {
     }
 }
 
+impl<C> Encode<C> for crate::data::Tag {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), Error<W::Error>> {
+        e.tag(*self)?.ok()
+    }
+}
+
+impl<C> CborLen<C> for crate::data::Tag {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        self.as_u64().cbor_len(ctx)
+    }
+}
+
+impl<C> Encode<C> for crate::data::IanaTag {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), Error<W::Error>> {
+        e.tag(*self)?.ok()
+    }
+}
+
+impl<C> CborLen<C> for crate::data::IanaTag {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        self.tag().cbor_len(ctx)
+    }
+}
+
 macro_rules! encode_basic {
     ($($t:ident)*) => {
         $(

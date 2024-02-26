@@ -1,9 +1,10 @@
 #![cfg(feature = "std")]
 
 use minicbor::{Encode, Encoder, CborLen, Decode, Decoder};
-use minicbor::data::{Int, Type};
+use minicbor::data::{Int, Type, IanaTag};
 use minicbor::encode;
 use quickcheck::quickcheck;
+use quickcheck::{Arbitrary, Gen};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
@@ -576,3 +577,67 @@ fn map_iter2() {
     quickcheck(property as fn(_) -> bool)
 }
 
+#[derive(Debug, Clone)]
+struct Ia(IanaTag);
+
+impl Arbitrary for Ia {
+    fn arbitrary(g: &mut Gen) -> Self {
+        use IanaTag::*;
+        const TAGS: &[IanaTag] = &[
+            DateTime,
+            Timestamp,
+            PosBignum,
+            NegBignum,
+            Decimal,
+            Bigfloat,
+            ToBase64Url,
+            ToBase64,
+            ToBase16,
+            Cbor,
+            Uri,
+            Base64Url,
+            Base64,
+            Regex,
+            Mime,
+            HomogenousArray,
+            TypedArrayU8,
+            TypedArrayU8Clamped,
+            TypedArrayU16B,
+            TypedArrayU32B,
+            TypedArrayU64B,
+            TypedArrayU16L,
+            TypedArrayU32L,
+            TypedArrayU64L,
+            TypedArrayI8,
+            TypedArrayI16B,
+            TypedArrayI32B,
+            TypedArrayI64B,
+            TypedArrayI16L,
+            TypedArrayI32L,
+            TypedArrayI64L,
+            TypedArrayF16B,
+            TypedArrayF32B,
+            TypedArrayF64B,
+            TypedArrayF128B,
+            TypedArrayF16L,
+            TypedArrayF32L,
+            TypedArrayF64L,
+            TypedArrayF128L,
+            MultiDimArrayR,
+            MultiDimArrayC
+        ];
+        Self(*g.choose(TAGS).expect("some tag"))
+    }
+}
+
+#[test]
+fn tags() {
+    fn property(arg: Ia) -> bool {
+        let vec = minicbor::to_vec(arg.0.tag()).unwrap();
+        let mut dec = Decoder::new(&vec);
+        let tag = dec.tag().unwrap();
+        assert_eq!(dec.position(), vec.len());
+        Some(arg.0) == IanaTag::try_from(tag).ok()
+    }
+    quickcheck(property as fn(_) -> bool)
+}
