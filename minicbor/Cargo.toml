@@ -18,10 +18,12 @@ features = ["std", "derive", "half"]
 alloc  = ["minicbor-derive?/alloc"]
 std    = ["alloc", "minicbor-derive?/std"]
 derive = ["minicbor-derive"]
+defmt  = [ "dep:defmt" ]
 
 [dependencies]
 minicbor-derive = { version = "0.13.0", path = "../minicbor-derive", optional = true }
 half            = { version = "1", default-features = false, optional = true }
+defmt           = { version = "0.3", optional = true }
 
 [dev-dependencies]
 minicbor = { path = ".", features = ["std", "half"] }

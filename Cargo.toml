@@ -1,6 +1,6 @@
 [workspace]
 members  = ["minicbor", "minicbor-derive", "minicbor-io", "minicbor-tests", "minicbor-tests-client"]
-exclude  = ["minicbor-tests-nostd"]
+exclude  = ["minicbor-tests-nostd", "minicbor-tests-defmt"]
 resolver = "2"
 
 [profile.bench]
