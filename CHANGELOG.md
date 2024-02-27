@@ -6,6 +6,11 @@
 
 # minicbor
 
+## `0.21.0`
+
+- ⚠️ **Breaking** ⚠️: Tag handling has been reworked (cf. merge request !34). The `Tag` type is now
+  merely a newtype around a `u64`. A new enum `IanaTag` represents registered tag values.
+
 ## `0.20.0`
 
 - Support for decoding arrays of arbitrary length has been added (cf. merge request !31 by @samuelmhicks).
@@ -394,6 +399,10 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.16.0`
+
+- Require at least `minicbor-0.21.0`.
 
 ## `0.15.0`
 
