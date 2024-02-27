@@ -5,7 +5,7 @@ extern crate alloc;
 use alloc::collections::btree_map::BTreeMap;
 use alloc::vec::Vec;
 use minicbor::{Decode, Decoder, Encode, Encoder};
-use minicbor::data::{Tag, Type};
+use minicbor::data::{IanaTag, Tag, Type};
 use minicbor::decode;
 use minicbor::encode::{self, Write};
 use quickcheck::{Arbitrary, Gen};
@@ -296,7 +296,7 @@ fn gen_cbor(g: &mut Gen, indef: bool, rem: usize) -> Cbor {
             Cbor::MapIndef(m)
         }
         _ => {
-            Cbor::Tagged(Tag::Base64, Box::new(Cbor::String(Arbitrary::arbitrary(g))))
+            Cbor::Tagged(IanaTag::Base64.tag(), Box::new(Cbor::String(Arbitrary::arbitrary(g))))
         }
     }
 }

@@ -431,7 +431,7 @@ impl<'b> Decoder<'b> {
                 .with_message("expected tag")
                 .at(p))
         }
-        self.unsigned(info_of(b), p).map(Tag::from)
+        self.unsigned(info_of(b), p).map(Tag::new)
     }
 
     /// Decode a CBOR null value.

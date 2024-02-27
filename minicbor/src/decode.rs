@@ -280,6 +280,12 @@ impl<'b, C> Decode<'b, C> for crate::data::Int {
     }
 }
 
+impl<'b, C> Decode<'b, C> for crate::data::Tag {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
+        d.tag()
+    }
+}
+
 macro_rules! decode_basic {
     ($($t:ident)*) => {
         $(
