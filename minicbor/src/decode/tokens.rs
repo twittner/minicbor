@@ -198,7 +198,7 @@ impl fmt::Display for Tokenizer<'_> {
                         }
                         Some(Ok(Token::Tag(t))) => {
                             stack.push(E::T);
-                            write!(f, "{}(", t.numeric())?
+                            write!(f, "{}(", u64::from(t))?
                         }
                         Some(Ok(t))  => t.fmt(f)?,
                         Some(Err(e)) => {
@@ -359,7 +359,7 @@ impl fmt::Display for Token<'_> {
             Token::String(n)   => write!(f, "\"{}\"", n),
             Token::Array(n)    => write!(f, "A[{}]", n),
             Token::Map(n)      => write!(f, "M[{}]", n),
-            Token::Tag(t)      => write!(f, "T({})", t.numeric()),
+            Token::Tag(t)      => write!(f, "T({})", u64::from(t)),
             Token::Simple(n)   => write!(f, "simple({})", n),
             Token::Break       => f.write_str("]"),
             Token::Null        => f.write_str("null"),

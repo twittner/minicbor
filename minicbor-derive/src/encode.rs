@@ -5,7 +5,7 @@ use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
 use crate::fields::Fields;
 use crate::variants::Variants;
 use quote::{quote, ToTokens};
-use std::{collections::HashSet, convert::TryInto};
+use std::collections::HashSet;
 use syn::spanned::Spanned;
 
 /// Entry point to derive `minicbor::Encode` on structs and enums.
