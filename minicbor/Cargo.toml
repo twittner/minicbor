@@ -21,7 +21,7 @@ derive = ["minicbor-derive"]
 
 [dependencies]
 minicbor-derive = { version = "0.13.0", path = "../minicbor-derive", optional = true }
-half            = { version = "1", default-features = false, optional = true }
+half            = { version = "2.4.0", default-features = false, optional = true }
 
 [dev-dependencies]
 minicbor = { path = ".", features = ["std", "half"] }
