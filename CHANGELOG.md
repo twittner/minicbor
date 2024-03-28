@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.21.1`
+
+- `Tag::new` and `Tag::as_u64` are now declared `const` (cf. merge request !36 by @DCNick3).
+
 ## `0.21.0`
 
 - ⚠️ **Breaking** ⚠️: Tag handling has been reworked (cf. merge request !34). The `Tag` type is now
@@ -399,6 +403,11 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.16.1`
+
+- Maintenance release.
+- Require at least `minicbor-0.21.1`.
 
 ## `0.16.0`
 
