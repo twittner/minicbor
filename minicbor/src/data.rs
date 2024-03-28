@@ -75,11 +75,11 @@ impl fmt::Display for Type {
 pub struct Tag(u64);
 
 impl Tag {
-    pub fn new(n: u64) -> Self {
+    pub const fn new(n: u64) -> Self {
         Self(n)
     }
 
-    pub fn as_u64(self) -> u64 {
+    pub const fn as_u64(self) -> u64 {
         self.0
     }
 }
