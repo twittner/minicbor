@@ -1,6 +1,6 @@
 [package]
 name          = "minicbor-io"
-version       = "0.16.0"
+version       = "0.16.1"
 authors       = ["Toralf Wittner <tw@dtex.org>"]
 license       = "BlueOak-1.0.0"
 edition       = "2021"
@@ -20,10 +20,10 @@ async-io = ["futures-core", "futures-io", "futures-util"]
 futures-core = { version = "0.3.8", optional = true }
 futures-io   = { version = "0.3.8", optional = true }
 futures-util = { version = "0.3.8", features = ["io"], optional = true }
-minicbor     = { path = "../minicbor", version = "0.21.0", features = ["std"] }
+minicbor     = { path = "../minicbor", version = "0.21.1", features = ["std"] }
 
 [dev-dependencies]
-minicbor    = { path = "../minicbor", version = "0.21.0", features = ["std", "derive"] }
+minicbor    = { path = "../minicbor", version = "0.21.1", features = ["std", "derive"] }
 minicbor-io = { path = ".", features = ["async-io"] }
 quickcheck  = "1.0.1"
 rand        = "0.8"
