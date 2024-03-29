@@ -141,6 +141,9 @@ pub mod data;
 pub mod decode;
 pub mod encode;
 
+#[cfg(feature = "serde")]
+pub mod serde;
+
 const UNSIGNED: u8 = 0x00;
 const SIGNED: u8   = 0x20;
 const BYTES: u8    = 0x40;

@@ -135,3 +135,16 @@ impl<E: std::error::Error + 'static> std::error::Error for Error<E> {
     }
 }
 
+#[cfg(all(feature = "serde", feature = "std"))]
+impl<E: std::error::Error + 'static> serde::ser::Error for Error<E> {
+    fn custom<T: core::fmt::Display>(msg: T) -> Self {
+        Self::message(msg)
+    }
+}
+
+#[cfg(all(feature = "serde", not(feature = "std")))]
+impl<E: core::fmt::Display + 'static> serde::ser::Error for Error<E> {
+    fn custom<T: core::fmt::Display>(msg: T) -> Self {
+        Self::message(msg)
+    }
+}
