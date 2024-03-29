@@ -17,6 +17,18 @@ impl<'de> Deserializer<'de> {
     pub fn from_slice(b: &'de [u8]) -> Self {
         Self::new(Decoder::new(b))
     }
+
+    pub fn decoder(&self) -> &Decoder<'de> {
+        &self.decoder
+    }
+
+    pub fn decoder_mut(&mut self) -> &mut Decoder<'de> {
+        &mut self.decoder
+    }
+
+    pub fn into_decoder(self) -> Decoder<'de> {
+        self.decoder
+    }
 }
 
 impl<'de> From<Decoder<'de>> for Deserializer<'de> {
@@ -28,35 +40,42 @@ impl<'de> From<Decoder<'de>> for Deserializer<'de> {
 impl<'a, 'de> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
 
-    fn deserialize_any<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
         match self.decoder.datatype()? {
-            Type::Bool         => todo!(),
-            Type::U8           => todo!{},
-            Type::U16          => todo!{},
-            Type::U32          => todo!{},
-            Type::U64          => todo!{},
-            Type::I8           => todo!{},
-            Type::I16          => todo!{},
-            Type::I32          => todo!{},
-            Type::I64          => todo!{},
-            Type::Int          => todo!{},
-            Type::F16          => todo!{},
-            Type::F32          => todo!{},
-            Type::F64          => todo!{},
-            Type::Bytes        => todo!{},
-            Type::String       => todo!{},
-            Type::Tag          => todo!{},
-            Type::Simple       => todo!{},
-            Type::Array        => todo!(),
-            Type::Map          => todo!(),
-            Type::BytesIndef   => todo!(),
-            Type::StringIndef  => todo!(),
-            Type::ArrayIndef   => todo!(),
-            Type::MapIndef     => todo!(),
-            Type::Null         => todo!(),
-            Type::Undefined    => todo!(),
-            Type::Break        => todo!(),
-            Type::Unknown(_)   => todo!()
+            Type::Bool       => self.deserialize_bool(visitor),
+            Type::U8         => self.deserialize_u8(visitor),
+            Type::U16        => self.deserialize_u16(visitor),
+            Type::U32        => self.deserialize_u32(visitor),
+            Type::U64        => self.deserialize_u64(visitor),
+            Type::I8         => self.deserialize_i8(visitor),
+            Type::I16        => self.deserialize_i16(visitor),
+            Type::I32        => self.deserialize_i32(visitor),
+            Type::I64        => self.deserialize_i64(visitor),
+            Type::F32        => self.deserialize_f32(visitor),
+            Type::F64        => self.deserialize_f64(visitor),
+            Type::Bytes      => visitor.visit_borrowed_bytes(self.decoder.bytes()?),
+            Type::String     => visitor.visit_borrowed_str(self.decoder.str()?),
+            Type::Null       => {
+                self.decoder.skip()?;
+                visitor.visit_none()
+            }
+            Type::BytesIndef => {
+                let mut buf = Vec::new();
+                for b in self.decoder.bytes_iter()? {
+                    buf.extend_from_slice(b?)
+                }
+                visitor.visit_byte_buf(buf)
+            }
+            Type::StringIndef => {
+                let mut buf = String::new();
+                for b in self.decoder.str_iter()? {
+                    buf += b?
+                }
+                visitor.visit_string(buf)
+            }
+            Type::Array | Type::ArrayIndef => self.deserialize_seq(visitor),
+            Type::Map   | Type::MapIndef   => self.deserialize_map(visitor),
+            t => Err(Error::type_mismatch(t).with_message("unexpected type").at(self.decoder.position()))
         }
     }
 
@@ -193,6 +212,13 @@ impl<'a, 'de> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>
     {
+        let p = self.decoder.position();
+        if Type::Map == self.decoder.datatype()? {
+            let m = self.decoder.map()?;
+            if m != Some(1) {
+                return Err(Error::message("invalid enum map length").at(p))
+            }
+        }
         visitor.visit_enum(Enum::new(self))
     }
 

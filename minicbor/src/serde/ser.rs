@@ -1,7 +1,14 @@
+use core::convert::Infallible;
 use crate::encode::{Encoder, Error, Write};
 use serde::Serialize;
 use serde::ser::{self, SerializeSeq, SerializeTuple, SerializeTupleStruct, SerializeTupleVariant};
 use serde::ser::{SerializeMap, SerializeStruct, SerializeStructVariant};
+
+pub fn to_vec<T: Serialize>(val: &T) -> Result<Vec<u8>, Error<Infallible>> {
+    let mut v = Vec::new();
+    val.serialize(&mut Serializer::new(&mut v))?;
+    Ok(v)
+}
 
 pub struct Serializer<W> {
     encoder: Encoder<W>,
@@ -10,15 +17,30 @@ pub struct Serializer<W> {
 
 impl<W: Write> Serializer<W> {
     pub fn new(w: W) -> Self {
-        Serializer {
-            encoder: Encoder::new(w),
-            use_variant_names: false
-        }
+        Self::from(Encoder::new(w))
     }
 
     pub fn use_variant_names(mut self, val: bool) -> Self {
         self.use_variant_names = val;
         self
+    }
+
+    pub fn encoder(&self) -> &Encoder<W> {
+        &self.encoder
+    }
+
+    pub fn encoder_mut(&mut self) -> &mut Encoder<W> {
+        &mut self.encoder
+    }
+
+    pub fn into_encoder(self) -> Encoder<W> {
+        self.encoder
+    }
+}
+
+impl<W: Write> From<Encoder<W>> for Serializer<W> {
+    fn from(e: Encoder<W>) -> Self {
+        Self { encoder: e, use_variant_names: true }
     }
 }
 

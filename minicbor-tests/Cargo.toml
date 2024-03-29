@@ -12,6 +12,7 @@ repository  = "https://gitlab.com/twittner/minicbor"
 alloc  = []
 std    = ["alloc", "minicbor/std", "minicbor/derive"]
 derive = ["alloc", "minicbor/derive"]
+serde  = ["minicbor/serde"]
 
 [dependencies]
 minicbor = { path = "../minicbor", features = ["half"] }
