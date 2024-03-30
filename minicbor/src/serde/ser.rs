@@ -1,28 +1,23 @@
-use core::convert::Infallible;
 use crate::encode::{Encoder, Error, Write};
 use serde::Serialize;
-use serde::ser::{self, SerializeSeq, SerializeTuple, SerializeTupleStruct, SerializeTupleVariant};
-use serde::ser::{SerializeMap, SerializeStruct, SerializeStructVariant};
+use serde::ser::{self, StdError, SerializeSeq, SerializeTuple, SerializeTupleStruct};
+use serde::ser::{SerializeMap, SerializeStruct, SerializeStructVariant, SerializeTupleVariant};
 
-pub fn to_vec<T: Serialize>(val: &T) -> Result<Vec<u8>, Error<Infallible>> {
+#[cfg(feature = "std")]
+pub fn to_vec<T: Serialize>(val: &T) -> Result<Vec<u8>, Error<core::convert::Infallible>> {
     let mut v = Vec::new();
     val.serialize(&mut Serializer::new(&mut v))?;
     Ok(v)
 }
 
+#[derive(Debug, Clone)]
 pub struct Serializer<W> {
-    encoder: Encoder<W>,
-    use_variant_names: bool
+    encoder: Encoder<W>
 }
 
 impl<W: Write> Serializer<W> {
     pub fn new(w: W) -> Self {
         Self::from(Encoder::new(w))
-    }
-
-    pub fn use_variant_names(mut self, val: bool) -> Self {
-        self.use_variant_names = val;
-        self
     }
 
     pub fn encoder(&self) -> &Encoder<W> {
@@ -40,13 +35,13 @@ impl<W: Write> Serializer<W> {
 
 impl<W: Write> From<Encoder<W>> for Serializer<W> {
     fn from(e: Encoder<W>) -> Self {
-        Self { encoder: e, use_variant_names: true }
+        Self { encoder: e }
     }
 }
 
 impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W>
 where
-    <W as Write>::Error: std::error::Error + 'static
+    <W as Write>::Error: StdError + 'static
 {
     type Ok = ();
     type Error = Error<W::Error>;
@@ -137,15 +132,11 @@ where
     fn serialize_unit_variant
         ( self
         , _name: &'static str
-        , index: u32
+        , _index: u32
         , variant: &'static str
         ) -> Result<Self::Ok, Self::Error>
     {
-        if self.use_variant_names {
-            variant.serialize(self)
-        } else {
-            index.serialize(self)
-        }
+        variant.serialize(self)
     }
 
     fn serialize_newtype_struct<T>
@@ -162,18 +153,14 @@ where
     fn serialize_newtype_variant<T>
         ( self
         , _name: &'static str
-        , index: u32
+        , _index: u32
         , variant: &'static str
         , value: &T
         ) -> Result<Self::Ok, Self::Error>
     where
         T: Serialize + ?Sized
     {
-        if self.use_variant_names {
-            self.encoder.map(1)?.str(variant)?;
-        } else {
-            self.encoder.map(1)?.u32(index)?;
-        }
+        self.encoder.map(1)?.str(variant)?;
         value.serialize(self)
     }
 
@@ -203,16 +190,12 @@ where
     fn serialize_tuple_variant
         ( self
         , _name: &'static str
-        , index: u32
+        , _index: u32
         , variant: &'static str
         , len: usize
         ) -> Result<Self::SerializeTupleVariant, Self::Error>
     {
-        if self.use_variant_names {
-            self.encoder.map(1)?.str(variant)?;
-        } else {
-            self.encoder.map(1)?.u32(index)?;
-        }
+        self.encoder.map(1)?.str(variant)?;
         self.serialize_tuple(len)
     }
 
@@ -238,20 +221,24 @@ where
     fn serialize_struct_variant
         ( self
         , name: &'static str
-        , index: u32
+        , _index: u32
         , variant: &'static str
         , len: usize
         ) -> Result<Self::SerializeStructVariant, Self::Error>
     {
-        if self.use_variant_names {
-            self.encoder.map(1)?.str(variant)?;
-        } else {
-            self.encoder.map(1)?.u32(index)?;
-        }
+        self.encoder.map(1)?.str(variant)?;
         self.serialize_struct(name, len)
     }
-}
 
+    #[cfg(not(feature = "alloc"))]
+    fn collect_str<T: core::fmt::Display + ?Sized>(self, _val: &T) -> Result<Self::Ok, Self::Error> {
+        Err(Error::message("collect_str requires features `alloc` or `std`"))
+    }
+
+    fn is_human_readable(&self) -> bool {
+        false
+    }
+}
 
 pub struct SeqSerializer<'a, W: 'a> {
     serializer: &'a mut Serializer<W>,
@@ -260,7 +247,7 @@ pub struct SeqSerializer<'a, W: 'a> {
 
 impl<'a, W: Write> SerializeSeq for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: std::error::Error + 'static
+    <W as Write>::Error: StdError + 'static
 {
     type Ok = ();
     type Error = Error<W::Error>;
@@ -279,7 +266,7 @@ where
 
 impl<'a, W: Write> SerializeTuple for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: std::error::Error + 'static
+    <W as Write>::Error: StdError + 'static
 {
     type Ok = ();
     type Error = Error<W::Error>;
@@ -295,7 +282,7 @@ where
 
 impl<'a, W: Write> SerializeTupleStruct for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: std::error::Error + 'static
+    <W as Write>::Error: StdError + 'static
 {
     type Ok = ();
     type Error = Error<W::Error>;
@@ -311,7 +298,7 @@ where
 
 impl<'a, W: Write> SerializeTupleVariant for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: std::error::Error + 'static
+    <W as Write>::Error: StdError + 'static
 {
     type Ok = ();
     type Error = Error<W::Error>;
@@ -327,7 +314,7 @@ where
 
 impl<'a, W: Write> SerializeMap for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: std::error::Error + 'static
+    <W as Write>::Error: StdError + 'static
 {
     type Ok = ();
     type Error = Error<W::Error>;
@@ -350,7 +337,7 @@ where
 
 impl<'a, W: Write> SerializeStruct for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: std::error::Error + 'static
+    <W as Write>::Error: StdError + 'static
 {
     type Ok = ();
     type Error = Error<W::Error>;
@@ -370,7 +357,7 @@ where
 
 impl<'a, W: Write> SerializeStructVariant for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: std::error::Error + 'static
+    <W as Write>::Error: StdError + 'static
 {
     type Ok = ();
     type Error = Error<W::Error>;

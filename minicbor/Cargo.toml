@@ -17,7 +17,7 @@ features = ["full"]
 [features]
 full   = ["std", "derive", "half", "serde"]
 alloc  = ["minicbor-derive?/alloc", "serde?/alloc"]
-std    = ["alloc", "minicbor-derive?/std", "serde?/std"]
+std    = ["alloc", "minicbor-derive?/std", "serde?/alloc", "serde?/std"]
 derive = ["minicbor-derive"]
 
 [dependencies]

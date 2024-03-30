@@ -1,10 +1,14 @@
-use serde::forward_to_deserialize_any;
 use serde::de::{self, DeserializeSeed, EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor};
 
 use crate::BREAK;
 use crate::data::Type;
 use crate::decode::{Decoder, Error};
 
+pub fn from_slice<'de, T: de::Deserialize<'de>>(b: &'de [u8]) -> Result<T, Error> {
+    T::deserialize(&mut Deserializer::from_slice(b))
+}
+
+#[derive(Debug, Clone)]
 pub struct Deserializer<'de> {
     decoder: Decoder<'de>
 }
@@ -40,46 +44,9 @@ impl<'de> From<Decoder<'de>> for Deserializer<'de> {
 impl<'a, 'de> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
 
-    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
-        match self.decoder.datatype()? {
-            Type::Bool       => self.deserialize_bool(visitor),
-            Type::U8         => self.deserialize_u8(visitor),
-            Type::U16        => self.deserialize_u16(visitor),
-            Type::U32        => self.deserialize_u32(visitor),
-            Type::U64        => self.deserialize_u64(visitor),
-            Type::I8         => self.deserialize_i8(visitor),
-            Type::I16        => self.deserialize_i16(visitor),
-            Type::I32        => self.deserialize_i32(visitor),
-            Type::I64        => self.deserialize_i64(visitor),
-            Type::F32        => self.deserialize_f32(visitor),
-            Type::F64        => self.deserialize_f64(visitor),
-            Type::Bytes      => visitor.visit_borrowed_bytes(self.decoder.bytes()?),
-            Type::String     => visitor.visit_borrowed_str(self.decoder.str()?),
-            Type::Null       => {
-                self.decoder.skip()?;
-                visitor.visit_none()
-            }
-            Type::BytesIndef => {
-                let mut buf = Vec::new();
-                for b in self.decoder.bytes_iter()? {
-                    buf.extend_from_slice(b?)
-                }
-                visitor.visit_byte_buf(buf)
-            }
-            Type::StringIndef => {
-                let mut buf = String::new();
-                for b in self.decoder.str_iter()? {
-                    buf += b?
-                }
-                visitor.visit_string(buf)
-            }
-            Type::Array | Type::ArrayIndef => self.deserialize_seq(visitor),
-            Type::Map   | Type::MapIndef   => self.deserialize_map(visitor),
-            t => Err(Error::type_mismatch(t).with_message("unexpected type").at(self.decoder.position()))
-        }
+    fn deserialize_any<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+        Err(Error::message("deserialize_any is not supported"))
     }
-
-    forward_to_deserialize_any!(str string bytes byte_buf identifier);
 
     fn deserialize_bool<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
         visitor.visit_bool(self.decoder.bool()?)
@@ -129,6 +96,22 @@ impl<'a, 'de> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         visitor.visit_char(self.decoder.char()?)
     }
 
+    fn deserialize_str<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        visitor.visit_borrowed_str(self.decoder.str()?)
+    }
+
+    fn deserialize_string<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        visitor.visit_str(self.decoder.str()?)
+    }
+
+    fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        visitor.visit_borrowed_bytes(self.decoder.bytes()?)
+    }
+
+    fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        visitor.visit_bytes(self.decoder.bytes()?)
+    }
+
     fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
         if Type::Null == self.decoder.datatype()? {
             self.decoder.skip()?;
@@ -169,7 +152,7 @@ impl<'a, 'de> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         let p = self.decoder.position();
         let n = self.decoder.array()?;
         if Some(len as u64) != n {
-            return Err(Error::message("invalid tuple-length {n:?}, was expecting: {len}").at(p))
+            return Err(Error::message("invalid tuple length {n:?}, was expecting: {len}").at(p))
         }
         visitor.visit_seq(Seq::new(self, n))
     }
@@ -222,9 +205,13 @@ impl<'a, 'de> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         visitor.visit_enum(Enum::new(self))
     }
 
+    fn deserialize_identifier<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        self.deserialize_str(visitor)
+    }
+
     fn deserialize_ignored_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
         self.decoder.skip()?;
-        visitor.visit_unit() // is ignored
+        visitor.visit_unit() // ignored
     }
 
     fn is_human_readable(&self) -> bool {

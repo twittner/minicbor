@@ -297,7 +297,10 @@ impl std::error::Error for Error {
 
 #[cfg(feature = "serde")]
 impl serde::de::Error for Error {
-    fn custom<T: core::fmt::Display>(msg: T) -> Self {
-        Self::message(msg)
+    fn custom<T: fmt::Display>(_msg: T) -> Self {
+        #[cfg(feature = "alloc")]
+        return Self::message(_msg);
+        #[cfg(not(feature = "alloc"))]
+        return Self::message("custom serde error");
     }
 }

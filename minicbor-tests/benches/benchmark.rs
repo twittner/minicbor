@@ -47,23 +47,28 @@ fn benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("encode");
     let book = gen_addressbook(8);
     group.bench_function("serde_cbor", |b| b.iter(|| {
-        serde_cbor::ser::to_vec_packed(&book).unwrap();
+        serde_cbor::ser::to_vec(&book).unwrap();
     }));
     group.bench_function("minicbor", |b| b.iter(|| {
         minicbor::to_vec(&book).unwrap();
+    }));
+    group.bench_function("minicbor serde", |b| b.iter(|| {
+        minicbor::serde::to_vec(&book).unwrap();
     }));
     group.finish();
 
     let mut group = c.benchmark_group("decode");
     let book = gen_addressbook(8);
-    let book_bytes_serde = serde_cbor::ser::to_vec_packed(&book).unwrap();
+    let book_bytes_serde = serde_cbor::ser::to_vec(&book).unwrap();
     let book_bytes_minicbor = minicbor::to_vec(&book).unwrap();
     group.bench_function("serde_cbor", |b| b.iter(|| {
         let _: AddressBook = serde_cbor::from_slice(&book_bytes_serde).unwrap();
-
     }));
     group.bench_function("minicbor", |b| b.iter(|| {
         let _: AddressBook = minicbor::decode(&book_bytes_minicbor).unwrap();
+    }));
+    group.bench_function("minicbor serde", |b| b.iter(|| {
+        let _: AddressBook = minicbor::serde::from_slice(&book_bytes_serde).unwrap();
     }));
     group.finish();
 }

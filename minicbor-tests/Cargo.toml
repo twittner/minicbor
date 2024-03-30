@@ -18,8 +18,8 @@ serde  = ["minicbor/serde"]
 minicbor = { path = "../minicbor", features = ["half"] }
 
 [dev-dependencies]
-criterion  = "0.3"
-half       = "1.6"
+criterion  = "0.5.1"
+half       = "2"
 hex        = "0.4.2"
 quickcheck = "1.0.1"
 rand       = "0.8"
