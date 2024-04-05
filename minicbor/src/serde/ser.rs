@@ -3,6 +3,7 @@ use serde::Serialize;
 use serde::ser::{self, StdError, SerializeSeq, SerializeTuple, SerializeTupleStruct};
 use serde::ser::{SerializeMap, SerializeStruct, SerializeStructVariant, SerializeTupleVariant};
 
+/// Serialise a type implementing [`serde::Serialize`] and return the encoded byte vector.
 #[cfg(feature = "std")]
 pub fn to_vec<T: Serialize>(val: &T) -> Result<Vec<u8>, Error<core::convert::Infallible>> {
     let mut v = Vec::new();
@@ -10,6 +11,9 @@ pub fn to_vec<T: Serialize>(val: &T) -> Result<Vec<u8>, Error<core::convert::Inf
     Ok(v)
 }
 
+/// An implementation of [`serde::Serializer`] based on [`minicbor::Encoder`][1].
+///
+/// [1]: crate::Encoder
 #[derive(Debug, Clone)]
 pub struct Serializer<W> {
     encoder: Encoder<W>

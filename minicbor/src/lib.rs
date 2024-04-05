@@ -27,6 +27,8 @@
 //!
 //! For I/O support see [`minicbor-io`][1].
 //!
+//! Finally, basic serde integration is optionally provided with feature `"serde"`.
+//!
 //! [1]: https://twittner.gitlab.io/minicbor/minicbor_io/
 //!
 //! # Feature flags

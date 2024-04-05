@@ -4,10 +4,14 @@ use crate::BREAK;
 use crate::data::Type;
 use crate::decode::{Decoder, Error};
 
+/// Deserialise a type implementing [`serde::Deserialize`] from the given byte slice.
 pub fn from_slice<'de, T: de::Deserialize<'de>>(b: &'de [u8]) -> Result<T, Error> {
     T::deserialize(&mut Deserializer::from_slice(b))
 }
 
+/// An implementation of [`serde::Deserializer`] based on [`minicbor::Decoder`][1].
+///
+/// [1]: crate::Decoder
 #[derive(Debug, Clone)]
 pub struct Deserializer<'de> {
     decoder: Decoder<'de>
