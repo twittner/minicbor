@@ -275,7 +275,7 @@ impl<W: Write> Encoder<W> {
         Ok(())
     }
 
-    /// Encode a sequence of [`Tokens`].
+    /// Encode a sequence of CBOR tokens.
     #[cfg(feature = "half")]
     pub fn tokens<'a, 'b: 'a, I>(&mut self, tokens: I) -> Result<(), Error<W::Error>>
     where

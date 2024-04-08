@@ -68,11 +68,11 @@ quickcheck::quickcheck! {
     }
 }
 
-struct Rec<'b>(Tokenizer<'b>);
+struct Rec<'a, 'b>(Tokenizer<'a, 'b>);
 
-impl fmt::Display for Rec<'_> {
+impl fmt::Display for Rec<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fn gen(it: &mut Tokenizer<'_>, f: &mut fmt::Formatter) -> fmt::Result {
+        fn gen(it: &mut Tokenizer<'_, '_>, f: &mut fmt::Formatter) -> fmt::Result {
             match it.next() {
                 Some(Ok(Token::Array(n))) => {
                     f.write_str("[")?;

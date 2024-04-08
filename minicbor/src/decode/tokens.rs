@@ -1,10 +1,11 @@
 //! Generic CBOR tokenization.
 
 use core::fmt;
-use crate::Decoder;
+use core::ops::{Deref, DerefMut};
+
 use crate::data::{Int, Tag, Type};
+use crate::encode::{self, Encode, Encoder, Write};
 use crate::decode::Error;
-use crate::encode::{Encode, Encoder, write::Write};
 
 /// Representation of possible CBOR tokens.
 ///
@@ -49,11 +50,11 @@ pub enum Token<'b> {
 ///
 /// *Requires feature* `"half"`.
 #[derive(Debug, Clone)]
-pub struct Tokenizer<'b> {
-    decoder: Decoder<'b>
+pub struct Tokenizer<'a, 'b> {
+    decoder: Decoder<'a, 'b>
 }
 
-impl<'b> Iterator for Tokenizer<'b> {
+impl<'a, 'b> Iterator for Tokenizer<'a, 'b> {
     type Item = Result<Token<'b>, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -65,16 +66,22 @@ impl<'b> Iterator for Tokenizer<'b> {
     }
 }
 
-impl<'b> From<Decoder<'b>> for Tokenizer<'b> {
-    fn from(d: Decoder<'b>) -> Self {
-        Tokenizer { decoder: d }
+impl<'b> From<crate::Decoder<'b>> for Tokenizer<'_, 'b> {
+    fn from(d: crate::Decoder<'b>) -> Self {
+        Tokenizer { decoder: Decoder::Owned(d) }
     }
 }
 
-impl<'b> Tokenizer<'b> {
+impl<'a, 'b> From<&'a mut crate::Decoder<'b>> for Tokenizer<'a, 'b> {
+    fn from(d: &'a mut crate::Decoder<'b>) -> Self {
+        Tokenizer { decoder: Decoder::Borrowed(d) }
+    }
+}
+
+impl<'a, 'b> Tokenizer<'a, 'b> {
     /// Create a new Tokenizer for the given input bytes.
     pub fn new(bytes: &'b[u8]) -> Self {
-        Tokenizer { decoder: Decoder::new(bytes) }
+        Tokenizer { decoder: Decoder::Owned(crate::Decoder::new(bytes)) }
     }
 
     /// Decode the next token.
@@ -85,7 +92,8 @@ impl<'b> Tokenizer<'b> {
         match self.try_token() {
             Ok(tk) => Ok(tk),
             Err(e) => {
-                self.decoder.set_position(self.decoder.input().len()); // drain decoder
+                let end = self.decoder.input().len();
+                self.decoder.set_position(end); // drain decoder
                 Err(e)
             }
         }
@@ -140,12 +148,13 @@ impl<'b> Tokenizer<'b> {
     }
 
     fn skip_byte(&mut self) {
-        self.decoder.set_position(self.decoder.position() + 1)
+        let p = self.decoder.position() + 1;
+        self.decoder.set_position(p)
     }
 }
 
 #[cfg(feature = "alloc")]
-impl fmt::Display for Tokenizer<'_> {
+impl fmt::Display for Tokenizer<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         /// Control stack element.
         enum E {
@@ -159,7 +168,7 @@ impl fmt::Display for Tokenizer<'_> {
             X(&'static str)  // display string (unless next token is BREAK)
         }
 
-        let mut iter = Tokenizer::from(self.decoder.clone()).peekable();
+        let mut iter  = self.clone().peekable();
         let mut stack = alloc::vec::Vec::new();
 
         while iter.peek().is_some() {
@@ -386,8 +395,8 @@ impl fmt::Display for Token<'_> {
     }
 }
 
-impl<'b, C> Encode<C> for crate::decode::Token<'b> {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, _ctx: &mut C) -> Result<(), crate::encode::Error<W::Error>> {
+impl<'b, C> Encode<C> for Token<'b> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
         match *self {
             Token::Bool(val)   => e.bool(val)?,
             Token::U8(val)     => e.u8(val)?,
@@ -419,3 +428,40 @@ impl<'b, C> Encode<C> for crate::decode::Token<'b> {
         Ok(())
     }
 }
+
+/// Either own or borrow a decoder (similar to `alloc::borrow::Cow`).
+#[derive(Debug)]
+enum Decoder<'a, 'b> {
+    Owned(crate::Decoder<'b>),
+    Borrowed(&'a mut crate::Decoder<'b>)
+}
+
+impl<'b> Deref for Decoder<'_, 'b> {
+    type Target = crate::Decoder<'b>;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Owned(d)    => d,
+            Self::Borrowed(d) => d
+        }
+    }
+}
+
+impl<'b> DerefMut for Decoder<'_, 'b> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            Self::Owned(d)    => d,
+            Self::Borrowed(d) => d
+        }
+    }
+}
+
+impl Clone for Decoder<'_, '_> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Owned(d)    => Self::Owned(d.clone()),
+            Self::Borrowed(d) => Self::Owned((*d).clone())
+        }
+    }
+}
+
