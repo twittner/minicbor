@@ -6,7 +6,7 @@
 
 # minicbor
 
-# `0.22.0`
+## `0.22.0`
 
 -  ⚠️ **Breaking** ⚠️: `Tokenizer` now has two lifetime parameters because it sometimes borrows the
   inner `Decoder`.
