@@ -6,6 +6,13 @@
 
 # minicbor
 
+# `0.22.0`
+
+-  ⚠️ **Breaking** ⚠️: `Tokenizer` now has two lifetime parameters because it sometimes borrows the
+  inner `Decoder`.
+- `Token`s can now also be encoded (cf. merge request !37 by @alistair23). Methods `Encoder::tokens`
+  and `Decoder::tokens` have been added.
+
 ## `0.21.1`
 
 - `Tag::new` and `Tag::as_u64` are now declared `const` (cf. merge request !36 by @DCNick3).
@@ -304,6 +311,12 @@
 
 # minicbor-derive
 
+## `0.14.0`
+
+- Upgrade dependency `syn` to version 2.0 (cf. commit 3a63fc304d380f2477959906a54b1f3dedc8ccef for
+  details).
+- Require `minicbor-0.22.0`.
+
 ## `0.13.0`
 
 - Added the ability to derive the `CborLen` trait on structs and enums.
@@ -403,6 +416,10 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.17.0`
+
+- Require `minicbor-0.22.0`.
 
 ## `0.16.1`
 
