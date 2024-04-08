@@ -275,6 +275,18 @@ impl<W: Write> Encoder<W> {
         Ok(())
     }
 
+    /// Encode a sequence of [`Tokens`].
+    #[cfg(feature = "half")]
+    pub fn tokens<'a, 'b: 'a, I>(&mut self, tokens: I) -> Result<(), Error<W::Error>>
+    where
+        I: IntoIterator<Item = &'a crate::decode::Token<'b>>
+    {
+        for t in tokens {
+            self.encode(t)?;
+        }
+        Ok(())
+    }
+
     /// Write the encoded byte slice.
     pub(crate) fn put(&mut self, b: &[u8]) -> Result<&mut Self, Error<W::Error>> {
         self.writer.write_all(b).map_err(Error::write)?;

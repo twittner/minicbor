@@ -93,7 +93,7 @@
 //! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```
 //!
-//! # Example: tokenization
+//! # Example: tokenization and re-encoding
 //!
 //! ```
 //! use minicbor::display;
@@ -116,6 +116,11 @@
 //!       Token::U8(4),
 //!       Token::U8(5)]
 //! };
+//!
+//! let mut buffer = [0u8; 9];
+//! minicbor::Encoder::new(buffer.as_mut()).tokens(&tokens)?;
+//!
+//! assert_eq!(buffer, input);
 //!
 //! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```

@@ -4,6 +4,7 @@ use core::fmt;
 use crate::Decoder;
 use crate::data::{Int, Tag, Type};
 use crate::decode::Error;
+use crate::encode::{Encode, Encoder, write::Write};
 
 /// Representation of possible CBOR tokens.
 ///
@@ -385,3 +386,36 @@ impl fmt::Display for Token<'_> {
     }
 }
 
+impl<'b, C> Encode<C> for crate::decode::Token<'b> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _ctx: &mut C) -> Result<(), crate::encode::Error<W::Error>> {
+        match *self {
+            Token::Bool(val)   => e.bool(val)?,
+            Token::U8(val)     => e.u8(val)?,
+            Token::U16(val)    => e.u16(val)?,
+            Token::U32(val)    => e.u32(val)?,
+            Token::U64(val)    => e.u64(val)?,
+            Token::I8(val)     => e.i8(val)?,
+            Token::I16(val)    => e.i16(val)?,
+            Token::I32(val)    => e.i32(val)?,
+            Token::I64(val)    => e.i64(val)?,
+            Token::Int(val)    => e.int(val)?,
+            Token::F16(val)    => e.f16(val)?,
+            Token::F32(val)    => e.f32(val)?,
+            Token::F64(val)    => e.f64(val)?,
+            Token::Bytes(val)  => e.bytes(val)?,
+            Token::String(val) => e.str(val)?,
+            Token::Array(val)  => e.array(val)?,
+            Token::Map(val)    => e.map(val)?,
+            Token::Tag(val)    => e.tag(val)?,
+            Token::Simple(val) => e.simple(val)?,
+            Token::Break       => e.end()?,
+            Token::Null        => e.null()?,
+            Token::Undefined   => e.undefined()?,
+            Token::BeginBytes  => e.begin_bytes()?,
+            Token::BeginString => e.begin_str()?,
+            Token::BeginArray  => e.begin_array()?,
+            Token::BeginMap    => e.begin_map()?
+        };
+        Ok(())
+    }
+}
