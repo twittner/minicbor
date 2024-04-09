@@ -131,7 +131,6 @@
 //! [CBOR]: https://datatracker.ietf.org/doc/html/rfc8949
 //! [serde]: https://serde.rs
 
-#![forbid(unused_variables)]
 #![allow(clippy::needless_lifetimes)]
 #![cfg_attr(not(feature = "std"), no_std)]
 

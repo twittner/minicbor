@@ -48,8 +48,66 @@ impl<'de> From<Decoder<'de>> for Deserializer<'de> {
 impl<'a, 'de> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
 
-    fn deserialize_any<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
-        Err(Error::message("deserialize_any is not supported"))
+    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        match self.decoder.datatype()? {
+            | Type::Bool       => self.deserialize_bool(visitor),
+            | Type::U8         => self.deserialize_u8(visitor),
+            | Type::U16        => self.deserialize_u16(visitor),
+            | Type::U32        => self.deserialize_u32(visitor),
+            | Type::U64        => self.deserialize_u64(visitor),
+            | Type::I8         => self.deserialize_i8(visitor),
+            | Type::I16        => self.deserialize_i16(visitor),
+            | Type::I32        => self.deserialize_i32(visitor),
+            | Type::I64        => self.deserialize_i64(visitor),
+            | Type::F32        => self.deserialize_f32(visitor),
+            | Type::F64        => self.deserialize_f64(visitor),
+            | Type::Bytes      => visitor.visit_borrowed_bytes(self.decoder.bytes()?),
+            | Type::String     => visitor.visit_borrowed_str(self.decoder.str()?),
+            | Type::Null       => { self.decoder.skip()?; visitor.visit_none() }
+            | Type::Array
+            | Type::ArrayIndef => self.deserialize_seq(visitor),
+            | Type::Map
+            | Type::MapIndef   => self.deserialize_map(visitor),
+
+            #[cfg(feature = "half")]
+            | Type::F16  => visitor.visit_f32(self.decoder.f16()?),
+
+            #[cfg(not(feature = "half"))]
+            | Type::F16  => Err(Error::type_mismatch(Type::F16)
+                .with_message("unexpected type")
+                .at(self.decoder.position())),
+
+            #[cfg(feature = "alloc")]
+            | Type::BytesIndef => {
+                let mut buf = alloc::vec::Vec::new();
+                for b in self.decoder.bytes_iter()? {
+                    buf.extend_from_slice(b?)
+                }
+                visitor.visit_byte_buf(buf)
+            }
+
+            #[cfg(feature = "alloc")]
+            | Type::StringIndef => {
+                let mut buf = alloc::string::String::new();
+                for b in self.decoder.str_iter()? {
+                    buf += b?
+                }
+                visitor.visit_string(buf)
+            }
+
+            #[cfg(not(feature = "alloc"))]
+            | t @ (Type::BytesIndef | Type::StringIndef) =>
+                Err(Error::type_mismatch(t).with_message("unexpected type").at(self.decoder.position())),
+
+            | t @ (
+                | Type::Undefined
+                | Type::Tag
+                | Type::Int
+                | Type::Simple
+                | Type::Break
+                | Type::Unknown(_)
+            ) => Err(Error::type_mismatch(t).with_message("unexpected type").at(self.decoder.position()))
+        }
     }
 
     fn deserialize_bool<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
@@ -156,7 +214,10 @@ impl<'a, 'de> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         let p = self.decoder.position();
         let n = self.decoder.array()?;
         if Some(len as u64) != n {
-            return Err(Error::message(format!("invalid tuple length {n:?}, was expecting: {len}")).at(p))
+            #[cfg(feature = "alloc")]
+            return Err(Error::message(alloc::format!("invalid length {n:?}, was expecting: {len}")).at(p));
+            #[cfg(not(feature = "alloc"))]
+            return Err(Error::message("invalid length").at(p));
         }
         visitor.visit_seq(Seq::new(self, n))
     }
@@ -242,14 +303,14 @@ impl<'a, 'de> SeqAccess<'de> for Seq<'a, 'de> {
         T: DeserializeSeed<'de>
     {
         match self.len {
-            None => if BREAK == self.deserializer.decoder.current()? {
+            | None => if BREAK == self.deserializer.decoder.current()? {
                 self.deserializer.decoder.read()?;
                 Ok(None)
             } else {
                 seed.deserialize(&mut *self.deserializer).map(Some)
             }
-            Some(0) => Ok(None),
-            Some(n) => {
+            | Some(0) => Ok(None),
+            | Some(n) => {
                 let x = seed.deserialize(&mut *self.deserializer)?;
                 self.len = Some(n - 1);
                 Ok(Some(x))
@@ -266,14 +327,14 @@ impl<'a, 'de> MapAccess<'de> for Seq<'a, 'de> {
         K: DeserializeSeed<'de>
     {
         match self.len {
-            None => if BREAK == self.deserializer.decoder.current()? {
+            | None => if BREAK == self.deserializer.decoder.current()? {
                 self.deserializer.decoder.read()?;
                 Ok(None)
             } else {
                 seed.deserialize(&mut *self.deserializer).map(Some)
             }
-            Some(0) => Ok(None),
-            Some(_) => seed.deserialize(&mut *self.deserializer).map(Some)
+            | Some(0) => Ok(None),
+            | Some(_) => seed.deserialize(&mut *self.deserializer).map(Some)
         }
     }
 

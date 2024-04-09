@@ -26,7 +26,23 @@ fn encode_serde_decode_minicbor() {
     quickcheck::quickcheck(property as fn(Cbor))
 }
 
+#[cfg(feature = "serde")]
+quickcheck::quickcheck! {
+    fn prop_serialize_deserialize_id(x: Cbor) -> bool {
+        let c = serde_cbor::to_vec(&x).unwrap();
+        let y = minicbor::serde::from_slice(&c).unwrap();
+        x == y
+    }
+
+    fn prop_serialize_deserialize_rev_id(x: Cbor) -> bool {
+        let c = minicbor::to_vec(&x).unwrap();
+        let y = serde_cbor::from_slice(&c).unwrap();
+        x == y
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 struct Cbor(Value);
 
 impl Arbitrary for Cbor {
@@ -84,6 +100,9 @@ fn gen_value(g: &mut Gen, rem: usize) -> Value {
         0 => Value::Null,
         1 => Value::Bool(true),
         2 => Value::Bool(false),
+        #[cfg(feature = "serde")]
+        3 => Value::Integer(r.gen_range(-2_i128.pow(63) .. 2_i128.pow(64))),
+        #[cfg(not(feature = "serde"))]
         3 => Value::Integer(r.gen_range(-2_i128.pow(64) .. 2_i128.pow(64))),
         4 => Value::Float(r.gen()),
         5 => Value::Bytes(Arbitrary::arbitrary(g)),
