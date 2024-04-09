@@ -156,7 +156,7 @@ impl<'a, 'de> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         let p = self.decoder.position();
         let n = self.decoder.array()?;
         if Some(len as u64) != n {
-            return Err(Error::message("invalid tuple length {n:?}, was expecting: {len}").at(p))
+            return Err(Error::message(format!("invalid tuple length {n:?}, was expecting: {len}")).at(p))
         }
         visitor.visit_seq(Seq::new(self, n))
     }
