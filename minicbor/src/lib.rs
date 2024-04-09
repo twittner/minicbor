@@ -97,13 +97,14 @@
 //!
 //! ```
 //! use minicbor::display;
-//! use minicbor::decode::{Token, Tokenizer};
+//! use minicbor::{Encoder, Decoder};
+//! use minicbor::decode::Token;
 //!
 //! let input  = [0x83, 0x01, 0x9f, 0x02, 0x03, 0xff, 0x82, 0x04, 0x05];
 //!
 //! assert_eq!("[1, [_ 2, 3], [4, 5]]", format!("{}", display(&input)));
 //!
-//! let tokens = Tokenizer::new(&input).collect::<Result<Vec<Token>, _>>()?;
+//! let tokens = Decoder::new(&input).tokens().collect::<Result<Vec<Token>, _>>()?;
 //!
 //! assert_eq! { &tokens[..],
 //!     &[Token::Array(3),
@@ -117,10 +118,15 @@
 //!       Token::U8(5)]
 //! };
 //!
+//! let mut buffer = [0u8; 9];
+//! Encoder::new(buffer.as_mut()).tokens(&tokens)?;
+//!
+//! assert_eq!(input, buffer);
+//!
 //! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```
 //!
-//! [CBOR]: https://tools.ietf.org/html/rfc7049
+//! [CBOR]: https://datatracker.ietf.org/doc/html/rfc8949
 //! [serde]: https://serde.rs
 
 #![forbid(unused_variables)]

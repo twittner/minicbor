@@ -473,6 +473,12 @@ impl<'b> Decoder<'b> {
         self.type_of(self.current()?)
     }
 
+    /// Iterate over a series of CBOR tokens.
+    #[cfg(feature = "half")]
+    pub fn tokens<'a>(&'a mut self) -> crate::decode::Tokenizer<'a, 'b> {
+        crate::decode::Tokenizer::from(self)
+    }
+
     /// Skip over the current CBOR value.
     #[cfg(feature = "alloc")]
     pub fn skip(&mut self) -> Result<(), Error> {

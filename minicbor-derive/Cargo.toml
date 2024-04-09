@@ -1,6 +1,6 @@
 [package]
 name          = "minicbor-derive"
-version       = "0.13.0"
+version       = "0.14.0"
 authors       = ["Toralf Wittner <tw@dtex.org>"]
 license       = "BlueOak-1.0.0"
 edition       = "2021"
@@ -18,9 +18,9 @@ alloc = []
 std   = []
 
 [dependencies]
-proc-macro2 = "1.0.18"
-quote       = "1.0.7"
-syn         = { version = "1.0.72", features = ["derive", "extra-traits", "visit"] }
+proc-macro2 = "1.0.79"
+quote       = "1.0.35"
+syn         = { version = "2.0.58", features = ["derive", "extra-traits", "visit"] }
 
 [dev-dependencies]
 minicbor = { path = "../minicbor", features = ["std", "derive"] }
