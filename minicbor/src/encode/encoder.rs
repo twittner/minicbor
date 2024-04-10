@@ -12,12 +12,6 @@ impl<W: Write> Encoder<W> {
         Encoder { writer }
     }
 
-    /// Get back the [`Write`] impl.
-    #[deprecated(note = "use Encoder::into_writer instead")]
-    pub fn into_inner(self) -> W {
-        self.writer
-    }
-
     /// Access the inner writer.
     pub fn writer(&self) -> &W {
         &self.writer
