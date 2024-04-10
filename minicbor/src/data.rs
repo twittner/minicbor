@@ -1,4 +1,10 @@
-//! Information about CBOR data types and tags.
+//! CBOR data types, tokens and tags.
+
+#[cfg(feature = "half")]
+mod token;
+
+#[cfg(feature = "half")]
+pub use token::Token;
 
 use core::fmt;
 

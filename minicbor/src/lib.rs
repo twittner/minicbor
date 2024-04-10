@@ -17,7 +17,7 @@
 //! [`data::Type`] that can represent every possible CBOR type and decoding
 //! can thus proceed based on this information. It is also possible to just
 //! tokenize the input bytes using a [`Tokenizer`](decode::Tokenizer), i.e.
-//! an `Iterator` over CBOR [`Token`](decode::Token)s. Finally, the length
+//! an `Iterator` over CBOR [`Token`](data::Token)s. Finally, the length
 //! in bytes of a value's CBOR representation can be calculated if the
 //! value's type implements the [`CborLen`] trait.
 //!
@@ -98,7 +98,7 @@
 //! ```
 //! use minicbor::display;
 //! use minicbor::{Encoder, Decoder};
-//! use minicbor::decode::Token;
+//! use minicbor::data::Token;
 //!
 //! let input  = [0x83, 0x01, 0x9f, 0x02, 0x03, 0xff, 0x82, 0x04, 0x05];
 //!

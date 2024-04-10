@@ -6,6 +6,11 @@
 
 # minicbor
 
+## `0.23.0`
+
+- Moved `Token` from `minicbor::decode` to `minicbor::data`. `Token` also implements `Decode` now.
+- Removed the deprecated `Encoder::into_inner` method. Use `Encoder::into_writer` instead.
+
 ## `0.22.0`
 
 -  ⚠️ **Breaking** ⚠️: `Tokenizer` now has two lifetime parameters because it sometimes borrows the
@@ -416,6 +421,10 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.18.0`
+
+- Require `minicbor-0.23.0`.
 
 ## `0.17.0`
 

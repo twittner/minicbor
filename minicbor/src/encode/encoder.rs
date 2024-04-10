@@ -12,12 +12,6 @@ impl<W: Write> Encoder<W> {
         Encoder { writer }
     }
 
-    /// Get back the [`Write`] impl.
-    #[deprecated(note = "use Encoder::into_writer instead")]
-    pub fn into_inner(self) -> W {
-        self.writer
-    }
-
     /// Access the inner writer.
     pub fn writer(&self) -> &W {
         &self.writer
@@ -279,7 +273,7 @@ impl<W: Write> Encoder<W> {
     #[cfg(feature = "half")]
     pub fn tokens<'a, 'b: 'a, I>(&mut self, tokens: I) -> Result<(), Error<W::Error>>
     where
-        I: IntoIterator<Item = &'a crate::decode::Token<'b>>
+        I: IntoIterator<Item = &'a crate::data::Token<'b>>
     {
         for t in tokens {
             self.encode(t)?;

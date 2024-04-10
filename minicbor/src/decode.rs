@@ -13,10 +13,14 @@ pub use decoder::{ArrayIter, ArrayIterWithCtx, BytesIter, MapIter, MapIterWithCt
 pub use error::Error;
 
 #[cfg(feature = "half")]
-mod tokens;
+mod tokenizer;
 
 #[cfg(feature = "half")]
-pub use tokens::{Token, Tokenizer};
+pub use tokenizer::Tokenizer;
+
+#[cfg(feature = "half")]
+#[deprecated(since = "0.23.0", note = "import `Token` from `minicbor::data` instead")]
+pub type Token<'b> = crate::data::Token<'b>;
 
 /// A type that can be decoded from CBOR.
 pub trait Decode<'b, C>: Sized {
