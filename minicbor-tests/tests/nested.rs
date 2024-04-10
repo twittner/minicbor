@@ -1,7 +1,7 @@
 #![cfg(feature = "std")]
 
-use minicbor::data::Type;
-use minicbor::decode::{self, Decode, Decoder, Token, Tokenizer};
+use minicbor::data::{Token, Type};
+use minicbor::decode::{self, Decode, Decoder, Tokenizer};
 use minicbor::encode::{self, Write, Encode, Encoder};
 use quickcheck::{Arbitrary, Gen};
 use std::collections::BTreeMap;

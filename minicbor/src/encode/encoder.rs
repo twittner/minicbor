@@ -279,7 +279,7 @@ impl<W: Write> Encoder<W> {
     #[cfg(feature = "half")]
     pub fn tokens<'a, 'b: 'a, I>(&mut self, tokens: I) -> Result<(), Error<W::Error>>
     where
-        I: IntoIterator<Item = &'a crate::decode::Token<'b>>
+        I: IntoIterator<Item = &'a crate::data::Token<'b>>
     {
         for t in tokens {
             self.encode(t)?;
