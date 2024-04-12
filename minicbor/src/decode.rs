@@ -8,6 +8,8 @@ mod decoder;
 mod error;
 pub mod info;
 
+use crate::data::{Int, Tag, Tagged};
+
 pub use decoder::{Decoder, Probe};
 pub use decoder::{ArrayIter, ArrayIterWithCtx, BytesIter, MapIter, MapIterWithCtx, StrIter};
 pub use error::Error;
@@ -278,15 +280,30 @@ impl<'b, C> Decode<'b, C> for isize {
     }
 }
 
-impl<'b, C> Decode<'b, C> for crate::data::Int {
+impl<'b, C> Decode<'b, C> for Int {
     fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         d.int()
     }
 }
 
-impl<'b, C> Decode<'b, C> for crate::data::Tag {
+impl<'b, C> Decode<'b, C> for Tag {
     fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         d.tag()
+    }
+}
+
+impl<'b, C, const N: u64, T: Decode<'b, C>> Decode<'b, C> for Tagged<N, T> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        let p = d.position();
+        let t = d.tag()?;
+        if N != t.as_u64() {
+            #[cfg(feature = "alloc")]
+            return Err(Error::tag_mismatch(t).with_message(alloc::format!("expected tag {N}")).at(p));
+            #[cfg(not(feature = "alloc"))]
+            return Err(Error::tag_mismatch(t).at(p))
+        }
+        let v = d.decode_with(ctx)?;
+        Ok(Tagged::new(v))
     }
 }
 
@@ -724,3 +741,4 @@ impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::ops::Bound<T> {
         }
     }
 }
+
