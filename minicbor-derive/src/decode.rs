@@ -113,9 +113,12 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         }
     };
 
+    let tag = decode_tag(&attrs);
+
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
             fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
+                #tag
                 let __p777 = __d777.position();
                 #statements
                 #result
@@ -147,11 +150,13 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let fields = Fields::try_from(var.ident.span(), var.fields.iter())?;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let con = &var.ident;
+        let tag = decode_tag(attrs);
         let row = if let syn::Fields::Unit = &var.fields {
             if index_only {
                 quote!(#idx => Ok(#name::#con),)
             } else {
                 quote!(#idx => {
+                    #tag
                     __d777.skip()?;
                     Ok(#name::#con)
                 })
@@ -182,6 +187,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             if let syn::Fields::Named(_) = var.fields {
                 quote! {
                     #idx => {
+                        #tag
                         #statements
                         Ok(#name::#con {
                             #(#idents : if let Some(x) = #idents {
@@ -197,6 +203,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             } else {
                 quote! {
                     #idx => {
+                        #tag
                         #statements
                         Ok(#name::#con(#(if let Some(x) = #idents {
                             x
@@ -239,9 +246,12 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         }
     };
 
+    let tag = decode_tag(&enum_attrs);
+
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
             fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
+                #tag
                 #check
                 match __d777.u32()? {
                     #(#rows)*
@@ -283,8 +293,12 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
         }
     });
 
-    let actions = fields.indices.iter().zip(fields.idents.iter().zip(fields.types.iter().zip(decode_fns)))
-        .map(|(ix, (name, (ty, ff)))| {
+    let actions = fields.indices.iter()
+        .zip(fields.idents.iter()
+            .zip(fields.types.iter()
+                .zip(decode_fns.iter()
+                    .zip(fields.attrs.iter()))))
+        .map(|(ix, (name, (ty, (ff, attrs))))| {
             let decode_fn = ff.as_ref()
                 .and_then(CustomCodec::to_decode_path)
                 .unwrap_or_else(|| default_decode_fn.clone());
@@ -330,7 +344,10 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
                     quote!(Some(__v777))
                 };
 
+            let tag = decode_tag(attrs);
+
             quote! {
+                #tag
                 match #decode_fn(__d777, __ctx777) {
                     Ok(__v777) => #name = #value,
                     #unknown_var_err
@@ -475,4 +492,23 @@ fn nils(types: &[syn::Type], decode_fns: &[Option<CustomCodec>]) -> Vec<proc_mac
             }
         })
         .collect()
+}
+
+fn decode_tag(a: &Attributes) -> proc_macro2::TokenStream {
+    if let Some(t) = a.tag() {
+        quote! {
+            let __p777 = __d777.position();
+            let __t777 = __d777.tag()?;
+            if #t != __t777.as_u64() {
+                #[cfg(feature = "alloc")]
+                return Err(minicbode::decode::Error::tag_mismatch(__t777)
+                    .with_message(alloc::format!("expected tag {}", #t))
+                    .at(__p777));
+                #[cfg(not(feature = "alloc"))]
+                return Err(minicbor::decode::Error::tag_mismatch(__t777).at(__p777))
+            }
+        }
+    } else {
+        quote!()
+    }
 }

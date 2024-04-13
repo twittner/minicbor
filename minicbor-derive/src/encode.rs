@@ -71,6 +71,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         return make_transparent_impl(&inp.ident, f, a, impl_generics, typ_generics, where_clause)
     }
 
+    let tag = encode_tag(&attrs);
     let statements = encode_fields(&fields, true, encoding, &custom_enc)?;
 
     Ok(quote! {
@@ -79,6 +80,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             where
                 __W777: minicbor::encode::Write
             {
+                #tag
                 #statements
             }
         }
@@ -118,6 +120,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         });
         let con = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
+        let tag = encode_tag(attrs);
         let row = match &var.fields {
             syn::Fields::Unit => match encoding {
                 Encoding::Array | Encoding::Map if index_only => quote! {
@@ -130,6 +133,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con => {
                         __e777.array(2)?;
                         __e777.u32(#idx)?;
+                        #tag
                         __e777.array(0)?;
                         Ok(())
                     }
@@ -138,6 +142,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con => {
                         __e777.array(2)?;
                         __e777.u32(#idx)?;
+                        #tag
                         __e777.map(0)?;
                         Ok(())
                     }
@@ -153,6 +158,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con{#(#idents,)*} => {
                         __e777.array(2)?;
                         __e777.u32(#idx)?;
+                        #tag
                         #statements
                     }
                 }
@@ -167,6 +173,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con(#(#idents,)*) => {
                         __e777.array(2)?;
                         __e777.u32(#idx)?;
+                        #tag
                         #statements
                     }
                 }
@@ -199,12 +206,15 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         }
     };
 
+    let tag = encode_tag(&enum_attrs);
+
     Ok(quote! {
         impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {
             fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut Ctx) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
                 __W777: minicbor::encode::Write
             {
+                #tag
                 #body
             }
         }
@@ -241,7 +251,8 @@ fn encode_fields
             .zip(fields.idents.iter()
                 .zip(fields.is_name.iter()
                     .zip(fields.types.iter()
-                        .zip(custom_enc)))));
+                        .zip(custom_enc.iter()
+                            .zip(fields.attrs.iter()))))));
 
     match encoding {
         // Under array encoding the number of elements is the highest
@@ -249,7 +260,7 @@ fn encode_fields
         // the highest index is incremented.
         Encoding::Array => {
             for field in iter.clone() {
-                let (i, (idx, (ident, (&is_name, (typ, encode))))) = field;
+                let (i, (idx, (ident, (&is_name, (typ, (encode, _)))))) = field;
                 let is_nil = is_nil(typ, encode);
                 let n = idx.val();
                 let expr =
@@ -284,7 +295,7 @@ fn encode_fields
         // substract 1 from the total.
         Encoding::Map => {
             for field in iter.clone() {
-                let (i, (_idx, (ident, (&is_name, (typ, encode))))) = field;
+                let (i, (_idx, (ident, (&is_name, (typ, (encode, _)))))) = field;
                 let is_nil = is_nil(typ, encode);
                 let expr =
                     if has_self {
@@ -327,17 +338,19 @@ fn encode_fields
         // Under map encoding each field is encoded with its index.
         // Only field values which are not nil are encoded.
         Encoding::Map => for field in iter {
-            let (i, (idx, (ident, (&is_name, (typ, encode))))) = field;
+            let (i, (idx, (ident, (&is_name, (typ, (encode, attrs)))))) = field;
             let is_nil = is_nil(typ, encode);
             let encode_fn = encode.as_ref()
                 .and_then(|f| f.to_encode_path())
                 .unwrap_or_else(|| default_encode_fn.clone());
+            let tag = encode_tag(attrs);
             let statement =
                 match (is_name, has_self) {
                     // struct
                     (IS_NAME, HAS_SELF) => quote! {
                         if !#is_nil(&self.#ident) {
                             __e777.u32(#idx)?;
+                            #tag
                             #encode_fn(&self.#ident, __e777, __ctx777)?
                         }
                     },
@@ -345,6 +358,7 @@ fn encode_fields
                     (IS_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
                             __e777.u32(#idx)?;
+                            #tag
                             #encode_fn(#ident, __e777, __ctx777)?
                         }
                     },
@@ -354,6 +368,7 @@ fn encode_fields
                         quote! {
                             if !#is_nil(&self.#i) {
                                 __e777.u32(#idx)?;
+                                #tag
                                 #encode_fn(&self.#i, __e777, __ctx777)?
                             }
                         }
@@ -362,6 +377,7 @@ fn encode_fields
                     (NO_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
                             __e777.u32(#idx)?;
+                            #tag
                             #encode_fn(#ident, __e777, __ctx777)?
                         }
                     }
@@ -375,10 +391,11 @@ fn encode_fields
             let mut first = true;
             let mut k = 0;
             for field in iter {
-                let (i, (idx, (ident, (&is_name, (_, encode))))) = field;
+                let (i, (idx, (ident, (&is_name, (_, (encode, attrs)))))) = field;
                 let encode_fn = encode.as_ref()
                     .and_then(|f| f.to_encode_path())
                     .unwrap_or_else(|| default_encode_fn.clone());
+                let tag = encode_tag(attrs);
                 let gaps = if first {
                     first = false;
                     idx.val() - k
@@ -393,11 +410,13 @@ fn encode_fields
                                 for _ in 0 .. #gaps {
                                     __e777.null()?;
                                 }
+                                #tag
                                 #encode_fn(&self.#ident, __e777, __ctx777)?
                             }
                         },
                         (IS_NAME, HAS_SELF, NO_GAPS) => quote! {
                             if #idx <= __i777 {
+                                #tag
                                 #encode_fn(&self.#ident, __e777, __ctx777)?
                             }
                         },
@@ -407,11 +426,13 @@ fn encode_fields
                                 for _ in 0 .. #gaps {
                                     __e777.null()?;
                                 }
+                                #tag
                                 #encode_fn(#ident, __e777, __ctx777)?
                             }
                         },
                         (IS_NAME, NO_SELF, NO_GAPS) => quote! {
                             if #idx <= __i777 {
+                                #tag
                                 #encode_fn(#ident, __e777, __ctx777)?
                             }
                         },
@@ -423,6 +444,7 @@ fn encode_fields
                                     for _ in 0 .. #gaps {
                                         __e777.null()?;
                                     }
+                                    #tag
                                     #encode_fn(&self.#i, __e777, __ctx777)?
                                 }
                             }
@@ -431,6 +453,7 @@ fn encode_fields
                             let i = syn::Index::from(*i);
                             quote! {
                                 if #idx <= __i777 {
+                                    #tag
                                     #encode_fn(&self.#i, __e777, __ctx777)?
                                 }
                             }
@@ -441,11 +464,13 @@ fn encode_fields
                                 for _ in 0 .. #gaps {
                                     __e777.null()?;
                                 }
+                                #tag
                                 #encode_fn(#ident, __e777, __ctx777)?
                             }
                         },
                         (NO_NAME, NO_SELF, NO_GAPS) => quote! {
                             if #idx <= __i777 {
+                                #tag
                                 #encode_fn(#ident, __e777, __ctx777)?
                             }
                         }
@@ -544,3 +569,12 @@ pub(crate) fn is_nil(ty: &syn::Type, codec: &Option<CustomCodec>) -> proc_macro2
         quote!(minicbor::Encode::<Ctx>::is_nil)
     }
 }
+
+fn encode_tag(a: &Attributes) -> proc_macro2::TokenStream {
+    if let Some(t) = a.tag() {
+        quote!(__e777.tag(minicbor::data::Tag::new(#t))?)
+    } else {
+        quote!()
+    }
+}
+
