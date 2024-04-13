@@ -3,10 +3,11 @@
 #[cfg(feature = "half")]
 mod token;
 
+use core::fmt;
+use core::ops::{Deref, DerefMut};
+
 #[cfg(feature = "half")]
 pub use token::Token;
-
-use core::fmt;
 
 /// CBOR data types.
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
@@ -99,6 +100,12 @@ impl From<Tag> for u64 {
 impl From<&Tag> for u64 {
     fn from(t: &Tag) -> Self {
         t.0
+    }
+}
+
+impl fmt::Display for Tag {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 
@@ -287,6 +294,69 @@ impl fmt::Display for UnknownTag {
 
 #[cfg(feature = "std")]
 impl std::error::Error for UnknownTag {}
+
+
+/// Statically tag a value.
+///
+/// # Example
+///
+/// ```
+/// use minicbor::data::{IanaTag, Tagged};
+///
+/// let input = [
+///     0xc0, 0x74, 0x32, 0x30, 0x31, 0x33, 0x2d, 0x30,
+///     0x33, 0x2d, 0x32, 0x31, 0x54, 0x32, 0x30, 0x3a,
+///     0x30, 0x34, 0x3a, 0x30, 0x30, 0x5a
+/// ];
+///
+/// let date_time: Tagged<0, &str> = minicbor::decode(&input)?;
+/// assert_eq!(date_time.tag(), IanaTag::DateTime.tag());
+/// assert_eq!(date_time.value(), &"2013-03-21T20:04:00Z");
+///
+/// # Ok::<_, Box<dyn std::error::Error>>(())
+///
+/// ```
+#[derive(Debug)]
+pub struct Tagged<const N: u64, T>(T);
+
+impl<const N: u64, T> Tagged<N, T> {
+    pub const fn new(val: T) -> Self {
+        Self(val)
+    }
+
+    pub const fn tag(&self) -> Tag {
+        Tag::new(N)
+    }
+
+    pub const fn value(&self) -> &T {
+        &self.0
+    }
+
+    pub fn into_value(self) -> T {
+        self.0
+    }
+}
+
+impl<const N: u64, T> From<T> for Tagged<N, T> {
+    fn from(val: T) -> Self {
+        Self::new(val)
+    }
+}
+
+impl<const N: u64, T> Deref for Tagged<N, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<const N: u64, T> DerefMut for Tagged<N, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 
 /// CBOR integer type that covers values of [-2<sup>64</sup>, 2<sup>64</sup> - 1]
 ///
