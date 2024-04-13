@@ -331,6 +331,10 @@ impl<const N: u64, T> Tagged<N, T> {
     pub const fn value(&self) -> &T {
         &self.0
     }
+
+    pub fn into_value(self) -> T {
+        self.0
+    }
 }
 
 impl<const N: u64, T> From<T> for Tagged<N, T> {
