@@ -316,7 +316,7 @@ impl std::error::Error for UnknownTag {}
 /// # Ok::<_, Box<dyn std::error::Error>>(())
 ///
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Tagged<const N: u64, T>(T);
 
 impl<const N: u64, T> Tagged<N, T> {
