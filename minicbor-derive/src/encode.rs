@@ -572,7 +572,7 @@ pub(crate) fn is_nil(ty: &syn::Type, codec: &Option<CustomCodec>) -> proc_macro2
 
 fn encode_tag(a: &Attributes) -> proc_macro2::TokenStream {
     if let Some(t) = a.tag() {
-        quote!(__e777.tag(minicbor::data::Tag::new(#t))?)
+        quote!(__e777.tag(minicbor::data::Tag::new(#t))?;)
     } else {
         quote!()
     }

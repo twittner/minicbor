@@ -346,14 +346,14 @@ fn gen_statements(fields: &Fields, decode_fns: &[Option<CustomCodec>], encoding:
 
             let tag = decode_tag(attrs);
 
-            quote! {
+            quote! {{
                 #tag
                 match #decode_fn(__d777, __ctx777) {
                     Ok(__v777) => #name = #value,
                     #unknown_var_err
                     Err(e) => return Err(e)
                 }
-            }
+            }}
     })
     .collect::<Vec<_>>();
 
