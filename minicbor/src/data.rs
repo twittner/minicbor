@@ -326,6 +326,10 @@ impl<const N: u64, T> Tagged<N, T> {
         Self(val)
     }
 
+    pub const fn tag(&self) -> Tag {
+        Self::TAG
+    }
+
     pub const fn value(&self) -> &T {
         &self.0
     }
