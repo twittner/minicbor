@@ -320,12 +320,10 @@ impl std::error::Error for UnknownTag {}
 pub struct Tagged<const N: u64, T>(T);
 
 impl<const N: u64, T> Tagged<N, T> {
+    pub const TAG: Tag = Tag::new(N);
+
     pub const fn new(val: T) -> Self {
         Self(val)
-    }
-
-    pub const fn tag(&self) -> Tag {
-        Tag::new(N)
     }
 
     pub const fn value(&self) -> &T {
