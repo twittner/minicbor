@@ -35,7 +35,8 @@ enum Kind {
     HasNil,
     ContextBound,
     CborLen,
-    Tag
+    Tag,
+    Skip
 }
 
 #[derive(Debug, Clone)]
@@ -51,7 +52,8 @@ enum Value {
     HasNil(proc_macro2::Span),
     ContextBound(HashSet<syn::TraitBound>, proc_macro2::Span),
     CborLen(syn::ExprPath, proc_macro2::Span),
-    Tag(u64, proc_macro2::Span)
+    Tag(u64, proc_macro2::Span),
+    Skip(proc_macro2::Span)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -104,6 +106,11 @@ impl Attributes {
             }
             if this.contains_key(Kind::Transparent) {
                 return Err(syn::Error::new(*s, "`tag` and `transparent` are mutually exclusive"))
+            }
+        }
+        if let Some(Value::Skip(s)) = this.get(Kind::Skip) {
+            if this.1.len() > 1 {
+                return Err(syn::Error::new(*s, "`skip` does not allow other attributes"))
             }
         }
         Ok(this)
@@ -191,19 +198,21 @@ impl Attributes {
                 syn::parenthesized!(content in meta.input);
                 let n: LitInt = content.parse()?;
                 let i = parse_int(&n).map(Idx::N)?;
-                attrs.try_insert(Kind::Index, Value::Index(i, meta.path.span()))?;
+                attrs.try_insert(Kind::Index, Value::Index(i, meta.path.span()))?
             } else if meta.path.is_ident("b") {
                 let content;
                 syn::parenthesized!(content in meta.input);
                 let n: LitInt = content.parse()?;
                 let i = parse_int(&n).map(Idx::B)?;
-                attrs.try_insert(Kind::Index, Value::Index(i, meta.path.span()))?;
+                attrs.try_insert(Kind::Index, Value::Index(i, meta.path.span()))?
             } else if meta.path.is_ident("tag") {
                 let content;
                 syn::parenthesized!(content in meta.input);
                 let n: LitInt = content.parse()?;
                 let i = n.base10_parse()?;
-                attrs.try_insert(Kind::Tag, Value::Tag(i, meta.path.span()))?;
+                attrs.try_insert(Kind::Tag, Value::Tag(i, meta.path.span()))?
+            } else if meta.path.is_ident("skip") {
+                attrs.try_insert(Kind::Skip, Value::Skip(meta.path.span()))?
             } else {
                 return Err(meta.error("unsupported attribute"))
             }
@@ -249,6 +258,10 @@ impl Attributes {
         self.get(Kind::Tag).and_then(|v| v.tag())
     }
 
+    pub fn skip(&self) -> bool {
+        self.contains_key(Kind::Skip)
+    }
+
     fn contains_key(&self, k: Kind) -> bool {
         self.1.contains_key(&k)
     }
@@ -281,6 +294,7 @@ impl Attributes {
                 | Kind::IsNil
                 | Kind::HasNil
                 | Kind::CborLen
+                | Kind::Skip
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -295,6 +309,7 @@ impl Attributes {
                 | Kind::HasNil
                 | Kind::CborLen
                 | Kind::Tag
+                | Kind::Skip
                 => {}
                 | Kind::Encoding
                 | Kind::IndexOnly
@@ -319,6 +334,7 @@ impl Attributes {
                 | Kind::IsNil
                 | Kind::HasNil
                 | Kind::CborLen
+                | Kind::Skip
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -338,6 +354,7 @@ impl Attributes {
                 | Kind::HasNil
                 | Kind::ContextBound
                 | Kind::CborLen
+                | Kind::Skip
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -495,7 +512,8 @@ impl Value {
             Value::HasNil(s)          => *s,
             Value::ContextBound(_, s) => *s,
             Value::CborLen(_, s)      => *s,
-            Value::Tag(_, s)          => *s
+            Value::Tag(_, s)          => *s,
+            Value::Skip(s)            => *s
         }
     }
 

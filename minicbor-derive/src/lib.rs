@@ -577,7 +577,7 @@ fn is_byte_slice(ty: &syn::Type) -> bool {
 /// Traverse all field types and collect all type parameters along the way.
 fn collect_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashSet<syn::TypeParam>
 where
-    I: Iterator<Item = &'a syn::Field>
+    I: Iterator<Item = &'a fields::Field>
 {
     use syn::visit::Visit;
 
@@ -615,23 +615,24 @@ where
     };
 
     for f in fields {
-        c.visit_field(f)
+        c.visit_field(&f.orig)
     }
 
     c.found
 }
 
-fn add_bound_to_type_params<'a, I>
+fn add_bound_to_type_params<'a, I, A>
     ( bound: syn::TypeParamBound
     , params: I
     , blacklist: &HashSet<syn::TypeParam>
-    , attrs: &[attrs::Attributes]
+    , attrs: A
     , mode: Mode
     )
 where
-    I: IntoIterator<Item = &'a mut syn::TypeParam>
+    I: IntoIterator<Item = &'a mut syn::TypeParam>,
+    A: IntoIterator<Item = &'a attrs::Attributes> + Clone
 {
-    let find_type_param = |t: &syn::TypeParam| attrs.iter()
+    let find_type_param = |t: &syn::TypeParam| attrs.clone().into_iter()
         .find_map(|a| {
             a.type_params().and_then(|p| match mode {
                 Mode::Encode => p.get_encode(&t.ident),
