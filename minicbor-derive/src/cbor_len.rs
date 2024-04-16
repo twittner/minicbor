@@ -99,8 +99,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
             }
             syn::Fields::Unnamed(_) => {
-                let steps = on_fields(&fields, false, encoding)?;
-                let idents = fields.fields().idents();
+                let steps  = on_fields(&fields, false, encoding)?;
+                let idents = fields.match_idents();
                 match encoding {
                     Encoding::Map => quote! {
                         #name::#con(#(#idents,)* ..) => { 1 + #idx.cbor_len(__ctx777) + #(#steps)* }

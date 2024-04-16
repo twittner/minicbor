@@ -77,6 +77,16 @@ impl Fields {
         FieldIter(&self.skipped, 0)
     }
 
+    /// Order all identifiers by position and replace skipped ones with `_`.
+    ///
+    /// To be used when matching identifiers by position, e.g. in tuples.
+    pub fn match_idents(&self) -> Vec<syn::Ident> {
+        let idents  = self.fields().positions().zip(self.fields().idents().cloned());
+        let skipped = self.skipped().positions().zip(self.skipped().idents().map(|_| quote::format_ident!("_")));
+        let mut all = idents.chain(skipped).collect::<Vec<_>>();
+        all.sort_unstable_by_key(|(p, _)| *p);
+        all.into_iter().map(|(_, i)| i).collect()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -115,5 +125,9 @@ impl<'a> FieldIter<'a> {
 
     pub fn indices(&self) -> impl Iterator<Item = Idx> + 'a {
         self.clone().map(|f| f.index)
+    }
+
+    pub fn positions(&self) -> impl Iterator<Item = usize> + 'a {
+        self.clone().map(|f| f.pos)
     }
 }

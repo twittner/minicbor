@@ -154,7 +154,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             }
             syn::Fields::Unnamed(_) => {
                 let statements = encode_fields(&fields, false, encoding)?;
-                let idents = fields.fields().idents();
+                let idents = fields.match_idents();
                 quote! {
                     #name::#con(#(#idents,)* ..) => {
                         __e777.array(2)?;

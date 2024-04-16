@@ -453,10 +453,10 @@ fn nils<'a, T>(fields: T) -> Vec<proc_macro2::TokenStream>
 where
     T: IntoIterator<Item = &'a Field>
 {
-    fields.into_iter().map(nil_expr).collect()
+    fields.into_iter().map(nil).collect()
 }
 
-fn nil_expr(f: &Field) -> proc_macro2::TokenStream {
+fn nil(f: &Field) -> proc_macro2::TokenStream {
     if let Some(d) = f.attrs.codec() {
         if let Some(p) = d.to_nil_path() {
             quote!(#p())
@@ -494,7 +494,7 @@ fn decode_tag(a: &Attributes) -> proc_macro2::TokenStream {
 fn field_inits(name: &str, fields: &Fields) -> proc_macro2::TokenStream {
     let mut fragments = Vec::new();
     for field in fields.fields() {
-        let nil = nil_expr(field);
+        let nil = nil(field);
         let idt = &field.ident;
         let idx = field.index;
         let str = format!("{name}::{idt}");
