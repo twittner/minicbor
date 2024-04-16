@@ -5,3 +5,5 @@ mod structs;
 mod enums;
 mod various;
 
+pub mod deriving;
+

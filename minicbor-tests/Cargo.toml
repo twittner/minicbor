@@ -14,7 +14,8 @@ std    = ["alloc", "minicbor/std", "minicbor/derive"]
 derive = ["alloc", "minicbor/derive"]
 
 [dependencies]
-minicbor = { path = "../minicbor", features = ["half"] }
+arbitrary = { version = "1.3.2", features = ["derive"] }
+minicbor  = { path = "../minicbor", features = ["half"] }
 
 [dev-dependencies]
 criterion  = "0.3"

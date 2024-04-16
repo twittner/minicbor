@@ -34,7 +34,9 @@ enum Kind {
     IsNil,
     HasNil,
     ContextBound,
-    CborLen
+    CborLen,
+    Tag,
+    Skip
 }
 
 #[derive(Debug, Clone)]
@@ -42,13 +44,16 @@ enum Value {
     Codec(CustomCodec, proc_macro2::Span),
     Encoding(Encoding, proc_macro2::Span),
     Index(Idx, proc_macro2::Span),
-    Span(proc_macro2::Span),
+    IndexOnly(proc_macro2::Span),
+    Transparent(proc_macro2::Span),
     TypeParam(TypeParams, proc_macro2::Span),
     Nil(syn::ExprPath, proc_macro2::Span),
     IsNil(syn::ExprPath, proc_macro2::Span),
     HasNil(proc_macro2::Span),
     ContextBound(HashSet<syn::TraitBound>, proc_macro2::Span),
-    CborLen(syn::ExprPath, proc_macro2::Span)
+    CborLen(syn::ExprPath, proc_macro2::Span),
+    Tag(u64, proc_macro2::Span),
+    Skip(proc_macro2::Span)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -95,6 +100,19 @@ impl Attributes {
         if let Some(Value::HasNil(s)) = this.get(Kind::HasNil) {
             return Err(syn::Error::new(*s, "`has_nil` requires `with`"))
         }
+        if let Some(Value::Tag(_, s)) = this.get(Kind::Tag) {
+            if this.contains_key(Kind::IndexOnly) {
+                return Err(syn::Error::new(*s, "`tag` and `index_only` are mutually exclusive"))
+            }
+            if this.contains_key(Kind::Transparent) {
+                return Err(syn::Error::new(*s, "`tag` and `transparent` are mutually exclusive"))
+            }
+        }
+        if let Some(Value::Skip(s)) = this.get(Kind::Skip) {
+            if this.1.len() > 1 {
+                return Err(syn::Error::new(*s, "`skip` does not allow other attributes"))
+            }
+        }
         Ok(this)
     }
 
@@ -122,9 +140,9 @@ impl Attributes {
 
         a.parse_nested_meta(|meta| {
             if meta.path.is_ident("index_only") {
-                attrs.try_insert(Kind::IndexOnly, Value::Span(meta.path.span()))?
+                attrs.try_insert(Kind::IndexOnly, Value::IndexOnly(meta.path.span()))?
             } else if meta.path.is_ident("transparent") {
-                attrs.try_insert(Kind::Transparent, Value::Span(meta.path.span()))?
+                attrs.try_insert(Kind::Transparent, Value::Transparent(meta.path.span()))?
             } else if meta.path.is_ident("map") {
                 attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Map, meta.path.span()))?
             } else if meta.path.is_ident("array") {
@@ -180,13 +198,21 @@ impl Attributes {
                 syn::parenthesized!(content in meta.input);
                 let n: LitInt = content.parse()?;
                 let i = parse_int(&n).map(Idx::N)?;
-                attrs.try_insert(Kind::Index, Value::Index(i, meta.path.span()))?;
+                attrs.try_insert(Kind::Index, Value::Index(i, meta.path.span()))?
             } else if meta.path.is_ident("b") {
                 let content;
                 syn::parenthesized!(content in meta.input);
                 let n: LitInt = content.parse()?;
                 let i = parse_int(&n).map(Idx::B)?;
-                attrs.try_insert(Kind::Index, Value::Index(i, meta.path.span()))?;
+                attrs.try_insert(Kind::Index, Value::Index(i, meta.path.span()))?
+            } else if meta.path.is_ident("tag") {
+                let content;
+                syn::parenthesized!(content in meta.input);
+                let n: LitInt = content.parse()?;
+                let i = n.base10_parse()?;
+                attrs.try_insert(Kind::Tag, Value::Tag(i, meta.path.span()))?
+            } else if meta.path.is_ident("skip") {
+                attrs.try_insert(Kind::Skip, Value::Skip(meta.path.span()))?
             } else {
                 return Err(meta.error("unsupported attribute"))
             }
@@ -228,6 +254,14 @@ impl Attributes {
         self.get(Kind::CborLen).and_then(|v| v.cbor_len())
     }
 
+    pub fn tag(&self) -> Option<u64> {
+        self.get(Kind::Tag).and_then(|v| v.tag())
+    }
+
+    pub fn skip(&self) -> bool {
+        self.contains_key(Kind::Skip)
+    }
+
     fn contains_key(&self, k: Kind) -> bool {
         self.1.contains_key(&k)
     }
@@ -250,6 +284,7 @@ impl Attributes {
                 | Kind::Encoding
                 | Kind::Transparent
                 | Kind::ContextBound
+                | Kind::Tag
                 => {}
                 | Kind::TypeParam
                 | Kind::Codec
@@ -259,6 +294,7 @@ impl Attributes {
                 | Kind::IsNil
                 | Kind::HasNil
                 | Kind::CborLen
+                | Kind::Skip
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -272,6 +308,8 @@ impl Attributes {
                 | Kind::IsNil
                 | Kind::HasNil
                 | Kind::CborLen
+                | Kind::Tag
+                | Kind::Skip
                 => {}
                 | Kind::Encoding
                 | Kind::IndexOnly
@@ -286,6 +324,7 @@ impl Attributes {
                 | Kind::Encoding
                 | Kind::IndexOnly
                 | Kind::ContextBound
+                | Kind::Tag
                 => {}
                 | Kind::TypeParam
                 | Kind::Codec
@@ -295,6 +334,7 @@ impl Attributes {
                 | Kind::IsNil
                 | Kind::HasNil
                 | Kind::CborLen
+                | Kind::Skip
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -303,6 +343,7 @@ impl Attributes {
             Level::Variant => match key {
                 | Kind::Encoding
                 | Kind::Index
+                | Kind::Tag
                 => {}
                 | Kind::TypeParam
                 | Kind::Codec
@@ -313,6 +354,7 @@ impl Attributes {
                 | Kind::HasNil
                 | Kind::ContextBound
                 | Kind::CborLen
+                | Kind::Skip
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -463,12 +505,15 @@ impl Value {
             Value::Codec(_, s)        => *s,
             Value::Encoding(_, s)     => *s,
             Value::Index(_, s)        => *s,
-            Value::Span(s)            => *s,
+            Value::IndexOnly(s)       => *s,
+            Value::Transparent(s)     => *s,
             Value::Nil(_, s)          => *s,
             Value::IsNil(_, s)        => *s,
             Value::HasNil(s)          => *s,
             Value::ContextBound(_, s) => *s,
-            Value::CborLen(_, s)      => *s
+            Value::CborLen(_, s)      => *s,
+            Value::Tag(_, s)          => *s,
+            Value::Skip(s)            => *s
         }
     }
 
@@ -520,6 +565,13 @@ impl Value {
         }
     }
 
+    fn tag(&self) -> Option<u64> {
+        if let Value::Tag(x, _) = self {
+            Some(*x)
+        } else {
+            None
+        }
+    }
 }
 
 fn parse_u32_arg(a: &syn::Attribute) -> syn::Result<u32> {
@@ -527,8 +579,6 @@ fn parse_u32_arg(a: &syn::Attribute) -> syn::Result<u32> {
 }
 
 fn parse_int(n: &syn::LitInt) -> syn::Result<u32> {
-    n.base10_digits()
-     .parse()
-     .map_err(|_| syn::Error::new(n.span(), "expected `u32` value"))
+    n.base10_parse().map_err(|_| syn::Error::new(n.span(), "expected `u32` value"))
 }
 
