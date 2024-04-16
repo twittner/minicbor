@@ -92,6 +92,8 @@
 //! - [`#[cbor(map)]`](#cbormap)
 //! - [`#[cbor(index_only)]`](#cborindex_only)
 //! - [`#[cbor(transparent)]`](#cbortransparent)
+//! - [`#[cbor(skip)]`](#cborskip)
+//! - [`#[cbor(tag(...))]`](#cbortag)
 //! - [`#[cbor(decode_with)]`](#cbordecode_with--path)
 //! - [`#[cbor(encode_with)]`](#cborencode_with--path)
 //! - [`#[cbor(with)]`](#cborwith--path)
@@ -148,6 +150,18 @@
 //! If present, the generated `Encode` and `Decode` impls will just forward the
 //! respective `encode` and `decode` calls to the inner type, i.e. the resulting
 //! CBOR representation will be identical to the one of the inner type.
+//!
+//! ## `#[cbor(skip)]`
+//!
+//! This attribute can be attached to fields in structs and enums and prevents
+//! those fields from being encoded. Field types must implements [`Default`] and
+//! when decoding the fields are initialised with `Default::default()`.
+//!
+//! ## `#[cbor(tag(...))]`
+//!
+//! This attribute can be attached to structs, enums and their fields. Its argument
+//! is a base-10 unsigned integer which is encoded as the CBOR tag of the value.
+//! Decoding will also attempt to read the tag and fails otherwise.
 //!
 //! ## `#[cbor(decode_with = "<path>")]`
 //!
