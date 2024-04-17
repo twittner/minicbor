@@ -1,6 +1,7 @@
 use super::{Int, Tag, Type};
 use crate::encode::{self, Encode, Encoder, Write};
 use crate::decode::{Decode, Error};
+use crate::CborLen;
 use core::fmt;
 
 /// Representation of possible CBOR tokens.
@@ -199,3 +200,35 @@ impl<'b, C> Encode<C> for Token<'b> {
     }
 }
 
+impl<'b, C> CborLen<C> for Token<'b> {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        match self {
+            Token::Bool(val)   => val.cbor_len(ctx),
+            Token::U8(val)     => val.cbor_len(ctx),
+            Token::U16(val)    => val.cbor_len(ctx),
+            Token::U32(val)    => val.cbor_len(ctx),
+            Token::U64(val)    => val.cbor_len(ctx),
+            Token::I8(val)     => val.cbor_len(ctx),
+            Token::I16(val)    => val.cbor_len(ctx),
+            Token::I32(val)    => val.cbor_len(ctx),
+            Token::I64(val)    => val.cbor_len(ctx),
+            Token::Int(val)    => val.cbor_len(ctx),
+            Token::F16(val)    => val.cbor_len(ctx),
+            Token::F32(val)    => val.cbor_len(ctx),
+            Token::F64(val)    => val.cbor_len(ctx),
+            Token::Bytes(val)  => val.cbor_len(ctx),
+            Token::String(val) => val.cbor_len(ctx),
+            Token::Array(val)  => val.cbor_len(ctx),
+            Token::Map(val)    => val.cbor_len(ctx),
+            Token::Tag(val)    => val.cbor_len(ctx),
+            Token::Simple(val) => val.cbor_len(ctx),
+            Token::Break       => 1,
+            Token::Null        => 1,
+            Token::Undefined   => 1,
+            Token::BeginBytes  => 1,
+            Token::BeginString => 1,
+            Token::BeginArray  => 1,
+            Token::BeginMap    => 1
+        }
+    }
+}
