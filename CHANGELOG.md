@@ -6,6 +6,12 @@
 
 # minicbor
 
+## `0.24.0`
+
+- Added `minicbor::data::Tagged`, a newtype with a statically attached numeric tag.
+- Added attributes `skip` and `tag` (see [minicbor-derive-0.15.0](#minicbor-derive) for details).
+- Depend on `minicbor-derive-0.15.0`.
+
 ## `0.23.0`
 
 - Moved `Token` from `minicbor::decode` to `minicbor::data`. `Token` also implements `Decode` now.
@@ -316,11 +322,19 @@
 
 # minicbor-derive
 
+## `0.15.0`
+
+- Added attribute `skip` for fields, which ignores the value during encoding and initialises it
+  with `Default::default()` during decoding.
+- Added attribute `tag` to allow specifying the tag value which the subsequent value is encoded
+  and decoded with.
+- Requires `minicbor-0.24.0`.
+
 ## `0.14.0`
 
 - Upgrade dependency `syn` to version 2.0 (cf. commit 3a63fc304d380f2477959906a54b1f3dedc8ccef for
   details).
-- Require `minicbor-0.22.0`.
+- Requires `minicbor-0.22.0`.
 
 ## `0.13.0`
 
@@ -356,7 +370,7 @@
 
 ## `0.9.0`
 
-- Depends on `minicbor-0.14.0`.
+- Requires `minicbor-0.14.0`.
 
 ## `0.8.0`
 
@@ -421,6 +435,9 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.19.0`
+- Require `minicbor-0.24.0`.
 
 ## `0.18.0`
 

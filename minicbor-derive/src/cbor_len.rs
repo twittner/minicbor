@@ -74,7 +74,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let fields   = Fields::try_from(var.ident.span(), var.fields.iter())?;
         let con      = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
-        let tag      = on_tag(&attrs);
+        let tag      = on_tag(attrs);
         let row = match &var.fields {
             syn::Fields::Unit => if index_only {
                 quote! {
