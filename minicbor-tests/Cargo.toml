@@ -9,7 +9,7 @@ description = "minicbor test suite"
 repository  = "https://gitlab.com/twittner/minicbor"
 
 [features]
-alloc  = []
+alloc  = ["minicbor/alloc"]
 std    = ["alloc", "minicbor/std", "minicbor/derive"]
 derive = ["alloc", "minicbor/derive"]
 

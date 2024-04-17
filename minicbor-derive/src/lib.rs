@@ -470,8 +470,6 @@
 //! over. If such a combination occurs and `Decoder::skip` was compiled without
 //! feature "alloc", a decoding error is returned.
 
-#![allow(clippy::many_single_char_names)]
-
 extern crate proc_macro;
 
 mod decode;

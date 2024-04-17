@@ -40,12 +40,16 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let impl_generics = gen.split_for_impl().0;
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
+    let tag = on_tag(&attrs);
     let steps = on_fields(&fields, true, attrs.encoding().unwrap_or_default())?;
 
     Ok(quote! {
         impl #impl_generics minicbor::CborLen<Ctx> for #name #typ_generics #where_clause {
             fn cbor_len(&self, __ctx777: &mut Ctx) -> usize {
-                #(#steps)*
+                #tag +
+                {
+                    #(#steps)*
+                }
             }
         }
     })
@@ -70,6 +74,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let fields   = Fields::try_from(var.ident.span(), var.fields.iter())?;
         let con      = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
+        let tag      = on_tag(&attrs);
         let row = match &var.fields {
             syn::Fields::Unit => if index_only {
                 quote! {
@@ -77,7 +82,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 }
             } else {
                 quote! {
-                    #name::#con => { 1 + #idx.cbor_len(__ctx777) + 1 }
+                    #name::#con => { 1 + #idx.cbor_len(__ctx777) + #tag + 1 }
                 }
             }
             syn::Fields::Named(f) if index_only => {
@@ -88,10 +93,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 let idents = fields.fields().idents();
                 match encoding {
                     Encoding::Map => quote! {
-                        #name::#con{#(#idents,)* ..} => { 1 + #idx.cbor_len(__ctx777) + #(#steps)* }
+                        #name::#con{#(#idents,)* ..} => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
                     },
                     Encoding::Array => quote! {
-                        #name::#con{#(#idents,)* ..} => { #(#steps)* + 1 + #idx.cbor_len(__ctx777) }
+                        #name::#con{#(#idents,)* ..} => { #(#steps)* + #tag + 1 + #idx.cbor_len(__ctx777) }
                     }
                 }
             }
@@ -103,10 +108,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 let idents = fields.match_idents();
                 match encoding {
                     Encoding::Map => quote! {
-                        #name::#con(#(#idents,)* ..) => { 1 + #idx.cbor_len(__ctx777) + #(#steps)* }
+                        #name::#con(#(#idents,)*) => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
                     },
                     Encoding::Array => quote! {
-                        #name::#con(#(#idents,)* ..) => { #(#steps)* + 1 + #idx.cbor_len(__ctx777) }
+                        #name::#con(#(#idents,)*) => { #(#steps)* + #tag + 1 + #idx.cbor_len(__ctx777) }
                     }
                 }
             }
@@ -136,10 +141,15 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         }
     };
 
+    let tag = on_tag(&enum_attrs);
+
     Ok(quote! {
         impl #impl_generics minicbor::CborLen<Ctx> for #name #typ_generics #where_clause {
             fn cbor_len(&self, __ctx777: &mut Ctx) -> usize {
-                #body
+                #tag +
+                {
+                    #body
+                }
             }
         }
     })
@@ -159,13 +169,14 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                 let is_nil   = is_nil(&field.typ, field.attrs.codec());
                 let ident    = &field.ident;
                 let idx      = field.index;
+                let tag      = on_tag(&field.attrs);
                 if has_self {
                     if field.is_name {
                         steps.push(quote! {
                             + if #is_nil(&self.#ident) {
                                 0
                             } else {
-                                #idx.cbor_len(__ctx777) + #cbor_len(&self.#ident, __ctx777)
+                                #idx.cbor_len(__ctx777) + #tag + #cbor_len(&self.#ident, __ctx777)
                             }
                         })
                     } else {
@@ -174,7 +185,7 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                             + if #is_nil(&self.#i) {
                                 0
                             } else {
-                                #idx.cbor_len(__ctx777) + #cbor_len(&self.#i, __ctx777)
+                                #idx.cbor_len(__ctx777) + #tag + #cbor_len(&self.#i, __ctx777)
                             }
                         })
                     }
@@ -183,7 +194,7 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                         + if #is_nil(&#ident) {
                             0
                         } else {
-                            #idx.cbor_len(__ctx777) + #cbor_len(&#ident, __ctx777)
+                            #idx.cbor_len(__ctx777) + #tag + #cbor_len(&#ident, __ctx777)
                         }
                     })
                 }
@@ -206,11 +217,12 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                 let cbor_len = cbor_len(field.attrs.cbor_len(), field.attrs.codec());
                 let is_nil   = is_nil(&field.typ, field.attrs.codec());
                 let ident    = &field.ident;
+                let tag      = on_tag(&field.attrs);
                 if has_self {
                     if field.is_name {
                         steps.push(quote! {
                             if !#is_nil(&self.#ident) {
-                                __len777 += (#n - __num777) + #cbor_len(&self.#ident, __ctx777);
+                                __len777 += (#n - __num777) + #tag + #cbor_len(&self.#ident, __ctx777);
                                 __num777 = #n + 1
                             }
                         })
@@ -218,7 +230,7 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                         let i = syn::Index::from(field.pos);
                         steps.push(quote! {
                             if !#is_nil(&self.#i) {
-                                __len777 += (#n - __num777) + #cbor_len(&self.#i, __ctx777);
+                                __len777 += (#n - __num777) + #tag + #cbor_len(&self.#i, __ctx777);
                                 __num777 = #n + 1
                             }
                         })
@@ -226,7 +238,7 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                 } else {
                     steps.push(quote! {
                         if !#is_nil(&#ident) {
-                            __len777 += (#n - __num777) + #cbor_len(&#ident, __ctx777);
+                            __len777 += (#n - __num777) + #tag + #cbor_len(&#ident, __ctx777);
                             __num777 = #n + 1
                         }
                     })
@@ -260,3 +272,12 @@ fn gen_cbor_len_bound() -> syn::Result<syn::TypeParamBound> {
 fn gen_encode_bound() -> syn::Result<syn::TypeParamBound> {
     syn::parse_str("minicbor::Encode<Ctx>")
 }
+
+fn on_tag(a: &Attributes) -> proc_macro2::TokenStream {
+    if let Some(t) = a.tag() {
+        quote!(minicbor::data::Tag::new(#t).cbor_len(__ctx777))
+    } else {
+        quote!(0)
+    }
+}
+

@@ -474,16 +474,27 @@ fn nil(f: &Field) -> proc_macro2::TokenStream {
 
 fn decode_tag(a: &Attributes) -> proc_macro2::TokenStream {
     if let Some(t) = a.tag() {
+        let err =
+            if cfg!(feature = "std") {
+                quote! {
+                    minicbor::decode::Error::tag_mismatch(__t777)
+                        .with_message(format!("expected tag {}", #t))
+                        .at(__p777)
+                }
+            } else if cfg!(feature = "alloc") {
+                quote! {
+                    minicbor::decode::Error::tag_mismatch(__t777)
+                        .with_message(alloc::format!("expected tag {}", #t))
+                        .at(__p777)
+                }
+            } else {
+                quote!(minicbor::decode::Error::tag_mismatch(__t777).at(__p777))
+            };
         quote! {
             let __p777 = __d777.position();
             let __t777 = __d777.tag()?;
             if #t != __t777.as_u64() {
-                #[cfg(feature = "alloc")]
-                return Err(minicbode::decode::Error::tag_mismatch(__t777)
-                    .with_message(alloc::format!("expected tag {}", #t))
-                    .at(__p777));
-                #[cfg(not(feature = "alloc"))]
-                return Err(minicbor::decode::Error::tag_mismatch(__t777).at(__p777))
+                return Err(#err)
             }
         }
     } else {

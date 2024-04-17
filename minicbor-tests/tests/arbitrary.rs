@@ -1,4 +1,4 @@
-#![cfg(all(feature = "derive", feature = "std"))]
+#![cfg(all(feature = "derive", feature = "alloc"))]
 
 use arbitrary::{Arbitrary, Unstructured};
 use core::fmt::Debug;
@@ -24,7 +24,7 @@ where
 
         let len = minicbor::len(&val1);
         let vec = minicbor::to_vec(&val1).unwrap();
-        assert_eq!(len, vec.len());
+        assert_eq!(len, vec.len(), "cbor length mismatch; input := {val1:?}");
 
         let mut dec = Decoder::new(&vec);
         let val2 = match dec.decode() {

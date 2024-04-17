@@ -15,7 +15,7 @@ proc-macro = true
 
 [features]
 alloc = []
-std   = []
+std   = ["alloc"]
 
 [dependencies]
 proc-macro2 = "1.0.79"

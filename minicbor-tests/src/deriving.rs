@@ -1,5 +1,8 @@
 #![cfg(feature = "derive")]
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 use arbitrary::Arbitrary;
 use minicbor::{Encode, Decode, CborLen};
 
@@ -20,26 +23,26 @@ macro_rules! gen_modules {
                 use super::*;
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub struct Plain;
 
                 impl ResetSkipped for Plain {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
-                pub struct TupleStruct0(#[n(0)] pub bool);
+                #[cbor($array_or_map, tag(1000))]
+                pub struct TupleStruct0(#[cbor(n(0), tag(1001))] pub bool);
 
                 impl ResetSkipped for TupleStruct0 {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
-                pub struct TupleStruct1(#[n(1)] pub bool);
+                #[cbor($array_or_map, tag(1000))]
+                pub struct TupleStruct1(#[cbor(n(1), tag(1001))] pub bool);
 
                 impl ResetSkipped for TupleStruct1 {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
-                pub struct TupleStruct1Skipped(#[cbor(skip)] pub char, #[n(0)] bool);
+                #[cbor($array_or_map, tag(1000))]
+                pub struct TupleStruct1Skipped(#[cbor(skip)] pub char, #[cbor(n(0), tag(1001))] bool);
 
                 impl ResetSkipped for TupleStruct1Skipped {
                     fn reset_skipped(&mut self) {
@@ -48,20 +51,20 @@ macro_rules! gen_modules {
                 }
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
-                pub struct TupleStruct2(#[n(0)] pub bool, #[n(1)] pub char);
+                #[cbor($array_or_map, tag(1000))]
+                pub struct TupleStruct2(#[cbor(n(0), tag(1001))] pub bool, #[cbor(n(1), tag(1002))] pub char);
 
                 impl ResetSkipped for TupleStruct2 {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
-                pub struct TupleStruct2Rev(#[n(1)] pub char, #[n(0)] pub bool);
+                #[cbor($array_or_map, tag(1000))]
+                pub struct TupleStruct2Rev(#[cbor(n(1), tag(1001))] pub char, #[cbor(n(0), tag(1002))] pub bool);
 
                 impl ResetSkipped for TupleStruct2Rev {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
-                pub struct TupleStruct2Skipped(#[n(0)] pub bool, #[cbor(skip)] pub char);
+                #[cbor($array_or_map, tag(1000))]
+                pub struct TupleStruct2Skipped(#[cbor(n(0), tag(1001))] pub bool, #[cbor(skip)] pub char);
 
                 impl ResetSkipped for TupleStruct2Skipped {
                     fn reset_skipped(&mut self) {
@@ -85,32 +88,32 @@ macro_rules! gen_modules {
                 use super::*;
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub struct Plain {}
 
                 impl ResetSkipped for Plain {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub struct Struct0 {
-                    #[n(0)] pub a: bool
+                    #[cbor(n(0), tag(1001))] pub a: bool
                 }
 
                 impl ResetSkipped for Struct0 {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub struct Struct1 {
-                    #[n(1)] pub a: bool
+                    #[cbor(n(1), tag(1001))] pub a: bool
                 }
 
                 impl ResetSkipped for Struct1 {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub struct Struct1Skipped {
                     #[cbor(skip)] pub a: char,
-                    #[n(0)] pub b: bool
+                    #[cbor(n(0), tag(1001))] pub b: bool
                 }
 
                 impl ResetSkipped for Struct1Skipped {
@@ -120,27 +123,27 @@ macro_rules! gen_modules {
                 }
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub struct Struct2 {
-                    #[n(0)] pub a: bool,
-                    #[n(1)] pub b: char
+                    #[cbor(n(0), tag(1001))] pub a: bool,
+                    #[cbor(n(1), tag(1002))] pub b: char
                 }
 
                 impl ResetSkipped for Struct2 {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub struct Struct2Rev {
-                    #[n(1)] pub a: char,
-                    #[n(0)] pub b: bool
+                    #[cbor(n(1), tag(1001))] pub a: char,
+                    #[cbor(n(0), tag(1002))] pub b: bool
                 }
 
                 impl ResetSkipped for Struct2Rev {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub struct Struct2Skipped {
-                    #[n(0)] pub a: bool,
+                    #[cbor(n(0), tag(1001))] pub a: bool,
                     #[cbor(skip)] pub b: char
                 }
 
@@ -151,7 +154,7 @@ macro_rules! gen_modules {
                 }
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub struct Struct2AllSkipped {
                     #[cbor(skip)] pub a: bool,
                     #[cbor(skip)] pub b: char
@@ -169,86 +172,86 @@ macro_rules! gen_modules {
                 use super::*;
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub enum Enum1 {
-                    #[n(0)] A
+                    #[cbor(n(0), tag(1001))] A
                 }
 
                 impl ResetSkipped for Enum1 {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub enum Enum2 {
-                    #[n(0)] A,
-                    #[n(1)] B
+                    #[cbor(n(0), tag(1001))] A,
+                    #[cbor(n(1), tag(1002))] B
                 }
 
                 impl ResetSkipped for Enum2 {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub enum Enum2Rev {
-                    #[n(1)] B,
-                    #[n(0)] A
+                    #[cbor(n(1), tag(1002))] B,
+                    #[cbor(n(0), tag(1001))] A
                 }
 
                 impl ResetSkipped for Enum2Rev {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub enum Enum4 {
-                    #[n(0)] A,
-                    #[n(1)] B,
-                    #[n(2)] C(#[n(0)] char),
-                    #[n(3)] D(#[n(1)] char)
+                    #[cbor(n(0), tag(1001))] A,
+                    #[cbor(n(1), tag(1002))] B,
+                    #[cbor(n(2), tag(1003))] C(#[cbor(n(0), tag(2000))] char),
+                    #[cbor(n(3), tag(1004))] D(#[cbor(n(1), tag(2001))] char)
                 }
 
                 impl ResetSkipped for Enum4 {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub enum Enum4Rec {
-                    #[n(0)] A,
-                    #[n(1)] B,
-                    #[n(2)] C { #[n(0)] a: char },
-                    #[n(3)] D { #[n(1)] b: char }
+                    #[cbor(n(0), tag(1001))] A,
+                    #[cbor(n(1), tag(1002))] B,
+                    #[cbor(n(2), tag(1003))] C { #[cbor(n(0), tag(2000))] a: char },
+                    #[cbor(n(3), tag(1004))] D { #[cbor(n(1), tag(2001))] b: char }
                 }
 
                 impl ResetSkipped for Enum4Rec {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub enum Enum4Rev {
-                    #[n(3)] A,
-                    #[n(2)] B,
-                    #[n(1)] C(#[n(0)] char),
-                    #[n(0)] D(#[n(1)] char)
+                    #[cbor(n(3), tag(1004))] A,
+                    #[cbor(n(2), tag(1003))] B,
+                    #[cbor(n(1), tag(1002))] C(#[cbor(n(0), tag(2000))] char),
+                    #[cbor(n(0), tag(1001))] D(#[cbor(n(1), tag(2001))] char)
                 }
 
                 impl ResetSkipped for Enum4Rev {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub enum Enum4RecRev {
-                    #[n(3)] A,
-                    #[n(2)] B,
-                    #[n(1)] C { #[n(0)] a: char },
-                    #[n(0)] D { #[n(1)] b: char }
+                    #[cbor(n(3), tag(1004))] A,
+                    #[cbor(n(2), tag(1003))] B,
+                    #[cbor(n(1), tag(1002))] C { #[cbor(n(0), tag(2000))] a: char },
+                    #[cbor(n(0), tag(1001))] D { #[cbor(n(1), tag(2001))] b: char }
                 }
 
                 impl ResetSkipped for Enum4RecRev {}
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub enum Enum8 {
-                    #[n(0)] A,
-                    #[n(1)] B,
-                    #[n(2)] C(#[n(0)] char),
-                    #[n(3)] D(#[n(1)] char),
-                    #[n(6)] E(#[n(1)] char, #[n(0)] bool),
-                    #[n(8)] F(#[cbor(skip)] char, #[n(0)] bool),
-                    #[n(9)] G(#[n(0)] char, #[cbor(skip)] bool),
-                    #[n(7)] H(#[n(3)] char, #[cbor(skip)] bool),
+                    #[cbor(n(0), tag(1001))] A,
+                    #[cbor(n(1), tag(1002))] B,
+                    #[cbor(n(2), tag(1003))] C(#[cbor(n(0), tag(2000))] char),
+                    #[cbor(n(3), tag(1004))] D(#[cbor(n(1), tag(2001))] char),
+                    #[cbor(n(6), tag(1005))] E(#[cbor(n(1), tag(2002))] char, #[cbor(n(0), tag(3000))] bool),
+                    #[cbor(n(8), tag(1006))] F(#[cbor(skip)] char, #[cbor(n(0), tag(3000))] bool),
+                    #[cbor(n(9), tag(1007))] G(#[cbor(n(0), tag(2003))] char, #[cbor(skip)] bool),
+                    #[cbor(n(7), tag(1008))] H(#[cbor(n(3), tag(2004))] char, #[cbor(skip)] bool),
                 }
 
                 impl ResetSkipped for Enum8 {
@@ -263,16 +266,16 @@ macro_rules! gen_modules {
                 }
 
                 #[derive(Debug, Arbitrary, Encode, Decode, CborLen, PartialEq, Eq)]
-                #[cbor($array_or_map)]
+                #[cbor($array_or_map, tag(1000))]
                 pub enum Enum8Rec {
-                    #[n(0)] A,
-                    #[n(1)] B,
-                    #[n(2)] C { #[n(0)] a: char },
-                    #[n(3)] D { #[n(1)] a: char },
-                    #[n(6)] E { #[n(1)] a: char, #[n(0)] b: bool },
-                    #[n(8)] F { #[cbor(skip)] a: char, #[n(0)] b: bool },
-                    #[n(9)] G { #[n(0)] a: char, #[cbor(skip)] b: bool },
-                    #[n(7)] H { #[n(3)] a: char, #[cbor(skip)] b: bool }
+                    #[cbor(n(0), tag(1001))] A,
+                    #[cbor(n(1), tag(1002))] B,
+                    #[cbor(n(2), tag(1003))] C { #[cbor(n(0), tag(2000))] a: char },
+                    #[cbor(n(3), tag(1004))] D { #[cbor(n(1), tag(2001))] a: char },
+                    #[cbor(n(6), tag(1005))] E { #[cbor(n(1), tag(2002))] a: char, #[cbor(n(0), tag(3000))] b: bool },
+                    #[cbor(n(8), tag(1006))] F { #[cbor(skip)] a: char, #[cbor(n(0), tag(3000))] b: bool },
+                    #[cbor(n(9), tag(1007))] G { #[cbor(n(0), tag(2003))] a: char, #[cbor(skip)] b: bool },
+                    #[cbor(n(7), tag(1008))] H { #[cbor(n(3), tag(2004))] a: char, #[cbor(skip)] b: bool }
                 }
 
                 impl ResetSkipped for Enum8Rec {
