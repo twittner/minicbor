@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.24.1`
+
+- Maintenance release (cf. merge requests !44 by @alistair23 and !45 by @deundiak).
+
 ## `0.24.0`
 
 - Added `minicbor::data::Tagged`, a newtype with a statically attached numeric tag.
