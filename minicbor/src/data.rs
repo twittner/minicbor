@@ -334,6 +334,10 @@ impl<const N: u64, T> Tagged<N, T> {
         &self.0
     }
 
+    pub fn value_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+
     pub fn into_value(self) -> T {
         self.0
     }
