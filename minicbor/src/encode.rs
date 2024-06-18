@@ -284,8 +284,8 @@ where
     }
 }
 
-#[cfg(feature = "std")]
-impl<C, K, V> CborLen<C> for std::collections::BTreeMap<K, V>
+#[cfg(feature = "alloc")]
+impl<C, K, V> CborLen<C> for alloc::collections::BTreeMap<K, V>
 where
     K: CborLen<C>,
     V: CborLen<C>,
