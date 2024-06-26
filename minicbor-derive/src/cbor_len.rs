@@ -1,6 +1,7 @@
 use crate::{attrs::{Attributes, Level, Encoding, CustomCodec}, fields::Fields, add_typeparam, gen_ctx_param, variants::Variants, encode::is_nil};
 use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
+use crate::fields::Field;
 
 /// Entry point to derive `minicbor::CborLen` on structs and enums.
 pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -39,6 +40,16 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let gen = add_typeparam(&inp.generics, gen_ctx_param()?, attrs.context_bound());
     let impl_generics = gen.split_for_impl().0;
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
+
+    // If transparent, just forward the len call to the inner type.
+    if attrs.transparent() {
+        if fields.fields().len() != 1 {
+            let msg = "#[cbor(transparent)] requires a struct with one field";
+            return Err(syn::Error::new(inp.ident.span(), msg))
+        }
+        let f = fields.fields().next().expect("struct has 1 field");
+        return make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause)
+    }
 
     let tag = on_tag(&attrs);
     let steps = on_fields(&fields, true, attrs.encoding().unwrap_or_default())?;
@@ -263,6 +274,35 @@ fn cbor_len(custom: Option<&syn::ExprPath>, codec: Option<&CustomCodec>) -> proc
         }
     }
     quote!(minicbor::CborLen::<Ctx>::cbor_len)
+}
+
+/// Forward the length computation because of a `#[cbor(transparent)]` attribute.
+fn make_transparent_impl
+    ( name: &syn::Ident
+    , field: &Field
+    , impl_generics: syn::ImplGenerics
+    , typ_generics: syn::TypeGenerics
+    , where_clause: Option<&syn::WhereClause>
+    ) -> syn::Result<proc_macro2::TokenStream>
+{
+    let cbor_len = cbor_len(field.attrs.cbor_len(), field.attrs.codec());
+
+    let call =
+        if field.is_name {
+            let id = &field.ident;
+            quote!(#cbor_len(&self.#id, __ctx777))
+        } else {
+            quote!(#cbor_len(&self.0, __ctx777))
+        };
+
+    Ok(quote! {
+        impl #impl_generics minicbor::CborLen<Ctx> for #name #typ_generics #where_clause {
+            fn cbor_len(&self, __ctx777: &mut Ctx) -> usize
+            {
+                #call
+            }
+        }
+    })
 }
 
 fn gen_cbor_len_bound() -> syn::Result<syn::TypeParamBound> {
