@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.24.2`
+
+- Maintenance release (cf. merge request !46 by @deundiak).
+
 ## `0.24.1`
 
 - Maintenance release (cf. merge requests !44 by @alistair23 and !45 by @deundiak).
