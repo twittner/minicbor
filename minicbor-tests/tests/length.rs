@@ -42,6 +42,10 @@ struct BytesMapEncoding {
     #[cbor(n(1), with="minicbor::bytes")] vector: Vec<u8>
 }
 
+#[derive(Encode, Decode, CborLen, Clone, Debug)]
+#[cbor(transparent)]
+struct TransparentEncoding(#[cbor(n(0))] u8);
+
 impl Arbitrary for SampleArrayEncoding<BytesArrayEncoding> {
     fn arbitrary(g: &mut Gen) -> Self {
         match g.choose(&[0, 1, 2, 3]).unwrap() {
@@ -116,6 +120,12 @@ impl Arbitrary for BytesMapEncoding {
     }
 }
 
+impl Arbitrary for TransparentEncoding {
+    fn arbitrary(g: &mut Gen) -> Self {
+        TransparentEncoding(Arbitrary::arbitrary(g))
+    }
+}
+
 quickcheck! {
     fn sample_array_array(val: SampleArrayEncoding<BytesArrayEncoding>) -> bool {
         let bytes = minicbor::to_vec(&val).unwrap();
@@ -133,6 +143,11 @@ quickcheck! {
     }
 
     fn sample_map_array(val: SampleMapEncoding<BytesArrayEncoding>) -> bool {
+        let bytes = minicbor::to_vec(&val).unwrap();
+        bytes.len() == minicbor::len(&val)
+    }
+
+    fn sample_transparent(val: TransparentEncoding) -> bool {
         let bytes = minicbor::to_vec(&val).unwrap();
         bytes.len() == minicbor::len(&val)
     }

@@ -266,7 +266,7 @@ impl From<IanaTag> for Tag {
 
 impl From<&IanaTag> for Tag {
     fn from(t: &IanaTag) -> Tag {
-        t.into()
+        Tag::from(*t)
     }
 }
 
