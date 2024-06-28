@@ -216,8 +216,8 @@ impl TryFrom<Tag> for IanaTag {
     }
 }
 
-impl From<&IanaTag> for Tag {
-    fn from(t: &IanaTag) -> Tag {
+impl From<IanaTag> for Tag {
+    fn from(t: IanaTag) -> Tag {
         match t {
             IanaTag::DateTime            => Tag::new(0x00),
             IanaTag::Timestamp           => Tag::new(0x01),
@@ -264,9 +264,9 @@ impl From<&IanaTag> for Tag {
     }
 }
 
-impl From<IanaTag> for Tag {
-    fn from(t: IanaTag) -> Tag {
-        Tag::from(&t)
+impl From<&IanaTag> for Tag {
+    fn from(t: &IanaTag) -> Tag {
+        Tag::from(*t)
     }
 }
 
