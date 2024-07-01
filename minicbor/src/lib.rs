@@ -27,6 +27,8 @@
 //!
 //! For I/O support see [`minicbor-io`][1].
 //!
+//! Finally, basic serde integration is optionally provided with feature `"serde"`.
+//!
 //! [1]: https://twittner.gitlab.io/minicbor/minicbor_io/
 //!
 //! # Feature flags
@@ -129,7 +131,6 @@
 //! [CBOR]: https://datatracker.ietf.org/doc/html/rfc8949
 //! [serde]: https://serde.rs
 
-#![forbid(unused_variables)]
 #![allow(clippy::needless_lifetimes)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -140,6 +141,9 @@ pub mod bytes;
 pub mod data;
 pub mod decode;
 pub mod encode;
+
+#[cfg(feature = "serde")]
+pub mod serde;
 
 const UNSIGNED: u8 = 0x00;
 const SIGNED: u8   = 0x20;

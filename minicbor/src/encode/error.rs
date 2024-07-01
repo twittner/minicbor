@@ -135,3 +135,13 @@ impl<E: std::error::Error + 'static> std::error::Error for Error<E> {
     }
 }
 
+#[cfg(feature = "serde")]
+impl<E: serde::ser::StdError + 'static> serde::ser::Error for Error<E> {
+    fn custom<T: fmt::Display>(_msg: T) -> Self {
+        #[cfg(feature = "alloc")]
+        return Self::message(_msg);
+        #[cfg(not(feature = "alloc"))]
+        return Self::message("custom serde error");
+    }
+}
+

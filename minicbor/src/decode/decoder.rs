@@ -664,7 +664,7 @@ impl<'b> Decoder<'b> {
     }
 
     /// Get the byte at the current position.
-    fn current(&self) -> Result<u8, Error> {
+    pub(crate) fn current(&self) -> Result<u8, Error> {
         if let Some(b) = self.buf.get(self.pos) {
             return Ok(*b)
         }
@@ -672,7 +672,7 @@ impl<'b> Decoder<'b> {
     }
 
     /// Consume and return the byte at the current position.
-    fn read(&mut self) -> Result<u8, Error> {
+    pub(crate) fn read(&mut self) -> Result<u8, Error> {
         if let Some(b) = self.buf.get(self.pos) {
             self.pos += 1;
             return Ok(*b)

@@ -60,7 +60,6 @@ fn benchmark(c: &mut Criterion) {
     let book_bytes_minicbor = minicbor::to_vec(&book).unwrap();
     group.bench_function("serde_cbor", |b| b.iter(|| {
         let _: AddressBook = serde_cbor::from_slice(&book_bytes_serde).unwrap();
-
     }));
     group.bench_function("minicbor", |b| b.iter(|| {
         let _: AddressBook = minicbor::decode(&book_bytes_minicbor).unwrap();

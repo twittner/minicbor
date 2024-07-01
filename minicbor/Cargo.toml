@@ -12,17 +12,18 @@ categories    = ["encoding"]
 build         = "build.rs"
 
 [package.metadata.docs.rs]
-features = ["std", "derive", "half"]
+features = ["full"]
 
 [features]
-full   = ["std", "derive", "half"]
-alloc  = ["minicbor-derive?/alloc"]
-std    = ["alloc", "minicbor-derive?/std"]
+full   = ["std", "derive", "half", "serde"]
+alloc  = ["minicbor-derive?/alloc", "serde?/alloc"]
+std    = ["alloc", "minicbor-derive?/std", "serde?/alloc", "serde?/std"]
 derive = ["minicbor-derive"]
 
 [dependencies]
 minicbor-derive = { version = "0.15.0", path = "../minicbor-derive", optional = true }
 half            = { version = "2.4.0", default-features = false, optional = true }
+serde           = { version = "1.0.197", default-features = false, optional = true }
 
 [dev-dependencies]
 minicbor = { path = ".", features = ["std", "half"] }

@@ -12,14 +12,15 @@ repository  = "https://gitlab.com/twittner/minicbor"
 alloc  = ["minicbor/alloc"]
 std    = ["alloc", "minicbor/std", "minicbor/derive"]
 derive = ["alloc", "minicbor/derive"]
+serde  = ["minicbor/serde"]
 
 [dependencies]
 arbitrary = { version = "1.3.2", features = ["derive"] }
 minicbor  = { path = "../minicbor", features = ["half"] }
 
 [dev-dependencies]
-criterion  = "0.3"
-half       = "1.6"
+criterion  = "0.5.1"
+half       = "2"
 hex        = "0.4.2"
 quickcheck = "1.0.1"
 rand       = "0.8"
