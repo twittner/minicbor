@@ -171,6 +171,11 @@ impl Error {
         matches!(self.err, ErrorImpl::Message)
     }
 
+    /// Byte index of the input at which the error occurred.
+    pub fn position(&self) -> Option<usize> {
+        self.pos
+    }
+
     #[cfg(feature = "std")]
     pub fn is_custom(&self) -> bool {
         matches!(self.err, ErrorImpl::Custom(_))
