@@ -1,8 +1,20 @@
 [workspace]
-members  = ["minicbor", "minicbor-derive", "minicbor-io", "minicbor-tests", "minicbor-tests-client"]
+members  = [
+    "minicbor",
+    "minicbor-derive",
+    "minicbor-io",
+    "minicbor-serde",
+    "minicbor-tests",
+    "minicbor-tests-client",
+    "minicbor-bench"
+]
 exclude  = ["minicbor-tests-nostd"]
 resolver = "2"
 
 [profile.bench]
+lto = true
+codegen-units = 1
+
+[profile.release]
 lto = true
 codegen-units = 1

@@ -1,11 +1,8 @@
-use criterion::{criterion_group, criterion_main, Criterion};
 use minicbor::{Encode, Decode};
 use rand::{distributions::Alphanumeric, prelude::*};
 use serde::{Serialize, Deserialize};
-use std::{borrow::Cow, iter};
-
-criterion_group!(benches, benchmark);
-criterion_main!(benches);
+use std::{borrow::Cow, iter, path::Path};
+use std::time::Instant;
 
 #[derive(Debug, Encode, Decode, Serialize, Deserialize)]
 struct AddressBook<'a> {
@@ -43,29 +40,65 @@ enum Style<'a> {
     }
 }
 
-fn benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("encode");
-    let book = gen_addressbook(8);
-    group.bench_function("serde_cbor", |b| b.iter(|| {
-        serde_cbor::ser::to_vec_packed(&book).unwrap();
-    }));
-    group.bench_function("minicbor", |b| b.iter(|| {
-        minicbor::to_vec(&book).unwrap();
-    }));
-    group.finish();
+fn bench(label: &str, mut f: impl FnMut() -> bool) {
+    const ITERATIONS: u32 = 1000;
+    let start = Instant::now();
+    for _ in 0 .. ITERATIONS {
+        assert!(f())
+    }
+    eprintln!("{label:24} {:0.2?}", start.elapsed() / ITERATIONS)
+}
 
-    let mut group = c.benchmark_group("decode");
-    let book = gen_addressbook(8);
+#[test]
+fn packed_serde_cbor_vs_minicbor() {
+    let book = gen_addressbook(16);
     let book_bytes_serde = serde_cbor::ser::to_vec_packed(&book).unwrap();
     let book_bytes_minicbor = minicbor::to_vec(&book).unwrap();
-    group.bench_function("serde_cbor", |b| b.iter(|| {
-        let _: AddressBook = serde_cbor::from_slice(&book_bytes_serde).unwrap();
 
-    }));
-    group.bench_function("minicbor", |b| b.iter(|| {
-        let _: AddressBook = minicbor::decode(&book_bytes_minicbor).unwrap();
-    }));
-    group.finish();
+    println!();
+    bench("encode/serde_cbor", || serde_cbor::ser::to_vec_packed(&book).is_ok());
+    bench("encode/minicbor",   || minicbor::to_vec(&book).is_ok());
+    bench("decode/serde_cbor", || serde_cbor::from_slice::<AddressBook>(&book_bytes_serde).is_ok());
+    bench("decode/minicbor",   || minicbor::decode::<AddressBook>(&book_bytes_minicbor).is_ok());
+}
+
+#[test]
+fn serde_encode() {
+    let book = gen_addressbook(16);
+
+    let mut buf = Vec::new();
+
+    println!();
+    bench("encode/serde_cbor", || {
+        buf.clear();
+        book.serialize(&mut serde_cbor::Serializer::new(&mut buf)).is_ok()
+    });
+
+    bench("encode/cbor4ii", || {
+        buf.clear();
+        cbor4ii::serde::to_writer(&mut buf, &book).is_ok()
+    });
+
+    bench("encode/minicbor-serde", || {
+        buf.clear();
+        book.serialize(&mut minicbor_serde::Serializer::new(&mut buf)).is_ok()
+    });
+}
+
+#[test]
+fn serde_decode() {
+    let sample = Path::new("/tmp/sample.cbor");
+    if !sample.is_file() {
+        let book = gen_addressbook(16);
+        let cbor = serde_cbor::ser::to_vec(&book).unwrap();
+        std::fs::write(sample, &cbor).unwrap();
+    }
+    let sample = std::fs::read(sample).unwrap();
+
+    println!();
+    bench("decode/serde_cbor",     || serde_cbor::from_slice::<AddressBook>(&sample).is_ok());
+    bench("decode/cbor4ii",        || cbor4ii::serde::from_slice::<AddressBook>(&sample).is_ok());
+    bench("decode/minicbor-serde", || minicbor_serde::from_slice::<AddressBook>(&sample).is_ok());
 }
 
 fn gen_addressbook(n: usize) -> AddressBook<'static> {

@@ -1,0 +1,22 @@
+[package]
+publish     = false
+name        = "minicbor-bench"
+version     = "0.1.0"
+authors     = ["Toralf Wittner <tw@dtex.org>"]
+license     = "BlueOak-1.0.0"
+edition     = "2021"
+description = "minicbor benchmark suite"
+repository  = "https://gitlab.com/twittner/minicbor"
+
+[features]
+alloc  = ["minicbor/alloc"]
+std    = ["alloc", "minicbor/std", "minicbor/derive"]
+derive = ["alloc", "minicbor/derive"]
+
+[dev-dependencies]
+cbor4ii        = { version = "0.3.3", features = ["serde1", "use_std"] }
+minicbor       = { path = "../minicbor", features = ["full"] }
+minicbor-serde = { path = "../minicbor-serde", features = ["full"] }
+rand           = "0.8.5"
+serde          = { version = "1.0", features = ["derive"] }
+serde_cbor     = "0.11"
