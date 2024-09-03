@@ -41,10 +41,11 @@ const ATOMIC64: &[&str] = &[
 fn main() {
     let target = std::env::var("TARGET").unwrap();
 
+    println!("cargo::rustc-check-cfg=cfg(atomic64, atomic32)");
+
     if ATOMIC64.iter().any(|a| target.starts_with(a)) {
-        println!("cargo:rustc-cfg=atomic64");
+        println!("cargo::rustc-cfg=atomic64");
     } else if ATOMIC32.iter().any(|a| target.starts_with(a)) {
-        println!("cargo:rustc-cfg=atomic32");
+        println!("cargo::rustc-cfg=atomic32");
     }
 }
-
