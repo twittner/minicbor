@@ -6,6 +6,10 @@
 
 # minicbor
 
+## `0.24.3`
+
+- Maintenance release (cf. merge request !47 by @chrysn).
+
 ## `0.24.2`
 
 - Maintenance release (cf. merge request !46 by @deundiak).
@@ -565,4 +569,3 @@
 [1]: https://twittner.gitlab.io/minicbor/minicbor_derive/index.html#index_only
 [2]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
 [3]: https://twittner.gitlab.io/minicbor/minicbor/index.html#feature-flags
-
