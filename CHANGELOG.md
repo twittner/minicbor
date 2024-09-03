@@ -3,6 +3,7 @@
 - [minicbor](#minicbor)
 - [minicbor-derive](#minicbor-derive)
 - [minicbor-io](#minicbor-io)
+- [minicbor-serde](#minicbor-serde)
 
 # minicbor
 
@@ -565,6 +566,12 @@
 ## `0.1.0`
 
 - Initial release which provides some I/O utilities.
+
+# minicbor-serde
+
+## `0.1.0`
+
+- Initial release.
 
 [1]: https://twittner.gitlab.io/minicbor/minicbor_derive/index.html#index_only
 [2]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
