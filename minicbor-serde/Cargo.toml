@@ -6,7 +6,6 @@ license       = "BlueOak-1.0.0"
 edition       = "2021"
 description   = "Integrates minicbor with serde."
 repository    = "https://gitlab.com/twittner/minicbor"
-documentation = "https://twittner.gitlab.io/minicbor/minicbor_serde/"
 keywords      = ["cbor", "serde", "serialization", "encoding", "binary", "no_std"]
 categories    = ["encoding"]
 
@@ -23,4 +22,3 @@ std    = ["alloc", "minicbor/std", "serde/std"]
 minicbor = "0.24.3"
 half     = { version = "2.4.0", default-features = false, optional = true }
 serde    = { version = "1.0.197", default-features = false }
-
