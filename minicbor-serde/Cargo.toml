@@ -6,7 +6,7 @@ license       = "BlueOak-1.0.0"
 edition       = "2021"
 description   = "Integrates minicbor with serde."
 repository    = "https://gitlab.com/twittner/minicbor"
-keywords      = ["cbor", "serde", "serialization", "encoding", "binary", "no_std"]
+keywords      = ["cbor", "serde", "serialization", "binary", "no_std"]
 categories    = ["encoding"]
 
 [package.metadata.docs.rs]
