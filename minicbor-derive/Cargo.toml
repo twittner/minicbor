@@ -7,7 +7,7 @@ edition       = "2021"
 description   = "Derive minicbor `Decode` and `Encode` traits."
 repository    = "https://gitlab.com/twittner/minicbor"
 documentation = "https://twittner.gitlab.io/minicbor/minicbor_derive/"
-keywords      = ["cbor", "serialization", "encoding", "binary", "no_std"]
+keywords      = ["cbor", "minicbor", "serialization", "encoding", "no_std"]
 categories    = ["encoding"]
 
 [lib]
