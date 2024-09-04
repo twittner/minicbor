@@ -7,15 +7,13 @@ use crate::error::EncodeError;
 
 /// Serialise a type implementing [`serde::Serialize`] and return the encoded byte vector.
 #[cfg(feature = "std")]
-pub fn to_vec<T: Serialize>(val: &T) -> Result<Vec<u8>, EncodeError<core::convert::Infallible>> {
+pub fn to_vec<T: Serialize>(val: T) -> Result<Vec<u8>, EncodeError<core::convert::Infallible>> {
     let mut v = Vec::new();
     val.serialize(&mut Serializer::new(&mut v))?;
     Ok(v)
 }
 
-/// An implementation of [`serde::Serializer`] using a [`minicbor::Encoder`][1].
-///
-/// [1]: crate::Encoder
+/// An implementation of [`serde::Serializer`] using a [`minicbor::Encoder`].
 #[derive(Debug, Clone)]
 pub struct Serializer<W> {
     encoder: Encoder<W>

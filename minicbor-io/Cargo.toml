@@ -1,13 +1,13 @@
 [package]
 name          = "minicbor-io"
-version       = "0.19.0"
+version       = "0.19.1"
 authors       = ["Toralf Wittner <tw@dtex.org>"]
 license       = "BlueOak-1.0.0"
 edition       = "2021"
 description   = "A set of I/O utilities for minicbor."
 repository    = "https://gitlab.com/twittner/minicbor"
 documentation = "https://twittner.gitlab.io/minicbor/minicbor_io/"
-keywords      = ["cbor", "serialization", "encoding", "io", "async"]
+keywords      = ["cbor", "minicbor", "serialization", "encoding", "no_std"]
 categories    = ["encoding"]
 
 [package.metadata.docs.rs]
@@ -29,4 +29,3 @@ quickcheck  = "1.0.1"
 rand        = "0.8"
 tokio       = { version = "1.0", features = ["macros", "net", "rt"] }
 tokio-util  = { version = "0.6", features = ["compat"] }
-

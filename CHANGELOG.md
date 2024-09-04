@@ -7,6 +7,10 @@
 
 # minicbor
 
+## `0.24.4`
+
+- Maintenance release (documentation tweaks).
+
 ## `0.24.3`
 
 - Maintenance release (cf. merge request !47 by @chrysn).
@@ -335,6 +339,10 @@
 
 # minicbor-derive
 
+## `0.15.1`
+
+- Maintenance release (documentation tweaks).
+
 ## `0.15.0`
 
 - Added attribute `skip` for fields, which ignores the value during encoding and initialises it
@@ -449,7 +457,12 @@
 
 # minicbor-io
 
+## `0.19.1`
+
+- Maintenance release (documentation tweaks).
+
 ## `0.19.0`
+
 - Require `minicbor-0.24.0`.
 
 ## `0.18.0`
@@ -568,6 +581,10 @@
 - Initial release which provides some I/O utilities.
 
 # minicbor-serde
+
+## `0.2.0`
+
+- Maintenance release (documentation tweaks).
 
 ## `0.1.0`
 

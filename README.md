@@ -14,6 +14,10 @@ Allows deriving `minicbor::Encode` and `minicbor::Decode` traits.
 
 I/O utilities for reading and writing CBOR encoded data.
 
+### minicbor-serde
+
+Integrates minicbor with serde.
+
 # Documentation
 
 Documentation is available at

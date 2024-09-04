@@ -27,7 +27,11 @@
 //!
 //! For I/O support see [`minicbor-io`][1].
 //!
+//! Support for [serde][2] is available in [`minicbor-serde`][3].
+//!
 //! [1]: https://twittner.gitlab.io/minicbor/minicbor_io/
+//! [2]: https://crates.io/crates/serde
+//! [3]: https://crates.io/crates/minicbor-serde
 //!
 //! # Feature flags
 //!
@@ -276,4 +280,3 @@ where
 // Ensure we can safely cast a `usize` to a `u64`.
 const __USIZE_FITS_INTO_U64: () =
     assert!(core::mem::size_of::<usize>() <= core::mem::size_of::<u64>());
-

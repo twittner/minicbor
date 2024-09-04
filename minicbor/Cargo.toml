@@ -1,13 +1,13 @@
 [package]
 name          = "minicbor"
-version       = "0.24.3"
+version       = "0.24.4"
 authors       = ["Toralf Wittner <tw@dtex.org>"]
 license       = "BlueOak-1.0.0"
 edition       = "2021"
 description   = "A small CBOR codec suitable for no_std environments."
 repository    = "https://gitlab.com/twittner/minicbor"
 documentation = "https://twittner.gitlab.io/minicbor/minicbor/"
-keywords      = ["cbor", "serialization", "encoding", "binary", "no_std"]
+keywords      = ["cbor", "minicbor", "serialization", "encoding", "no_std"]
 categories    = ["encoding"]
 build         = "build.rs"
 
