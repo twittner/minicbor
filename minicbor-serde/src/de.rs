@@ -12,9 +12,7 @@ pub fn from_slice<'de, T: de::Deserialize<'de>>(b: &'de [u8]) -> Result<T, Decod
     T::deserialize(&mut Deserializer::from_slice(b))
 }
 
-/// An implementation of [`serde::Deserializer`] using a [`minicbor::Decoder`][1].
-///
-/// [1]: crate::Decoder
+/// An implementation of [`serde::Deserializer`] using a [`minicbor::Decoder`].
 #[derive(Debug, Clone)]
 pub struct Deserializer<'de> {
     decoder: Decoder<'de>
