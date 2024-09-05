@@ -1,4 +1,3 @@
-use core::convert::Infallible;
 use minicbor::encode::{Encoder, Write};
 use serde::Serialize;
 use serde::ser::{self, StdError, SerializeSeq, SerializeTuple, SerializeTupleStruct};
@@ -8,7 +7,7 @@ use crate::error::EncodeError;
 
 /// Serialise a type implementing [`serde::Serialize`] and return the encoded byte vector.
 #[cfg(feature = "std")]
-pub fn to_vec<T: Serialize>(val: T) -> Result<Vec<u8>, EncodeError<Infallible>> {
+pub fn to_vec<T: Serialize>(val: T) -> Result<Vec<u8>, EncodeError<core::convert::Infallible>> {
     let mut v = Vec::new();
     val.serialize(&mut Serializer::new(&mut v))?;
     Ok(v)
