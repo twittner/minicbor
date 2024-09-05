@@ -582,6 +582,10 @@
 
 # minicbor-serde
 
+## `0.2.1`
+
+- Exports error module.
+
 ## `0.2.0`
 
 - Maintenance release (documentation tweaks).
