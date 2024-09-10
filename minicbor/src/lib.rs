@@ -56,7 +56,7 @@
 //! let output: [&str; 2] = minicbor::decode(buffer.as_ref())?;
 //! assert_eq!(input, output);
 //!
-//! # Ok::<_, Box<dyn std::error::Error>>(())
+//! # Ok::<_, Box<dyn core::error::Error>>(())
 //! ```
 //!
 //! # Example: ad-hoc encoding
@@ -76,7 +76,7 @@
 //!     .bool(true)?.null()?
 //! .end()?;
 //!
-//! # Ok::<_, Box<dyn std::error::Error>>(())
+//! # Ok::<_, Box<dyn core::error::Error>>(())
 //! ```
 //!
 //! # Example: ad-hoc decoding
@@ -94,7 +94,7 @@
 //! let mut decoder = Decoder::new(&input);
 //! assert_eq!(IanaTag::DateTime.tag(), decoder.tag()?);
 //! assert_eq!("2013-03-21T20:04:00Z", decoder.str()?);
-//! # Ok::<_, Box<dyn std::error::Error>>(())
+//! # Ok::<_, Box<dyn core::error::Error>>(())
 //! ```
 //!
 //! # Example: tokenization
@@ -127,7 +127,7 @@
 //!
 //! assert_eq!(input, buffer);
 //!
-//! # Ok::<_, Box<dyn std::error::Error>>(())
+//! # Ok::<_, Box<dyn core::error::Error>>(())
 //! ```
 //!
 //! [CBOR]: https://datatracker.ietf.org/doc/html/rfc8949

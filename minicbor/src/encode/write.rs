@@ -151,8 +151,7 @@ impl core::fmt::Display for EndOfSlice {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for EndOfSlice {}
+impl core::error::Error for EndOfSlice {}
 
 /// An error indicating the end of an array.
 #[derive(Debug)]
@@ -164,6 +163,4 @@ impl core::fmt::Display for EndOfArray {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for EndOfArray {}
-
+impl core::error::Error for EndOfArray {}

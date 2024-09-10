@@ -32,7 +32,7 @@
 //!
 //! assert_eq!(s1, s3);
 //!
-//! # Ok::<_, Box<dyn std::error::Error>>(())
+//! # Ok::<_, Box<dyn core::error::Error>>(())
 //! ```
 //!
 //! [serde]: https://serde.rs/

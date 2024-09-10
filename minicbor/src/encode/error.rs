@@ -3,6 +3,9 @@ use core::fmt;
 #[cfg(feature = "alloc")]
 use alloc::string::ToString;
 
+#[cfg(feature = "alloc")]
+use alloc::boxed::Box;
+
 /// Encoding error.
 #[derive(Debug)]
 pub struct Error<E> {
@@ -41,9 +44,9 @@ impl<E> Error<E> {
 
     /// A custom error.
     ///
-    /// *Requires feature* `"std"`.
-    #[cfg(feature = "std")]
-    pub fn custom<T: std::error::Error + Send + Sync + 'static>(err: T) -> Self {
+    /// *Requires feature* `"alloc"`.
+    #[cfg(feature = "alloc")]
+    pub fn custom<T: core::error::Error + Send + Sync + 'static>(err: T) -> Self {
         Error { err: ErrorImpl::Custom(Box::new(err)), msg: Default::default() }
     }
 
@@ -77,7 +80,7 @@ impl<E> Error<E> {
         matches!(self.err, ErrorImpl::Write(_))
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     pub fn is_custom(&self) -> bool {
         matches!(self.err, ErrorImpl::Custom(_))
     }
@@ -91,8 +94,8 @@ enum ErrorImpl<E> {
     /// Generic error message.
     Message,
     /// Custom error.
-    #[cfg(feature = "std")]
-    Custom(Box<dyn std::error::Error + Send + Sync>)
+    #[cfg(feature = "alloc")]
+    Custom(Box<dyn core::error::Error + Send + Sync>)
 }
 
 impl<E: fmt::Display> fmt::Display for Error<E> {
@@ -113,7 +116,7 @@ impl<E: fmt::Display> fmt::Display for Error<E> {
                 } else {
                     write!(f, "write error: {}", self.msg)
                 }
-            #[cfg(feature = "std")]
+            #[cfg(feature = "alloc")]
             ErrorImpl::Custom(_) =>
                 if self.msg.is_empty() {
                     write!(f, "encode error")
@@ -124,14 +127,13 @@ impl<E: fmt::Display> fmt::Display for Error<E> {
     }
 }
 
-#[cfg(feature = "std")]
-impl<E: std::error::Error + 'static> std::error::Error for Error<E> {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match &self.err {
             ErrorImpl::Message   => None,
             ErrorImpl::Write(e)  => Some(e),
+            #[cfg(feature = "alloc")]
             ErrorImpl::Custom(e) => Some(&**e)
         }
     }
 }
-
