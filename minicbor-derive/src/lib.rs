@@ -14,16 +14,16 @@
 //! In order to reach this goal, the encoding has the following characteristics:
 //!
 //! 1. The encoding does not contain any names, i.e. no field names, type names
-//! or variant names. Instead, every field and every constructor needs to be
-//! annotated with an (unsigned) index number, e.g. `#[n(1)]`.
+//!    or variant names. Instead, every field and every constructor needs to be
+//!    annotated with an (unsigned) index number, e.g. `#[n(1)]`.
 //!
 //! 2. Unknown fields are ignored during decoding.[^1]
 //!
 //! 3. Optional types default to `None` if their value is not present during
-//! decoding.
+//!    decoding.
 //!
 //! 4. Optional enums default to `None` if an unknown variant is encountered
-//! during decoding.
+//!    during decoding.
 //!
 //! Item **1** ensures that names can be changed freely without compatibility
 //! concerns. Item **2** ensures that new fields do not affect older software.
@@ -76,11 +76,11 @@
 //! - Renaming every identifier.
 //!
 //! - Adding optional fields to `Point`, `ConvexHull`, `State::Start` or
-//! `State::Search`.
+//!   `State::Search`.
 //!
 //! - Adding more variants to `State` *iff* `State` is only decoded as part of
-//! `ConvexHull`. Direct decoding of `State` would produce an `UnknownVariant`
-//! error for those new variants.
+//!   `ConvexHull`. Direct decoding of `State` would produce an `UnknownVariant`
+//!   error for those new variants.
 //!
 //! [1]: https://developers.google.com/protocol-buffers/
 //!
@@ -454,10 +454,10 @@
 //! should be encoded:
 //!
 //! - *Dense types* are types which contain only few `Option`s or their `Option`s
-//! are assumed to be `Some`s usually. They are best encoded as arrays.
+//!   are assumed to be `Some`s usually. They are best encoded as arrays.
 //!
 //! - *Sparse types* are types with many `Option`s and their `Option`s are usually
-//! `None`s. They are best encoded as maps.
+//!   `None`s. They are best encoded as maps.
 //!
 //! When selecting the encoding, future changes to the type should be considered
 //! as they may turn a dense type into a sparse one over time. This also applies
@@ -676,4 +676,3 @@ where
 fn gen_ctx_param() -> syn::Result<syn::TypeParam> {
     syn::parse_str("Ctx")
 }
-

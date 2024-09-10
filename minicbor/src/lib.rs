@@ -3,12 +3,12 @@
 //! The crate is organised around the following entities:
 //!
 //! - [`Encoder`] and [`Decoder`] for type-directed encoding and decoding
-//! of values.
+//!   of values.
 //!
 //! - [`Encode`] and [`Decode`] traits which can be implemented for any
-//! type that should be encoded to or decoded from CBOR. They are similar
-//! to [serde]'s `Serialize` and `Deserialize` traits but do not abstract
-//! over the encoder/decoder.
+//!   type that should be encoded to or decoded from CBOR. They are similar
+//!   to [serde]'s `Serialize` and `Deserialize` traits but do not abstract
+//!   over the encoder/decoder.
 //!
 //! Encoding and decoding proceeds in a type-directed way, i.e.  by calling
 //! methods for expected data item types, e.g. [`Decoder::u32`] or
