@@ -292,8 +292,7 @@ impl fmt::Display for UnknownTag {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for UnknownTag {}
+impl core::error::Error for UnknownTag {}
 
 
 /// Statically tag a value.
@@ -313,7 +312,7 @@ impl std::error::Error for UnknownTag {}
 /// assert_eq!(date_time.tag(), IanaTag::DateTime.tag());
 /// assert_eq!(date_time.value(), &"2013-03-21T20:04:00Z");
 ///
-/// # Ok::<_, Box<dyn std::error::Error>>(())
+/// # Ok::<_, Box<dyn core::error::Error>>(())
 ///
 /// ```
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -580,6 +579,4 @@ impl fmt::Display for TryFromIntError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for TryFromIntError {}
-
+impl core::error::Error for TryFromIntError {}

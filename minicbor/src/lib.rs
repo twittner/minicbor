@@ -3,12 +3,12 @@
 //! The crate is organised around the following entities:
 //!
 //! - [`Encoder`] and [`Decoder`] for type-directed encoding and decoding
-//! of values.
+//!   of values.
 //!
 //! - [`Encode`] and [`Decode`] traits which can be implemented for any
-//! type that should be encoded to or decoded from CBOR. They are similar
-//! to [serde]'s `Serialize` and `Deserialize` traits but do not abstract
-//! over the encoder/decoder.
+//!   type that should be encoded to or decoded from CBOR. They are similar
+//!   to [serde]'s `Serialize` and `Deserialize` traits but do not abstract
+//!   over the encoder/decoder.
 //!
 //! Encoding and decoding proceeds in a type-directed way, i.e.  by calling
 //! methods for expected data item types, e.g. [`Decoder::u32`] or
@@ -56,7 +56,7 @@
 //! let output: [&str; 2] = minicbor::decode(buffer.as_ref())?;
 //! assert_eq!(input, output);
 //!
-//! # Ok::<_, Box<dyn std::error::Error>>(())
+//! # Ok::<_, Box<dyn core::error::Error>>(())
 //! ```
 //!
 //! # Example: ad-hoc encoding
@@ -76,7 +76,7 @@
 //!     .bool(true)?.null()?
 //! .end()?;
 //!
-//! # Ok::<_, Box<dyn std::error::Error>>(())
+//! # Ok::<_, Box<dyn core::error::Error>>(())
 //! ```
 //!
 //! # Example: ad-hoc decoding
@@ -94,7 +94,7 @@
 //! let mut decoder = Decoder::new(&input);
 //! assert_eq!(IanaTag::DateTime.tag(), decoder.tag()?);
 //! assert_eq!("2013-03-21T20:04:00Z", decoder.str()?);
-//! # Ok::<_, Box<dyn std::error::Error>>(())
+//! # Ok::<_, Box<dyn core::error::Error>>(())
 //! ```
 //!
 //! # Example: tokenization
@@ -127,7 +127,7 @@
 //!
 //! assert_eq!(input, buffer);
 //!
-//! # Ok::<_, Box<dyn std::error::Error>>(())
+//! # Ok::<_, Box<dyn core::error::Error>>(())
 //! ```
 //!
 //! [CBOR]: https://datatracker.ietf.org/doc/html/rfc8949

@@ -60,10 +60,12 @@ pub enum Token<'b> {
 /// - Simple values are displayed as `simple(n)` where `n` denotes the numeric
 ///   value.
 /// - Indefinite items start with:
+///
 ///     * `?B[` for byte strings,
 ///     * `?S[` for text strings,
 ///     * `?A[` for arrays,
 ///     * `?M[` for maps,
+///
 ///   and end with `]` when a `Token::Break` is encountered. All tokens
 ///   in between belong to the indefinite container.
 /// - `Token::Null` is displayed as `null` and `Token::Undefined` as `undefined`.

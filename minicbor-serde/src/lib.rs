@@ -27,12 +27,12 @@
 //! let mut ser = minicbor_serde::Serializer::new(&mut buf);
 //! s1.serialize(&mut ser)?;
 //!
-//! let mut de = minicbor_serde::Deserializer::from_slice(&buf);
+//! let mut de = minicbor_serde::Deserializer::new(&buf);
 //! let s3 = S::deserialize(&mut de)?;
 //!
 //! assert_eq!(s1, s3);
 //!
-//! # Ok::<_, Box<dyn std::error::Error>>(())
+//! # Ok::<_, Box<dyn core::error::Error>>(())
 //! ```
 //!
 //! [serde]: https://serde.rs/
@@ -48,5 +48,5 @@ pub mod error;
 pub use de::{Deserializer, from_slice};
 pub use ser::Serializer;
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 pub use ser::to_vec;

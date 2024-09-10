@@ -15,7 +15,7 @@ use super::{decoder::{info_of, type_of}, Error};
 /// let hlen = Size::head(cbor[0])?;
 /// let size = Size::tail(&cbor[.. hlen])?;
 /// assert_eq!(Size::Items(5), size);
-/// # Ok::<_, Box<dyn std::error::Error>>(())
+/// # Ok::<_, Box<dyn core::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Size {
@@ -76,4 +76,3 @@ impl Size {
         }
     }
 }
-
