@@ -9,7 +9,7 @@ const BREAK: u8 = 0xff;
 
 /// Deserialise a type implementing [`serde::Deserialize`] from the given byte slice.
 pub fn from_slice<'de, T: de::Deserialize<'de>>(b: &'de [u8]) -> Result<T, DecodeError> {
-    T::deserialize(&mut Deserializer::from_slice(b))
+    T::deserialize(&mut Deserializer::new(b))
 }
 
 /// An implementation of [`serde::Deserializer`] using a [`minicbor::Decoder`].
@@ -19,12 +19,8 @@ pub struct Deserializer<'de> {
 }
 
 impl<'de> Deserializer<'de> {
-    fn new(d: Decoder<'de>) -> Self {
-        Self { decoder: d }
-    }
-
-    pub fn from_slice(b: &'de [u8]) -> Self {
-        Self::new(Decoder::new(b))
+    pub fn new(b: &'de [u8]) -> Self {
+        Self::from(Decoder::new(b))
     }
 
     pub fn decoder(&self) -> &Decoder<'de> {
@@ -60,7 +56,7 @@ impl<'de> Deserializer<'de> {
 
 impl<'de> From<Decoder<'de>> for Deserializer<'de> {
     fn from(d: Decoder<'de>) -> Self {
-        Self::new(d)
+        Self { decoder: d }
     }
 }
 

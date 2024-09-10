@@ -20,7 +20,7 @@ alloc  = ["minicbor/alloc", "serde/alloc"]
 std    = ["alloc", "minicbor/std", "serde/std"]
 
 [dependencies]
-minicbor = "0.24.3"
+minicbor = { path = "../minicbor", version = "0.24.3" }
 half     = { version = "2.4.0", default-features = false, optional = true }
 serde    = { version = "1.0.197", default-features = false }
 

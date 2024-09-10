@@ -1,12 +1,12 @@
 use minicbor::encode::{Encoder, Write};
 use serde::Serialize;
-use serde::ser::{self, StdError, SerializeSeq, SerializeTuple, SerializeTupleStruct};
+use serde::ser::{self, SerializeSeq, SerializeTuple, SerializeTupleStruct};
 use serde::ser::{SerializeMap, SerializeStruct, SerializeStructVariant, SerializeTupleVariant};
 
 use crate::error::EncodeError;
 
 /// Serialise a type implementing [`serde::Serialize`] and return the encoded byte vector.
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 pub fn to_vec<T: Serialize>(val: T) -> Result<Vec<u8>, EncodeError<core::convert::Infallible>> {
     let mut v = Vec::new();
     val.serialize(&mut Serializer::new(&mut v))?;
@@ -45,7 +45,7 @@ impl<W: Write> From<Encoder<W>> for Serializer<W> {
 
 impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W>
 where
-    <W as Write>::Error: StdError + 'static
+    <W as Write>::Error: core::error::Error + 'static
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
@@ -267,7 +267,7 @@ pub struct SeqSerializer<'a, W: 'a> {
 
 impl<'a, W: Write> SerializeSeq for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: StdError + 'static
+    <W as Write>::Error: core::error::Error + 'static
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
@@ -286,7 +286,7 @@ where
 
 impl<'a, W: Write> SerializeTuple for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: StdError + 'static
+    <W as Write>::Error: core::error::Error + 'static
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
@@ -302,7 +302,7 @@ where
 
 impl<'a, W: Write> SerializeTupleStruct for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: StdError + 'static
+    <W as Write>::Error: core::error::Error + 'static
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
@@ -318,7 +318,7 @@ where
 
 impl<'a, W: Write> SerializeTupleVariant for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: StdError + 'static
+    <W as Write>::Error: core::error::Error + 'static
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
@@ -334,7 +334,7 @@ where
 
 impl<'a, W: Write> SerializeMap for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: StdError + 'static
+    <W as Write>::Error: core::error::Error + 'static
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
@@ -357,7 +357,7 @@ where
 
 impl<'a, W: Write> SerializeStruct for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: StdError + 'static
+    <W as Write>::Error: core::error::Error + 'static
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
@@ -377,7 +377,7 @@ where
 
 impl<'a, W: Write> SerializeStructVariant for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: StdError + 'static
+    <W as Write>::Error: core::error::Error + 'static
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
