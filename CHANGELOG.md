@@ -7,6 +7,12 @@
 
 # minicbor
 
+## `0.25.0`
+
+- Error types now implement `core::error::Error`, which was stabilised in Rust 1.81.
+- `Encode` and `Decode` are implemented for `core::num::{NonZeroIsize, NonZeroUsize}` (see
+  merge request !48 by @chrysn).
+
 ## `0.24.4`
 
 - Maintenance release (documentation tweaks).
@@ -339,6 +345,10 @@
 
 # minicbor-derive
 
+## `0.15.2`
+
+- Maintenance release (documentation tweaks).
+
 ## `0.15.1`
 
 - Maintenance release (documentation tweaks).
@@ -456,6 +466,11 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.20.0`
+
+- Error types now implement `core::error::Error`, which was stabilised in Rust 1.81.
+- Requires `minicbor-0.25.0`.
 
 ## `0.19.1`
 
@@ -581,6 +596,13 @@
 - Initial release which provides some I/O utilities.
 
 # minicbor-serde
+
+## `0.3.0`
+
+- Error types now implement `core::error::Error`, which was stabilised in Rust 1.81.
+- `Deserializer::from_slice` has been renamed to `Deserializer::new` and `to_vec` is
+  available with feature `alloc`.
+- Requires `minicbor-0.25.0`.
 
 ## `0.2.1`
 
