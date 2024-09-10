@@ -572,6 +572,12 @@ encode_nonzero! {
     core::num::NonZeroI64
 }
 
+#[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
+encode_nonzero! {
+    core::num::NonZeroUsize
+    core::num::NonZeroIsize
+}
+
 #[cfg(any(atomic32, atomic64))]
 macro_rules! encode_atomic {
     ($($t:ty)*) => {

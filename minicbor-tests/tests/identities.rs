@@ -87,6 +87,12 @@ fn nonzero_u64() {
     quickcheck(identity as fn(core::num::NonZeroU64) -> bool)
 }
 
+#[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
+#[test]
+fn nonzero_usize() {
+    quickcheck(identity as fn(core::num::NonZeroUsize) -> bool)
+}
+
 #[test]
 fn f16() {
     fn property(arg: f32) -> bool {
