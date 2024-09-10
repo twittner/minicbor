@@ -5,6 +5,9 @@ use serde::ser::{SerializeMap, SerializeStruct, SerializeStructVariant, Serializ
 
 use crate::error::EncodeError;
 
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+
 /// Serialise a type implementing [`serde::Serialize`] and return the encoded byte vector.
 #[cfg(feature = "alloc")]
 pub fn to_vec<T: Serialize>(val: T) -> Result<Vec<u8>, EncodeError<core::convert::Infallible>> {
