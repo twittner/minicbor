@@ -345,6 +345,12 @@ decode_nonzero! {
     core::num::NonZeroI64, "unexpected 0 when decoding a `NonZeroI64`"
 }
 
+#[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
+decode_nonzero! {
+    core::num::NonZeroUsize,  "unexpected 0 when decoding a `NonZeroUsize`"
+    core::num::NonZeroIsize,  "unexpected 0 when decoding a `NonZeroIsize`"
+}
+
 #[cfg(any(atomic32, atomic64))]
 macro_rules! decode_atomic {
     ($($t:ty)*) => {
