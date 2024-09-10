@@ -1,0 +1,50 @@
+name: Compile & Test
+
+on: [push, pull_request]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+          - nightly
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+
+      - id: restore-toolchain
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.rustup
+          key: none
+          restore-keys: |
+            rust-${{ runner.os }}-${{ matrix.toolchain }}
+
+      - id: toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+            toolchain: ${{ matrix.toolchain }}
+            components: clippy
+
+      - name: Build
+        run: make build
+
+      - name: Test
+        run: make test
+
+      - name: Check
+        run: make check
+
+      - name: Lint
+        run: cargo clippy --all-features --verbose
+
+      - uses: actions/cache/save@v4
+        if: ${{ ! endsWith(steps.restore-toolchain.outputs.cache-matched-key, steps.toolchain.outputs.cachekey) }}
+        with:
+          path: ~/.rustup
+          key: rust-${{ runner.os }}-${{ matrix.toolchain }}-${{ steps.toolchain.outputs.cachekey }}
