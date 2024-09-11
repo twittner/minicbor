@@ -7,6 +7,10 @@
 
 # minicbor
 
+## `0.25.1`
+
+- Update documentation.
+
 ## `0.25.0`
 
 - Error types now implement `core::error::Error`, which was stabilised in Rust 1.81.
@@ -345,6 +349,10 @@
 
 # minicbor-derive
 
+## `0.15.3`
+
+- Update documentation.
+
 ## `0.15.2`
 
 - Maintenance release (documentation tweaks).
@@ -466,6 +474,10 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.20.1`
+
+- Update documentation.
 
 ## `0.20.0`
 
@@ -596,6 +608,10 @@
 - Initial release which provides some I/O utilities.
 
 # minicbor-serde
+
+## `0.3.1`
+
+- Update documentation.
 
 ## `0.3.0`
 
