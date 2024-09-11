@@ -5,10 +5,7 @@ and `minicbor::Decode` traits.
 
 # Documentation
 
-Documentation is available at
-
-- <https://twittner.gitlab.io/minicbor/minicbor_derive/>
-- <https://docs.rs/minicbor_derive/>
+Documentation is available at <https://docs.rs/minicbor_derive/>
 
 # License
 
@@ -18,4 +15,3 @@ CONTRIBUTING.md first.
 
 [1]: https://crates.io/crates/minicbor
 [2]: https://blueoakcouncil.org/license/1.0.0
-

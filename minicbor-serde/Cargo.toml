@@ -5,8 +5,7 @@ authors       = ["Toralf Wittner <tw@dtex.org>"]
 license       = "BlueOak-1.0.0"
 edition       = "2021"
 description   = "Integrates minicbor with serde."
-repository    = "https://gitlab.com/twittner/minicbor"
-documentation = "https://twittner.gitlab.io/minicbor/minicbor_serde/"
+repository    = "https://github.com/twittner/minicbor"
 keywords      = ["cbor", "minicbor", "serde", "serialization", "no_std"]
 categories    = ["encoding"]
 

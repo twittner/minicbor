@@ -20,10 +20,7 @@ Integrates minicbor with serde.
 
 # Documentation
 
-Documentation is available at
-
-- <https://twittner.gitlab.io/minicbor/minicbor/>
-- <https://docs.rs/minicbor/>
+Documentation is available at <https://docs.rs/minicbor/>
 
 # License
 

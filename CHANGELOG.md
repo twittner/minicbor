@@ -616,6 +616,6 @@
 
 - Initial release.
 
-[1]: https://twittner.gitlab.io/minicbor/minicbor_derive/index.html#index_only
+[1]: https://docs.rs/minicbor_derive/0.6.0/index.html#index_only
 [2]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
-[3]: https://twittner.gitlab.io/minicbor/minicbor/index.html#feature-flags
+[3]: https://docs.rs/minicbor/0.10.0/index.html#feature-flags
