@@ -29,7 +29,7 @@
 //!
 //! Support for [serde][2] is available in [`minicbor-serde`][3].
 //!
-//! [1]: https://twittner.gitlab.io/minicbor/minicbor_io/
+//! [1]: https://docs.rs/minicbor_io/
 //! [2]: https://crates.io/crates/serde
 //! [3]: https://crates.io/crates/minicbor-serde
 //!

@@ -4,10 +4,7 @@ Integrates [minicbor][1] with [serde][2].
 
 # Documentation
 
-Documentation is available at
-
-- <https://twittner.gitlab.io/minicbor/minicbor_serde/>
-- <https://docs.rs/minicbor_serde/>
+Documentation is available at <https://docs.rs/minicbor_serde/>
 
 # License
 

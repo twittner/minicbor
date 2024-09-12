@@ -7,11 +7,15 @@
 
 # minicbor
 
+## `0.25.1`
+
+- Update documentation.
+
 ## `0.25.0`
 
 - Error types now implement `core::error::Error`, which was stabilised in Rust 1.81.
 - `Encode` and `Decode` are implemented for `core::num::{NonZeroIsize, NonZeroUsize}` (see
-  merge request !48 by @chrysn).
+  merge request [48][mr48] by @chrysn).
 
 ## `0.24.4`
 
@@ -19,15 +23,15 @@
 
 ## `0.24.3`
 
-- Maintenance release (cf. merge request !47 by @chrysn).
+- Maintenance release (cf. merge request [47][mr47] by @chrysn).
 
 ## `0.24.2`
 
-- Maintenance release (cf. merge request !46 by @deundiak).
+- Maintenance release (cf. merge request [46][mr46] by @deundiak).
 
 ## `0.24.1`
 
-- Maintenance release (cf. merge requests !44 by @alistair23 and !45 by @deundiak).
+- Maintenance release (cf. merge requests [44][mr44] by @alistair23 and [45][mr45] by @deundiak).
 
 ## `0.24.0`
 
@@ -44,34 +48,34 @@
 
 -  ⚠️ **Breaking** ⚠️: `Tokenizer` now has two lifetime parameters because it sometimes borrows the
   inner `Decoder`.
-- `Token`s can now also be encoded (cf. merge request !37 by @alistair23). Methods `Encoder::tokens`
+- `Token`s can now also be encoded (cf. merge request [37][mr37] by @alistair23). Methods `Encoder::tokens`
   and `Decoder::tokens` have been added.
 
 ## `0.21.1`
 
-- `Tag::new` and `Tag::as_u64` are now declared `const` (cf. merge request !36 by @DCNick3).
+- `Tag::new` and `Tag::as_u64` are now declared `const` (cf. merge request [36][mr36] by @DCNick3).
 
 ## `0.21.0`
 
-- ⚠️ **Breaking** ⚠️: Tag handling has been reworked (cf. merge request !34). The `Tag` type is now
+- ⚠️ **Breaking** ⚠️: Tag handling has been reworked (cf. merge request [34][mr34]). The `Tag` type is now
   merely a newtype around a `u64`. A new enum `IanaTag` represents registered tag values.
 
 ## `0.20.0`
 
-- Support for decoding arrays of arbitrary length has been added (cf. merge request !31 by @samuelmhicks).
-- Added `Encode` and `Decode` impls for `CStr` and `CString` (cf. merge request !29).
-- Added `decode::info::Size` to allow length introspection of CBOR values (see merge requests !25
-  and !28 for details).
+- Support for decoding arrays of arbitrary length has been added (cf. merge request [31][mr31] by @samuelmhicks).
+- Added `Encode` and `Decode` impls for `CStr` and `CString` (cf. merge request [29][mr29]).
+- Added `decode::info::Size` to allow length introspection of CBOR values (see merge requests [25][mr25]
+  and [28][mr28] for details).
 
 ## `0.19.1`
 
-- Bugfix release (see merge request !26 by @jeandudey for details).
+- Bugfix release (see merge request [26][mr26] by @jeandudey for details).
 
 ## `0.19.0`
 
 - Added the trait `CborLen` and functions `minicbor::len` and `minicbor::len_with` to allow client
-  code to calculate the length in bytes of a value's CBOR representation. See issue #32 and merge
-  request !23 for details.
+  code to calculate the length in bytes of a value's CBOR representation. See issue [32][i32] and merge
+  request [23][mr23] for details.
 
 ## `0.18.0`
 
@@ -107,7 +111,7 @@
 
 - ⚠️ **Breaking** ⚠️: The `Encode` and `Decode` traits are now parameterised by a context type and
   the context value is passed as another argument to `Encode::encode` and `Decode::decode` (see
-  merge request !21 and issue #26 for details).
+  merge request [21][mr21] and issue [26][i26] for details).
   Implementations of these traits that do not make use of the context need to be generic in the
   type variable and accept the context parameter, e.g. instead of
 
@@ -176,7 +180,7 @@
   A new module `minicbor::legacy` is introduced which contains newtype wrappers for these types
   which continue to use the array-based encoding. Users can opt out of the new compact format by
   enabling the cargo feature `"legacy"` and importing the types from the legacy module.
-- A new type `minicbor::data::Int` has been introduced (see merge request !20) to allow encoding
+- A new type `minicbor::data::Int` has been introduced (see merge request [20][mr20]) to allow encoding
   and decoding of the whole CBOR integer range [-2<sup>64</sup>, 2<sup>64</sup> - 1].
 - ⚠️ **Breaking** ⚠️: As a consequence of adding the new `Int` type, a new constructor
   `minicbor::data::Type::Int` has been added to denote those (signed) integers that do not fit
@@ -184,7 +188,7 @@
 
 ## `0.14.2`
 
-- Bugfix release: Imports `alloc::string::ToString` when necessary (see issue #21) for details.
+- Bugfix release: Imports `alloc::string::ToString` when necessary (see issue [21][i21]) for details.
 
 ## `0.14.1`
 
@@ -196,16 +200,16 @@
   The actual error representation is hidden and errors are constructed with functions instead
   of creating enum values directly, for example `Error::Message("foo")` is now
   `Error::message("foo")`. This was done to support adding more information to error values,
-  like the decoding position. For details see merge request !19.
+  like the decoding position. For details see merge request [19][mr19].
 
 ## `0.13.2`
 
-- Added `Decode` impl for `Box<str>` (see merge request !18 by @tailhook).
+- Added `Decode` impl for `Box<str>` (see merge request [18][mr18] by @tailhook).
 
 ## `0.13.1`
 
 - Bugfix: `Decoder::datatype` would sometimes report incorrect types for negative integers
-  (see issue #18 and commit 0bd97b72 for details).
+  (see issue [18][i18] and commit 0bd97b72 for details).
 
 ## `0.13.0`
 
@@ -223,26 +227,26 @@
 
 - Extend the optionality of fields beyond `Option`. This applies to derived impls of `Encode`
   and `Decode` which make use of newly added methods `Encode::is_nil` and `Decode::nil`
-  instead of `Option::is_none` and `None`. See issue #10 and merge request !15 for details.
+  instead of `Option::is_none` and `None`. See issue [10][i10] and merge request [15][mr15] for details.
 
 ## `0.11.5`
 
-- Accept non-preferred integer encodings (see issue #14 for details).
+- Accept non-preferred integer encodings (see issue [14][i14] for details).
 - Added `Decoder::{null, undefined}` methods.
 - Added `data::Cbor` as identity element of `Encode` and `Decode`.
 
 ## `0.11.4`
 
 - Bugfix: Decoding strings or bytes with a length of `u64::MAX` would cause an overflow of the
-  internal decoder position value. This case is now properly handled. See issue #12 for details.
+  internal decoder position value. This case is now properly handled. See issue [12][i12] for details.
 - Bugfix: The `partial-derive-support` feature did not re-export `minicbor-derive`, nor did it
-  make the functionality of `minicbor::bytes` available. See merge request !14 by @dne1 for details.
+  make the functionality of `minicbor::bytes` available. See merge request [14][mr14] by @dne1 for details.
 
 ## `0.11.3`
 
 - Bugfix release: Version `0.11.2` added `Encode`/`Decode` impls for various atomic types without
-  considering their availability on the target platform (cf. issue #11). In here we attempt to
-  only offer impls for available atomic types (cf. merge request !13 for details).
+  considering their availability on the target platform (cf. issue [11][i11]). In here we attempt to
+  only offer impls for available atomic types (cf. merge request [13][mr13] for details).
 
 ## `0.11.2`
 
@@ -276,7 +280,7 @@
   corresponds to the implementation of minicbor <= 0.9.1 but does not support skipping over
   indefinite-length arrays or maps inside of regular arrays or maps. The variant enabled by
   `"alloc"` supports skipping over arbitrary CBOR items. For more information see
-  [feature flags][3] and issue #9.
+  [feature flags][3] and issue [9][i9].
 
 ## `0.9.1`
 
@@ -286,12 +290,12 @@
 
 - ⚠️ **Breaking** ⚠️: The encoding of `()` and `PhantomData` has changed. See commit b6b1f907.
 - ⚠️ **Breaking** ⚠️: The `decode::Error::TypeMismatch` constructor changed to use a `data::Type`
-  instead of a `u8` as its first parameter. See merge request !6 for details.
+  instead of a `u8` as its first parameter. See merge request [6][mr6] for details.
 - Added feature flag `alloc` (implied by `std`), which enables most collections types in a `no_std`
-  environment. See merge request !9 for details.
+  environment. See merge request [9][mr9] for details.
 - Added `ByteArray` to support compact encoding of `u8`-arrays, similarly to the already existing
-  `ByteSlice` and `ByteVec` types added in `minicbor-0.6.0`. See merge request !10 for details.
-- Added `Write` impl for `alloc::vec::Vec` (see merge request !11 by @Hawk777).
+  `ByteSlice` and `ByteVec` types added in `minicbor-0.6.0`. See merge request [10][mr10] for details.
+- Added `Write` impl for `alloc::vec::Vec` (see merge request [11][mr11] by @Hawk777).
 - Depends on `minicbor-derive-0.6.4`.
 
 ## `0.8.1`
@@ -321,7 +325,7 @@
 
 ## `0.6.0`
 
-- Removes the `&[u8]` impl for `Decode` (see issue #4) and add a new module `minicbor::bytes`
+- Removes the `&[u8]` impl for `Decode` (see issue [4][i4]) and add a new module `minicbor::bytes`
   to support specialised encoding of CBOR bytes. This module provides the types `ByteSlice` and
   `ByteVec` which are substitutes for `&[u8]` and `Vec<u8>` respectively. See also the module
   documentation of `minicbor::bytes`.
@@ -341,9 +345,13 @@
 
 ## `0.4.0`
 
-- Added `Encode` and `Decode` impls for tuples (see merge request !1 by @koushiro).
+- Added `Encode` and `Decode` impls for tuples (see merge request [1][mr1] by @koushiro).
 
 # minicbor-derive
+
+## `0.15.3`
+
+- Update documentation.
 
 ## `0.15.2`
 
@@ -426,7 +434,7 @@
 
 ## `0.6.4`
 
-- Improve hygiene (see merge request !7).
+- Improve hygiene (see merge request [7][mr7]).
 
 ## `0.6.3`
 
@@ -466,6 +474,10 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.20.1`
+
+- Update documentation.
 
 ## `0.20.0`
 
@@ -597,6 +609,10 @@
 
 # minicbor-serde
 
+## `0.3.1`
+
+- Update documentation.
+
 ## `0.3.0`
 
 - Error types now implement `core::error::Error`, which was stabilised in Rust 1.81.
@@ -616,6 +632,45 @@
 
 - Initial release.
 
-[1]: https://twittner.gitlab.io/minicbor/minicbor_derive/index.html#index_only
+[1]: https://docs.rs/minicbor_derive/0.6.0/index.html#index_only
 [2]: https://www.rfc-editor.org/rfc/rfc8949.html#section-8
-[3]: https://twittner.gitlab.io/minicbor/minicbor/index.html#feature-flags
+[3]: https://docs.rs/minicbor/0.10.0/index.html#feature-flags
+
+[mr1]: https://gitlab.com/twittner/minicbor/-/merge_requests/1
+[mr6]: https://gitlab.com/twittner/minicbor/-/merge_requests/6
+[mr7]: https://gitlab.com/twittner/minicbor/-/merge_requests/7
+[mr9]: https://gitlab.com/twittner/minicbor/-/merge_requests/9
+[mr10]: https://gitlab.com/twittner/minicbor/-/merge_requests/10
+[mr11]: https://gitlab.com/twittner/minicbor/-/merge_requests/11
+[mr13]: https://gitlab.com/twittner/minicbor/-/merge_requests/13
+[mr14]: https://gitlab.com/twittner/minicbor/-/merge_requests/14
+[mr15]: https://gitlab.com/twittner/minicbor/-/merge_requests/15
+[mr18]: https://gitlab.com/twittner/minicbor/-/merge_requests/18
+[mr19]: https://gitlab.com/twittner/minicbor/-/merge_requests/19
+[mr20]: https://gitlab.com/twittner/minicbor/-/merge_requests/20
+[mr21]: https://gitlab.com/twittner/minicbor/-/merge_requests/21
+[mr23]: https://gitlab.com/twittner/minicbor/-/merge_requests/23
+[mr25]: https://gitlab.com/twittner/minicbor/-/merge_requests/25
+[mr26]: https://gitlab.com/twittner/minicbor/-/merge_requests/26
+[mr28]: https://gitlab.com/twittner/minicbor/-/merge_requests/28
+[mr29]: https://gitlab.com/twittner/minicbor/-/merge_requests/29
+[mr31]: https://gitlab.com/twittner/minicbor/-/merge_requests/31
+[mr34]: https://gitlab.com/twittner/minicbor/-/merge_requests/34
+[mr36]: https://gitlab.com/twittner/minicbor/-/merge_requests/36
+[mr37]: https://gitlab.com/twittner/minicbor/-/merge_requests/37
+[mr44]: https://gitlab.com/twittner/minicbor/-/merge_requests/44
+[mr45]: https://gitlab.com/twittner/minicbor/-/merge_requests/45
+[mr46]: https://gitlab.com/twittner/minicbor/-/merge_requests/46
+[mr47]: https://gitlab.com/twittner/minicbor/-/merge_requests/47
+[mr48]: https://gitlab.com/twittner/minicbor/-/merge_requests/48
+
+[i4]: https://gitlab.com/twittner/minicbor/-/issues/4
+[i9]: https://gitlab.com/twittner/minicbor/-/issues/9
+[i10]: https://gitlab.com/twittner/minicbor/-/issues/10
+[i11]: https://gitlab.com/twittner/minicbor/-/issues/11
+[i12]: https://gitlab.com/twittner/minicbor/-/issues/12
+[i14]: https://gitlab.com/twittner/minicbor/-/issues/14
+[i18]: https://gitlab.com/twittner/minicbor/-/issues/18
+[i21]: https://gitlab.com/twittner/minicbor/-/issues/21
+[i26]: https://gitlab.com/twittner/minicbor/-/issues/26
+[i32]: https://gitlab.com/twittner/minicbor/-/issues/32

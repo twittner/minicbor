@@ -1,12 +1,11 @@
 [package]
 name          = "minicbor-serde"
-version       = "0.3.0"
+version       = "0.3.1"
 authors       = ["Toralf Wittner <tw@dtex.org>"]
 license       = "BlueOak-1.0.0"
 edition       = "2021"
 description   = "Integrates minicbor with serde."
-repository    = "https://gitlab.com/twittner/minicbor"
-documentation = "https://twittner.gitlab.io/minicbor/minicbor_serde/"
+repository    = "https://github.com/twittner/minicbor"
 keywords      = ["cbor", "minicbor", "serde", "serialization", "no_std"]
 categories    = ["encoding"]
 
@@ -20,7 +19,7 @@ alloc  = ["minicbor/alloc", "serde/alloc"]
 std    = ["alloc", "minicbor/std", "serde/std"]
 
 [dependencies]
-minicbor = { path = "../minicbor", version = "0.25.0" }
+minicbor = { path = "../minicbor", version = "0.25.1" }
 half     = { version = "2.4.0", default-features = false, optional = true }
 serde    = { version = "1.0.197", default-features = false }
 

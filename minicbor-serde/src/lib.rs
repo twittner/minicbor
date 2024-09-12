@@ -36,7 +36,7 @@
 //! ```
 //!
 //! [serde]: https://serde.rs/
-//! [minicbor-derive]: https://twittner.gitlab.io/minicbor/minicbor_derive/
+//! [minicbor-derive]: https://docs.rs/minicbor_derive/
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
