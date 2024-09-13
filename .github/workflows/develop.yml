@@ -12,7 +12,7 @@ jobs:
       matrix:
         toolchain:
           - stable
-          - nightly
+          - beta
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
