@@ -609,6 +609,10 @@
 
 # minicbor-serde
 
+## `0.3.2`
+
+- Add `no_std` attribute (see issue #3).
+
 ## `0.3.1`
 
 - Update documentation.

@@ -38,6 +38,8 @@
 //! [serde]: https://serde.rs/
 //! [minicbor-derive]: https://docs.rs/minicbor_derive/
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
