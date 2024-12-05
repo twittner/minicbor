@@ -282,7 +282,11 @@ impl<W: Write> Encoder<W> {
     }
 
     /// Write the encoded byte slice.
-    pub(crate) fn put(&mut self, b: &[u8]) -> Result<&mut Self, Error<W::Error>> {
+    ///
+    /// The byte slice may contain a single CBOR item, multiple items or even parts of an item; as
+    /// with maps and arrays, it is up to the caller to eventually provide the right number of
+    /// items.
+    pub fn put(&mut self, b: &[u8]) -> Result<&mut Self, Error<W::Error>> {
         self.writer.write_all(b).map_err(Error::write)?;
         Ok(self)
     }
