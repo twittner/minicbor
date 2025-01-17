@@ -64,7 +64,7 @@ fn encode_as_map() {
     struct T {
         #[n(0)] a: Option<u8>,
         #[n(2)] b: Option<u8>,
-        #[n(5)] c: Option<u8>
+        #[n(-1)] c: Option<u8>
     }
 
     // empty value => empty map
@@ -92,21 +92,21 @@ fn encode_as_map() {
     let v = T { a: Some(1), b: Some(2), c: Some(3) };
 
     let bytes = minicbor::to_vec(&v).unwrap();
-    assert_eq!(&[0xa3, 0, 1, 2, 2, 5, 3][..], &bytes[..]);
+    assert_eq!(&[0xa3, 0, 1, 2, 2, 32 /* -1 */, 3][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
     let v = T { a: Some(1), b: None, c: Some(3) };
 
     let bytes = minicbor::to_vec(&v).unwrap();
-    assert_eq!(&[0xa2, 0, 1, 5, 3][..], &bytes[..]);
+    assert_eq!(&[0xa2, 0, 1, 32 /* -1 */, 3][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
     let v = T { a: None, b: None, c: Some(3) };
 
     let bytes = minicbor::to_vec(&v).unwrap();
-    assert_eq!(&[0xa1, 5, 3][..], &bytes[..]);
+    assert_eq!(&[0xa1, 32 /* -1 */, 3][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap())
 }
 
