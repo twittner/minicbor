@@ -13,7 +13,7 @@ std    = ["alloc", "minicbor/std", "minicbor/derive"]
 derive = ["alloc", "minicbor/derive"]
 
 [dev-dependencies]
-cbor4ii        = { version = "0.3.3", features = ["serde1", "use_std"] }
+cbor4ii        = { version = "1.0.0", features = ["serde1", "use_std"] }
 minicbor       = { path = "../minicbor", features = ["full"] }
 minicbor-serde = { path = "../minicbor-serde", features = ["full"] }
 rand           = "0.8.5"
