@@ -25,6 +25,6 @@ minicbor     = { path = "../minicbor", version = "0.25.1", features = ["std"] }
 minicbor    = { path = "../minicbor", version = "0.25.1", features = ["std", "derive"] }
 minicbor-io = { path = ".", features = ["async-io"] }
 quickcheck  = "1.0.1"
-rand        = "0.8"
+rand        = "0.9"
 tokio       = { version = "1.0", features = ["macros", "net", "rt"] }
 tokio-util  = { version = "0.7", features = ["compat"] }
