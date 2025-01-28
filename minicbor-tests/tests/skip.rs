@@ -240,7 +240,7 @@ fn gen_cbor(g: &mut Gen, indef: bool, rem: usize) -> Cbor {
     match g.choose(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
         Some(1) => Cbor::Int(Arbitrary::arbitrary(g)),
         Some(2) => {
-            let n = rand::random::<usize>() % 5;
+            let n = usize::arbitrary(g) % 5;
             let mut v = Vec::with_capacity(n);
             if rem > 0 {
                 for _ in 0 .. n {
@@ -250,7 +250,7 @@ fn gen_cbor(g: &mut Gen, indef: bool, rem: usize) -> Cbor {
             Cbor::Array(v)
         }
         Some(3) => {
-            let n = rand::random::<usize>() % 5;
+            let n = usize::arbitrary(g) % 5;
             let mut m = BTreeMap::new();
             if rem > 0 {
                 for _ in 0 .. n {
@@ -274,7 +274,7 @@ fn gen_cbor(g: &mut Gen, indef: bool, rem: usize) -> Cbor {
             Cbor::BytesIndef(Arbitrary::arbitrary(g))
         }
         Some(8) if indef => {
-            let n = rand::random::<usize>() % 5;
+            let n = usize::arbitrary(g) % 5;
             let mut v = Vec::with_capacity(n);
             if rem > 0 {
                 for _ in 0 .. n {
@@ -284,7 +284,7 @@ fn gen_cbor(g: &mut Gen, indef: bool, rem: usize) -> Cbor {
             Cbor::ArrayIndef(v)
         }
         Some(9) if indef => {
-            let n = rand::random::<usize>() % 5;
+            let n = usize::arbitrary(g) % 5;
             let mut m = BTreeMap::new();
             if rem > 0 {
                 for _ in 0 .. n {

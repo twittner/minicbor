@@ -1,5 +1,6 @@
 use minicbor::{Encode, Decode};
-use rand::{distributions::Alphanumeric, prelude::*};
+use rand::prelude::*;
+use rand::distr::Alphanumeric;
 use serde::{Serialize, Deserialize};
 use std::{borrow::Cow, iter, path::Path};
 use std::time::Instant;
@@ -110,19 +111,19 @@ fn gen_addressbook(n: usize) -> AddressBook<'static> {
         Address {
             street: gen_string(g),
             houseno: gen_string(g),
-            postcode: g.gen(),
+            postcode: g.random(),
             city: gen_string(g),
             country: gen_string(g)
         }
     }
 
     fn gen_style(g: &mut ThreadRng) -> Option<Style<'static>> {
-        let s = match g.gen_range(0 .. 5) {
+        let s = match g.random_range(0 .. 5) {
             0 => return None,
             1 => Style::Version1,
             2 => Style::Version2,
-            3 => Style::Version3(g.gen(), g.gen()),
-            4 => Style::Version4 { path: gen_string(g), timestamp: g.gen() },
+            3 => Style::Version3(g.random(), g.random()),
+            4 => Style::Version4 { path: gen_string(g), timestamp: g.random() },
             _ => unreachable!()
         };
         Some(s)
@@ -132,7 +133,7 @@ fn gen_addressbook(n: usize) -> AddressBook<'static> {
         Entry {
             firstname: gen_string(g),
             lastname: gen_string(g),
-            birthday: g.gen(),
+            birthday: g.random(),
             addresses: {
                 let mut v = Vec::with_capacity(n);
                 for _ in 0 .. n {
@@ -143,10 +144,10 @@ fn gen_addressbook(n: usize) -> AddressBook<'static> {
         }
     }
 
-    let mut g = rand::thread_rng();
+    let mut g = rand::rng();
 
     AddressBook {
-        timestamp: g.gen(),
+        timestamp: g.random(),
         entries: {
             let mut v = Vec::with_capacity(n);
             for _ in 0 .. n {
@@ -155,8 +156,8 @@ fn gen_addressbook(n: usize) -> AddressBook<'static> {
             v
         },
         style: gen_style(&mut g),
-        rating: if g.gen() {
-            Some(g.gen_range(-2342.42342 .. 234423.2342))
+        rating: if g.random() {
+            Some(g.random_range(-2342.42342 .. 234423.2342))
         } else {
             None
         }
