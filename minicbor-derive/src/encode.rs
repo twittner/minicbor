@@ -92,6 +92,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
+    let flat         = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter())?;
 
     let mut blacklist = HashSet::new();
@@ -112,6 +113,14 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 Encoding::Array | Encoding::Map if index_only => quote! {
                     #name::#con => {
                         __e777.u32(#idx)?;
+                        Ok(())
+                    }
+                },
+                Encoding::Array if flat => quote! {
+                    #name::#con => {
+                        __e777.array(1)?;
+                        __e777.u32(#idx)?;
+                       // #tag
                         Ok(())
                     }
                 },
@@ -137,6 +146,20 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             syn::Fields::Named(f) if index_only => {
                 return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
             }
+            syn::Fields::Named(_) if flat => {
+                let mut num_elems: u32 = 0;
+                let statements = encode_flat_fields(&fields, false, encoding, &mut num_elems)?;
+                let idents = fields.fields().idents();
+                num_elems += 1;
+                quote! {
+                    #name::#con{#(#idents,)* ..} => {
+                        __e777.array(#num_elems as u64)?;
+                        __e777.u32(#idx)?;
+                        #tag
+                        #statements
+                    }
+                }
+            }
             syn::Fields::Named(_) => {
                 let statements = encode_fields(&fields, false, encoding)?;
                 let idents = fields.fields().idents();
@@ -151,6 +174,20 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             }
             syn::Fields::Unnamed(f) if index_only => {
                 return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
+            }
+            syn::Fields::Unnamed(_) if flat => {
+                let mut num_elems: u32 = 0;
+                let statements = encode_flat_fields(&fields, false, encoding, &mut num_elems)?;
+                num_elems += 1;
+                let idents = fields.match_idents();
+                quote! {
+                    #name::#con(#(#idents,)*) => {
+                        __e777.array(#num_elems as u64)?;
+                        __e777.u32(#idx)?;
+                        #tag
+                        #statements
+                    }
+                }
             }
             syn::Fields::Unnamed(_) => {
                 let statements = encode_fields(&fields, false, encoding)?;
@@ -497,6 +534,200 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
 
             Ok(())
         })
+    }
+}
+
+/// Temporary copy-paste of [encode_fields].
+fn encode_flat_fields(
+    fields: &Fields,
+    has_self: bool, 
+    encoding: Encoding,
+    num_elems: &mut u32,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let default_encode_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::encode")?;
+
+    let mut tests = Vec::new();
+
+    match encoding {
+        // Under array encoding the number of elements is the highest
+        // index + 1. Each value is checked if it is not nil and if so,
+        // the highest index is incremented.
+        Encoding::Array => {
+            for field in fields.fields() {
+                if field.attrs.skip() {
+                    continue
+                }
+                let is_nil = is_nil(&field.typ, field.attrs.codec());
+                let n = field.index.val();
+                let ident = &field.ident;
+                let expr =
+                    if has_self {
+                        if field.is_name {
+                            quote! {
+                                if !#is_nil(&self.#ident) {
+                                    __max_index777 = Some(#n)
+                                }
+                            }
+                        } else {
+                            let i = syn::Index::from(field.pos);
+                            quote! {
+                                if !#is_nil(&self.#i) {
+                                    __max_index777 = Some(#n)
+                                }
+                            }
+                        }
+                    } else {
+                        quote! {
+                            if !#is_nil(&#ident) {
+                                __max_index777 = Some(#n)
+                            }
+                        }
+                    };
+                tests.push(expr)
+            }
+        }
+        // Map encoding is not allowed under `Flat`
+        _ => todo!(),
+    }
+
+    let mut statements = Vec::new();
+
+    const IS_NAME: bool = true;
+    const NO_NAME: bool = false;
+    const HAS_SELF: bool = true;
+    const NO_SELF: bool = false;
+    const HAS_GAPS: bool = true;
+    const NO_GAPS: bool = false;
+
+    match encoding {
+        // Under array encoding only field values are encoded and their
+        // index is represented as the array position. Gaps between indexes
+        // need to be filled with null.
+        Encoding::Array => {
+            let mut first = true;
+            let mut k = 0;
+            for field in fields.fields() {
+                if field.attrs.skip() {
+                    continue
+                }
+                let encode_fn = field.attrs.codec().as_ref()
+                    .and_then(|f| f.to_encode_path())
+                    .unwrap_or_else(|| default_encode_fn.clone());
+                let tag = encode_tag(&field.attrs);
+                let idx = &field.index;
+                let gaps = if first {
+                    first = false;
+                    idx.val() - k
+                } else {
+                    idx.val() - k - 1
+                };
+                let ident = &field.ident;
+                let statement =
+                    match (field.is_name, has_self, gaps > 0) {
+                        // struct
+                        (IS_NAME, HAS_SELF, HAS_GAPS) => quote! {
+                            if #idx <= __i777 {
+                                for _ in 0 .. #gaps {
+                                    __e777.null()?;
+                                }
+                                #tag
+                                #encode_fn(&self.#ident, __e777, __ctx777)?
+                            }
+                        },
+                        (IS_NAME, HAS_SELF, NO_GAPS) => quote! {
+                            if #idx <= __i777 {
+                                #tag
+                                #encode_fn(&self.#ident, __e777, __ctx777)?
+                            }
+                        },
+                        // enum struct
+                        (IS_NAME, NO_SELF, HAS_GAPS) => quote! {
+                            if #idx <= __i777 {
+                                for _ in 0 .. #gaps {
+                                    __e777.null()?;
+                                }
+                                #tag
+                                #encode_fn(#ident, __e777, __ctx777)?
+                            }
+                        },
+                        (IS_NAME, NO_SELF, NO_GAPS) => quote! {
+                            if #idx <= __i777 {
+                                #tag
+                                #encode_fn(#ident, __e777, __ctx777)?
+                            }
+                        },
+                        // tuple struct
+                        (NO_NAME, HAS_SELF, HAS_GAPS) => {
+                            let i = syn::Index::from(field.pos);
+                            quote! {
+                                if #idx <= __i777 {
+                                    for _ in 0 .. #gaps {
+                                        __e777.null()?;
+                                    }
+                                    #tag
+                                    #encode_fn(&self.#i, __e777, __ctx777)?
+                                }
+                            }
+                        }
+                        (NO_NAME, HAS_SELF, NO_GAPS) => {
+                            let i = syn::Index::from(field.pos);
+                            quote! {
+                                if #idx <= __i777 {
+                                    #tag
+                                    #encode_fn(&self.#i, __e777, __ctx777)?
+                                }
+                            }
+                         }
+                        // enum tuple
+                        (NO_NAME, NO_SELF, HAS_GAPS) => quote! {
+                            if #idx <= __i777 {
+                                for _ in 0 .. #gaps {
+                                    __e777.null()?;
+                                }
+                                #tag
+                                #encode_fn(#ident, __e777, __ctx777)?
+                            }
+                        },
+                        (NO_NAME, NO_SELF, NO_GAPS) => quote! {
+                            if #idx <= __i777 {
+                                #tag
+                                #encode_fn(#ident, __e777, __ctx777)?
+                            }
+                        }
+                    };
+                statements.push(statement);
+                k = idx.val()
+            }
+        }
+        // Map encoding is not allowed under `Flat`
+        _ => todo!(),
+    }
+    
+    let max_fields: u32 = fields.fields().len().try_into()
+        .map_err(|_| {
+            let msg = "more than 2^32 fields are not supported";
+            syn::Error::new(proc_macro2::Span::call_site(), msg)
+        })?;
+
+    *num_elems = max_fields;
+    
+    match encoding {
+        Encoding::Array => Ok(quote! {
+            let mut __max_index777: core::option::Option<u32> = None;
+
+            #(#tests)*
+
+            if let Some(__i777) = __max_index777 {
+                // __e777.array(u64::from(__i777) + 1)?;
+                #(#statements)*
+            // } else {
+            //     __e777.array(0)?;
+            }
+
+            Ok(())
+        }),
+        // Map encoding is not allowed under `Flat`
+        _ => todo!(),
     }
 }
 

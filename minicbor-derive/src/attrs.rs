@@ -36,7 +36,8 @@ enum Kind {
     ContextBound,
     CborLen,
     Tag,
-    Skip
+    Skip,
+    Flat,
 }
 
 #[derive(Debug, Clone)]
@@ -53,7 +54,8 @@ enum Value {
     ContextBound(HashSet<syn::TraitBound>, proc_macro2::Span),
     CborLen(syn::ExprPath, proc_macro2::Span),
     Tag(u64, proc_macro2::Span),
-    Skip(proc_macro2::Span)
+    Skip(proc_macro2::Span),
+    Flat(proc_macro2::Span)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -213,6 +215,8 @@ impl Attributes {
                 attrs.try_insert(Kind::Tag, Value::Tag(i, meta.path.span()))?
             } else if meta.path.is_ident("skip") {
                 attrs.try_insert(Kind::Skip, Value::Skip(meta.path.span()))?
+            } else if meta.path.is_ident("flat") {
+                attrs.try_insert(Kind::Flat, Value::Flat(meta.path.span()))?
             } else {
                 return Err(meta.error("unsupported attribute"))
             }
@@ -262,6 +266,10 @@ impl Attributes {
         self.contains_key(Kind::Skip)
     }
 
+    pub fn flat(&self) -> bool {
+        self.contains_key(Kind::Flat)
+    }
+
     fn contains_key(&self, k: Kind) -> bool {
         self.1.contains_key(&k)
     }
@@ -295,6 +303,7 @@ impl Attributes {
                 | Kind::HasNil
                 | Kind::CborLen
                 | Kind::Skip
+                | Kind::Flat
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -315,6 +324,7 @@ impl Attributes {
                 | Kind::IndexOnly
                 | Kind::Transparent
                 | Kind::ContextBound
+                | Kind::Flat
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -325,6 +335,7 @@ impl Attributes {
                 | Kind::IndexOnly
                 | Kind::ContextBound
                 | Kind::Tag
+                | Kind::Flat
                 => {}
                 | Kind::TypeParam
                 | Kind::Codec
@@ -355,6 +366,7 @@ impl Attributes {
                 | Kind::ContextBound
                 | Kind::CborLen
                 | Kind::Skip
+                | Kind::Flat
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -513,7 +525,8 @@ impl Value {
             Value::ContextBound(_, s) => *s,
             Value::CborLen(_, s)      => *s,
             Value::Tag(_, s)          => *s,
-            Value::Skip(s)            => *s
+            Value::Skip(s)            => *s,
+            Value::Flat(s)            => *s
         }
     }
 
