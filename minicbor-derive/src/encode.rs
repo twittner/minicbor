@@ -587,7 +587,7 @@ fn encode_flat_fields(
             }
         }
         // Map encoding is not allowed under `Flat`
-        _ => todo!(),
+        _ => unreachable!(),
     }
 
     let mut statements = Vec::new();
@@ -700,7 +700,7 @@ fn encode_flat_fields(
             }
         }
         // Map encoding is not allowed under `Flat`
-        _ => todo!(),
+        _ => unreachable!(),
     }
     
     let max_fields: u32 = fields.fields().len().try_into()
@@ -727,7 +727,7 @@ fn encode_flat_fields(
             Ok(())
         }),
         // Map encoding is not allowed under `Flat`
-        _ => todo!(),
+        _ => unreachable!(),
     }
 }
 
