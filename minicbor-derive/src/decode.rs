@@ -218,7 +218,9 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     } else if flat {
         quote! {
             let __p777 = __d777.position();
-            let __len777 =__d777.array()?.expect("variants are arrays under `flat`");
+            let __len777 =__d777.array()?.ok_or(minicbor::decode::Error::message(
+                "variants are definite-length arrays under `flat`"
+            ).at(__p777))?;
             let __p778 = __d777.position();
         }
     } else {
