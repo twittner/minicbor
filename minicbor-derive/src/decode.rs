@@ -71,7 +71,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         return make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause)
     }
 
-    let statements = gen_statements(&fields, attrs.encoding().unwrap_or_default())?;
+    let statements = gen_statements(&fields, attrs.encoding().unwrap_or_default(), false)?;
 
     let result = if let syn::Fields::Named(_) = data.fields {
         let nils      = nils(fields.fields());
@@ -127,6 +127,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
+    let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter())?;
 
     let mut blacklist = HashSet::new();
@@ -139,7 +140,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let con = &var.ident;
         let tag = decode_tag(attrs);
         let row = if let syn::Fields::Unit = var.fields {
-            if index_only {
+            if index_only | flat {
                 quote!(#idx => Ok(#name::#con),)
             } else {
                 quote!(#idx => {
@@ -159,7 +160,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             blacklist.extend(collect_type_params(&inp.generics, fields.fields().filter(|f| {
                 f.attrs.codec().map(|c| c.is_decode()).unwrap_or(false)
             })));
-            let statements = gen_statements(&fields, encoding)?;
+            let statements = gen_statements(&fields, encoding, flat)?;
             if let syn::Fields::Named(_) = var.fields {
                 let nils      = nils(fields.fields());
                 let indices   = fields.fields().indices();
@@ -214,6 +215,12 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         quote! {
             let __p778 = __d777.position();
         }
+    } else if flat {
+        quote! {
+            let __p777 = __d777.position();
+            let __len777 =__d777.array()?.expect("variants are arrays under `flat`");
+            let __p778 = __d777.position();
+        }
     } else {
         quote! {
             let __p777 = __d777.position();
@@ -258,7 +265,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 // [1]: These variables will later be deconstructed in `on_enum` and
 // `on_struct` and their inner value will be used to initialise a field.
 // If not present, an error will be produced.
-fn gen_statements(fields: &Fields, encoding: Encoding) -> syn::Result<proc_macro2::TokenStream> {
+fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Result<proc_macro2::TokenStream> {
     let default_decode_fn: syn::ExprPath = syn::parse_str("minicbor::Decode::decode")?;
 
     let actions = fields.fields().map(|field| {
@@ -335,6 +342,16 @@ fn gen_statements(fields: &Fields, encoding: Encoding) -> syn::Result<proc_macro
     let indices = fields.fields().indices().collect::<Vec<_>>();
 
     Ok(match encoding {
+        Encoding::Array if flat => quote! {
+            #(let mut #idents : core::option::Option<#types> = #inits;)*
+
+            for __i777 in 0 .. __len777-1 {
+                match __i777 {
+                    #(#indices => #actions)*
+                    _          => __d777.skip()?
+                }
+            }
+        },
         Encoding::Array => quote! {
             #(let mut #idents : core::option::Option<#types> = #inits;)*
 

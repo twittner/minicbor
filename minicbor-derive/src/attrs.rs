@@ -115,6 +115,11 @@ impl Attributes {
                 return Err(syn::Error::new(*s, "`skip` does not allow other attributes"))
             }
         }
+        if let Some(Value::Flat(s)) = this.get(Kind::Flat) {
+            if let Some(Value::Encoding(Encoding::Map, _)) = this.get(Kind::Encoding) {
+                return Err(syn::Error::new(*s, "`flat` does not work with `map`"))
+            }
+        }
         Ok(this)
     }
 
