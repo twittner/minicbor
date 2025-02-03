@@ -224,7 +224,7 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                 }
                 let n: usize = field.index.val()
                     .try_into()
-                    .map_err(|_| syn::Error::new(field.index.span(), "index does not fit into usize"))?;
+                    .map_err(|_| syn::Error::new(field.span(), "index does not fit into usize"))?;
                 let cbor_len = cbor_len(field.attrs.cbor_len(), field.attrs.codec());
                 let is_nil   = is_nil(&field.typ, field.attrs.codec());
                 let ident    = &field.ident;
