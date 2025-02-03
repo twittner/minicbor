@@ -144,6 +144,13 @@
 //! them. This changes the encoding to encode only the variant index (cf. section
 //! [CBOR encoding](#cbor-encoding) for details).
 //!
+//! ## `#[cbor(flat)]`
+//!
+//! This attribute can be attached to enums. It provides with a "shallow" encoding,
+//! in such a way that each variant is a encoded as a variable-sized array
+//! containing as its first element the index of the enum, and further elements
+//! correspond to the enum fields in order.
+//!
 //! ## `#[cbor(transparent)]`
 //!
 //! This attribute can be attached to structs with exactly one field (aka newtypes).
@@ -431,7 +438,8 @@
 //! ## Enums
 //!
 //! Unless the [`#[cbor(index_only)]`](#cborindex_only) attribute is used for
-//! enums without any fields, each enum variant is encoded as a two-element
+//! enums without any fields (or [`#[cbor(flat)]`](#cborflat) is in use),
+//! each enum variant is encoded as a two-element
 //! array. The first element is the variant index and the second the actual
 //! variant value. Otherwise, if enums do not have fields and the `index_only`
 //! attribute is present, only the variant index is encoded:
@@ -440,8 +448,11 @@
 //! <<enum encoding>> =
 //!     | `array(2)` n <<struct-as-array encoding>> ; if #[cbor(array)]
 //!     | `array(2)` n <<struct-as-map encoding>>   ; if #[cbor(map)]
+//!     | `array(k)` n <<field encoding>>*          ; if #[cbor(flat)]
 //!     | n                                         ; if #[cbor(index_only)]
 //! ```
+//!
+//! Above, `k` is the number of variant fields plus one.
 //!
 //! ## Which encoding to use?
 //!
