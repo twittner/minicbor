@@ -46,7 +46,7 @@ impl Fields {
             let attrs = Attributes::try_from_iter(Level::Field, &f.attrs)?;
             let index = if attrs.skip() {
                 debug_assert!(attrs.index().is_none());
-                Idx::N(u32::MAX)
+                Idx::N(i32::MAX)
             } else if let Some(i) = attrs.index() {
                 debug_assert!(!attrs.skip());
                 i
@@ -69,7 +69,7 @@ impl Fields {
             }
         }
 
-        fields.sort_unstable_by_key(|f| f.index.val());
+        fields.sort_unstable_by_key(|f| f.index.val_for_sorting());
         idx::check_uniq(span, fields.iter().map(|f| f.index))?;
 
         Ok(Fields { fields, skipped })

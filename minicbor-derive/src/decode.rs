@@ -362,14 +362,14 @@ fn gen_statements(fields: &Fields, encoding: Encoding) -> syn::Result<proc_macro
 
             if let Some(__len777) = __d777.map()? {
                 for _ in 0 .. __len777 {
-                    match __d777.u32()? {
+                    match __d777.i32()? {
                         #(#indices => #actions)*
                         _          => __d777.skip()?
                     }
                 }
             } else {
                 while minicbor::data::Type::Break != __d777.datatype()? {
-                    match __d777.u32()? {
+                    match __d777.i32()? {
                         #(#indices => #actions)*
                         _          => __d777.skip()?
                     }

@@ -98,7 +98,7 @@ impl Error {
 
     /// A value, expected at the given index, was missing.
     #[doc(hidden)]
-    pub fn missing_value(idx: u32) -> Self {
+    pub fn missing_value(idx: i32) -> Self {
         Error {
             err: ErrorImpl::MissingValue(idx),
             pos: None,
@@ -213,7 +213,7 @@ enum ErrorImpl {
     /// An unknown enum variant was encountered.
     UnknownVariant(u32),
     /// A value was missing at the specified index.
-    MissingValue(u32),
+    MissingValue(i32),
     /// Generic error message.
     Message,
     /// Custom error.

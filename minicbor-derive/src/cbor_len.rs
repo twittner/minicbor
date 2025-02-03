@@ -222,9 +222,14 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                 if field.attrs.skip() {
                     continue
                 }
-                let n: usize = field.index.val()
-                    .try_into()
-                    .map_err(|_| syn::Error::new(field.span(), "index does not fit into usize"))?;
+                let n: usize = field.index.val().try_into()
+                    .map_err(|_| {
+                        if field.index.val().is_negative() {
+                            syn::Error::new(field.span(), "array encoding does not support negative indices")
+                        } else {
+                            syn::Error::new(field.span(), "index does not fit into usize")
+                        }
+                    })?;
                 let cbor_len = cbor_len(field.attrs.cbor_len(), field.attrs.codec());
                 let is_nil   = is_nil(&field.typ, field.attrs.codec());
                 let ident    = &field.ident;
