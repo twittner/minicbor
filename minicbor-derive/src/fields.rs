@@ -28,6 +28,12 @@ pub struct Field {
     pub orig: syn::Field
 }
 
+impl quote::ToTokens for Field {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        self.orig.to_tokens(tokens)
+    }
+}
+
 impl Fields {
     pub fn try_from<'a, I>(span: Span, iter: I) -> syn::Result<Self>
     where
