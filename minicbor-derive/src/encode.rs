@@ -121,7 +121,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con => {
                         __e777.array(1)?;
                         __e777.u32(#idx)?;
-                       // #tag
+                        #tag
                         Ok(())
                     }
                 },
@@ -148,12 +148,14 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
             }
             syn::Fields::Named(_) if flat => {
-                let (statements, mut num_fields) = encode_fields(&fields, false, encoding, true)?;
+                let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
                 let idents = fields.fields().idents();
-                num_fields += 1;
                 quote! {
                     #name::#con{#(#idents,)* ..} => {
-                        __e777.array(#num_fields as u64)?;
+                        #tests
+                        // Adding 2 to get size (enum index and 0-based indexing).
+                        let __size777 = __max_index777.unwrap_or_default() as u64 + 2;
+                        __e777.array(__size777)?;
                         __e777.u32(#idx)?;
                         #tag
                         #statements
@@ -161,10 +163,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 }
             }
             syn::Fields::Named(_) => {
-                let statements = encode_fields(&fields, false, encoding, false)?.0;
+                let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
                 let idents = fields.fields().idents();
                 quote! {
                     #name::#con{#(#idents,)* ..} => {
+                        #tests
                         __e777.array(2)?;
                         __e777.u32(#idx)?;
                         #tag
@@ -176,12 +179,14 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
             }
             syn::Fields::Unnamed(_) if flat => {
-                let (statements, mut num_fields) = encode_fields(&fields, false, encoding, true)?;
-                num_fields += 1;
+                let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
                 let idents = fields.match_idents();
                 quote! {
                     #name::#con(#(#idents,)*) => {
-                        __e777.array(#num_fields as u64)?;
+                        #tests
+                        // Adding 2 to get size (enum index and 0-based indexing).
+                        let __size777 = __max_index777.unwrap_or_default() as u64 + 2;
+                        __e777.array(__size777)?;
                         __e777.u32(#idx)?;
                         #tag
                         #statements
@@ -189,10 +194,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 }
             }
             syn::Fields::Unnamed(_) => {
-                let statements = encode_fields(&fields, false, encoding, false)?.0;
+                let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
                 let idents = fields.match_idents();
                 quote! {
                     #name::#con(#(#idents,)*) => {
+                        #tests
                         __e777.array(2)?;
                         __e777.u32(#idx)?;
                         #tag
@@ -260,7 +266,7 @@ fn encode_fields(
     has_self: bool,
     encoding: Encoding,
     flat: bool,
-) -> syn::Result<(proc_macro2::TokenStream, u32)> {
+) -> syn::Result<(proc_macro2::TokenStream, proc_macro2::TokenStream)> {
     let default_encode_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::encode")?;
 
     let mut tests = Vec::new();
@@ -513,42 +519,51 @@ fn encode_fields(
         })?;
 
     match encoding {
-        Encoding::Array if flat => Ok((quote! {
-            let mut __max_index777: core::option::Option<u32> = None;
+        Encoding::Array if flat => Ok((
+            quote! {
+                let mut __max_index777: core::option::Option<u32> = None;
 
-            #(#tests)*
+                #(#tests)*
+            },
+            quote! {
+                if let Some(__i777) = __max_index777 {
+                    #(#statements)*
+                }
 
-            if let Some(__i777) = __max_index777 {
-                #(#statements)*
+                Ok(())
             }
+        )),
+        Encoding::Array => Ok((
+            quote! {
+                let mut __max_index777: core::option::Option<u32> = None;
 
-            Ok(())
-        }, max_fields)),
-        Encoding::Array => Ok((quote! {
-            let mut __max_index777: core::option::Option<u32> = None;
+                #(#tests)*
+            },
+            quote! {
+                if let Some(__i777) = __max_index777 {
+                    __e777.array(u64::from(__i777) + 1)?;
+                    #(#statements)*
+                } else {
+                    __e777.array(0)?;
+                }
 
-            #(#tests)*
-
-            if let Some(__i777) = __max_index777 {
-                __e777.array(u64::from(__i777) + 1)?;
-                #(#statements)*
-            } else {
-                __e777.array(0)?;
+                Ok(())
             }
+        )),
+        Encoding::Map => Ok((
+            quote! {
+                let mut __max_fields777 = #max_fields;
 
-            Ok(())
-        }, max_fields)),
-        Encoding::Map => Ok((quote! {
-            let mut __max_fields777 = #max_fields;
+                #(#tests)*
+            },
+            quote! {
+                __e777.map(u64::from(__max_fields777))?;
 
-            #(#tests)*
+                #(#statements)*
 
-            __e777.map(u64::from(__max_fields777))?;
-
-            #(#statements)*
-
-            Ok(())
-        }, max_fields)),
+                Ok(())
+            }
+        )),
     }
 }
 
