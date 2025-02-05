@@ -64,7 +64,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     }
 
     let tag = encode_tag(&attrs);
-    let statements = encode_fields(&fields, true, encoding, false)?.0;
+    let (tests, statements) = encode_fields(&fields, true, encoding, false)?;
 
     Ok(quote! {
         impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {
@@ -73,6 +73,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
                 __W777: minicbor::encode::Write
             {
                 #tag
+                #tests
                 #statements
             }
         }
