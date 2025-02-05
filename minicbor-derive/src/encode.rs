@@ -118,11 +118,16 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         Ok(())
                     }
                 },
+                Encoding::Array if flat & attrs.tag().is_some() => quote! {
+                    #name::#con => {
+                        Err(msg("tags are not allowed for `flat` variants with no fields"))
+                    }
+                },
                 Encoding::Array if flat => quote! {
                     #name::#con => {
                         __e777.array(1)?;
                         __e777.u32(#idx)?;
-                        #tag
+
                         Ok(())
                     }
                 },
@@ -164,7 +169,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 }
             }
             syn::Fields::Named(_) => {
-                let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
+                let (tests, statements) = encode_fields(&fields, false, encoding, false)?;
                 let idents = fields.fields().idents();
                 quote! {
                     #name::#con{#(#idents,)* ..} => {
@@ -195,7 +200,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 }
             }
             syn::Fields::Unnamed(_) => {
-                let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
+                let (tests, statements) = encode_fields(&fields, false, encoding, false)?;
+
                 let idents = fields.match_idents();
                 quote! {
                     #name::#con(#(#idents,)*) => {
