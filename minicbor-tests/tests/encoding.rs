@@ -64,49 +64,51 @@ fn encode_as_map() {
     struct T {
         #[n(0)] a: Option<u8>,
         #[n(2)] b: Option<u8>,
-        #[n(-1)] c: Option<u8>
+        #[n(5)] c: Option<u8>,
+        #[n(-1)] d: Option<u8>,
+        #[n(-100)] e: Option<u8>
     }
 
     // empty value => empty map
-    let v = T { a: None, b: None, c: None };
+    let v = T { a: None, b: None, c: None, d: None, e: None };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa0][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // empty suffix is not encoded
-    let v = T { a: Some(1), b: None, c: None };
+    let v = T { a: Some(1), b: None, c: None, d: None, e: None };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa1, 0, 1][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
-    let v = T { a: Some(1), b: Some(2), c: None };
+    let v = T { a: Some(1), b: Some(2), c: None, d: None, e: None };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa2, 0, 1, 2, 2][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
-    let v = T { a: Some(1), b: Some(2), c: Some(3) };
+    let v = T { a: Some(1), b: Some(2), c: Some(3), d: Some(4), e: Some(5) };
 
     let bytes = minicbor::to_vec(&v).unwrap();
-    assert_eq!(&[0xa3, 0, 1, 2, 2, 32 /* -1 */, 3][..], &bytes[..]);
+    assert_eq!(&[0xa5, 0, 1, 2, 2, 5, 3, 32, 4, 56, 99, 5][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
-    let v = T { a: Some(1), b: None, c: Some(3) };
+    let v = T { a: Some(1), b: None, c: Some(3), d: Some(4), e: Some(5) };
 
     let bytes = minicbor::to_vec(&v).unwrap();
-    assert_eq!(&[0xa2, 0, 1, 32 /* -1 */, 3][..], &bytes[..]);
+    assert_eq!(&[0xa4, 0, 1, 5, 3, 32, 4, 56, 99, 5][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
-    let v = T { a: None, b: None, c: Some(3) };
+    let v = T { a: None, b: None, c: Some(3), d: Some(4), e: Some(5) };
 
     let bytes = minicbor::to_vec(&v).unwrap();
-    assert_eq!(&[0xa1, 32 /* -1 */, 3][..], &bytes[..]);
+    assert_eq!(&[0xa3, 5, 3, 32, 4, 56, 99, 5][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap())
 }
 
