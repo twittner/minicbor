@@ -234,7 +234,10 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                     continue
                 }
                 let is_nil = is_nil(&field.typ, field.attrs.codec());
-                let n = field.index.val();
+                let n: u32 = field.index.val().try_into()
+                    .map_err(|_| {
+                        syn::Error::new(field.span(), "array encoding does not support negative indices")
+                    })?;
                 let ident = &field.ident;
                 let expr =
                     if has_self {
@@ -329,7 +332,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                     // struct
                     (IS_NAME, HAS_SELF) => quote! {
                         if !#is_nil(&self.#ident) {
-                            __e777.u32(#idx)?;
+                            __e777.i32(#idx)?;
                             #tag
                             #encode_fn(&self.#ident, __e777, __ctx777)?
                         }
@@ -337,7 +340,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                     // tuple struct
                     (IS_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
-                            __e777.u32(#idx)?;
+                            __e777.i32(#idx)?;
                             #tag
                             #encode_fn(#ident, __e777, __ctx777)?
                         }
@@ -347,7 +350,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                         let i = syn::Index::from(field.pos);
                         quote! {
                             if !#is_nil(&self.#i) {
-                                __e777.u32(#idx)?;
+                                __e777.i32(#idx)?;
                                 #tag
                                 #encode_fn(&self.#i, __e777, __ctx777)?
                             }
@@ -356,7 +359,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                     // enum tuple
                     (NO_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
-                            __e777.u32(#idx)?;
+                            __e777.i32(#idx)?;
                             #tag
                             #encode_fn(#ident, __e777, __ctx777)?
                         }
@@ -378,12 +381,15 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                     .and_then(|f| f.to_encode_path())
                     .unwrap_or_else(|| default_encode_fn.clone());
                 let tag = encode_tag(&field.attrs);
-                let idx = &field.index;
+                let idx: u32 = field.index.val().try_into()
+                    .map_err(|_| {
+                        syn::Error::new(field.span(), "array encoding does not support negative indices")
+                    })?;
                 let gaps = if first {
                     first = false;
-                    idx.val() - k
+                    idx - k
                 } else {
-                    idx.val() - k - 1
+                    idx - k - 1
                 };
                 let ident = &field.ident;
                 let statement =
@@ -460,7 +466,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                         }
                     };
                 statements.push(statement);
-                k = idx.val()
+                k = idx
             }
         }
     }

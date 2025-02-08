@@ -6,14 +6,14 @@ use std::collections::HashSet;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Idx {
     /// A regular, non-borrowing index.
-    N(u32),
+    N(i32),
     /// An index which indicates that the value borrows from the decoding input.
-    B(u32)
+    B(i32)
 }
 
 impl ToTokens for Idx {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        tokens.append(proc_macro2::Literal::u32_unsuffixed(self.val()))
+        tokens.append(proc_macro2::Literal::i32_unsuffixed(self.val()))
     }
 }
 
@@ -24,11 +24,23 @@ impl Idx {
     }
 
     /// Get the numeric index value.
-    pub fn val(self) -> u32 {
+    pub fn val(self) -> i32 {
         match self {
             Idx::N(i) => i,
             Idx::B(i) => i
         }
+    }
+
+    /// Get a property of the index that is sorted as needed to produce the encoded items:
+    /// They are sorted in their deterministic encoding.
+    ///
+    /// This produces the correct sequence both for CBOR arrays (where all items are emitted in
+    /// ascending order) and for CBOR maps (where keys need to be sorted in bytewise lexicographic
+    /// ordering).
+    ///
+    /// This is used for pre-sorting items for serialization.
+    pub fn val_for_sorting(self) -> impl Ord {
+        (self.val() < 0, self.val().unsigned_abs())
     }
 }
 
