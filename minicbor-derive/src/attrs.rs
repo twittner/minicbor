@@ -117,7 +117,7 @@ impl Attributes {
         }
         if let Some(Value::Flat(s)) = this.get(Kind::Flat) {
             if let Some(Value::Encoding(Encoding::Map, _)) = this.get(Kind::Encoding) {
-                return Err(syn::Error::new(*s, "`flat` does not work with `map`"))
+                return Err(syn::Error::new(*s, "map encoding does not support `flat`"))
             }
         }
         Ok(this)

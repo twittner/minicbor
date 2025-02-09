@@ -93,7 +93,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
-    let flat         = enum_attrs.flat();
+    let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter())?;
 
     let mut blacklist = HashSet::new();
@@ -118,7 +118,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         Ok(())
                     }
                 },
-                Encoding::Array if flat & attrs.tag().is_some() => quote! {
+                Encoding::Array if flat && attrs.tag().is_some() => quote! {
                     #name::#con => {
                         Err(msg("tags are not allowed for `flat` variants with no fields"))
                     }
@@ -127,7 +127,6 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con => {
                         __e777.array(1)?;
                         __e777.u32(#idx)?;
-
                         Ok(())
                     }
                 },
@@ -163,7 +162,6 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         let __size777 = __max_index777.unwrap_or_default() as u64 + 2;
                         __e777.array(__size777)?;
                         __e777.u32(#idx)?;
-                        #tag
                         #statements
                     }
                 }
@@ -194,7 +192,6 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         let __size777 = __max_index777.unwrap_or_default() as u64 + 2;
                         __e777.array(__size777)?;
                         __e777.u32(#idx)?;
-                        #tag
                         #statements
                     }
                 }
