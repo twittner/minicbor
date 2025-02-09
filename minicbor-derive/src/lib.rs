@@ -15,7 +15,7 @@
 //!
 //! 1. The encoding does not contain any names, i.e. no field names, type names
 //!    or variant names. Instead, every field and every constructor needs to be
-//!    annotated with an (unsigned) index number, e.g. `#[n(1)]`.
+//!    annotated with an index number, e.g. `#[n(1)]`.
 //!
 //! 2. Unknown fields are ignored during decoding.[^1]
 //!
@@ -408,7 +408,7 @@
 //!         item_0
 //!         item_1
 //!         ...
-//!         item_n
+//!         item_n-1
 //! ```
 //!
 //! ### Map encoding
@@ -423,7 +423,7 @@
 //!         `0` item_0
 //!         `1` item_1
 //!         ...
-//!          n  item_n
+//!         `n-1` item_n-1
 //! ```
 //!
 //! Optional fields whose value is `None` are not encoded.

@@ -111,14 +111,14 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             syn::Fields::Unit => match encoding {
                 Encoding::Array | Encoding::Map if index_only => quote! {
                     #name::#con => {
-                        __e777.u32(#idx)?;
+                        __e777.i32(#idx)?;
                         Ok(())
                     }
                 },
                 Encoding::Array => quote! {
                     #name::#con => {
                         __e777.array(2)?;
-                        __e777.u32(#idx)?;
+                        __e777.i32(#idx)?;
                         #tag
                         __e777.array(0)?;
                         Ok(())
@@ -127,7 +127,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 Encoding::Map => quote! {
                     #name::#con => {
                         __e777.array(2)?;
-                        __e777.u32(#idx)?;
+                        __e777.i32(#idx)?;
                         #tag
                         __e777.map(0)?;
                         Ok(())
@@ -143,7 +143,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 quote! {
                     #name::#con{#(#idents,)* ..} => {
                         __e777.array(2)?;
-                        __e777.u32(#idx)?;
+                        __e777.i32(#idx)?;
                         #tag
                         #statements
                     }
@@ -158,7 +158,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 quote! {
                     #name::#con(#(#idents,)*) => {
                         __e777.array(2)?;
-                        __e777.u32(#idx)?;
+                        __e777.i32(#idx)?;
                         #tag
                         #statements
                     }
@@ -236,7 +236,8 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                 let is_nil = is_nil(&field.typ, field.attrs.codec());
                 let n: u32 = field.index.val().try_into()
                     .map_err(|_| {
-                        syn::Error::new(field.span(), "array encoding does not support negative indices")
+                        let msg = "array encoding does not support fields with negative indices";
+                        syn::Error::new(field.span(), msg)
                     })?;
                 let ident = &field.ident;
                 let expr =
@@ -383,7 +384,8 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                 let tag = encode_tag(&field.attrs);
                 let idx: u32 = field.index.val().try_into()
                     .map_err(|_| {
-                        syn::Error::new(field.span(), "array encoding does not support negative indices")
+                        let msg = "array encoding does not support fields with negative indices";
+                        syn::Error::new(field.span(), msg)
                     })?;
                 let gaps = if first {
                     first = false;

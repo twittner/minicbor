@@ -231,7 +231,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #tag
                 #check
-                match __d777.u32()? {
+                match __d777.i32()? {
                     #(#rows)*
                     n => Err(minicbor::decode::Error::unknown_variant(n).at(__p778))
                 }

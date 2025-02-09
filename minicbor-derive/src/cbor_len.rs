@@ -225,7 +225,8 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                 let n: usize = field.index.val().try_into()
                     .map_err(|_| {
                         if field.index.val().is_negative() {
-                            syn::Error::new(field.span(), "array encoding does not support negative indices")
+                            let msg = "array encoding does not support fields with negative indices";
+                            syn::Error::new(field.span(), msg)
                         } else {
                             syn::Error::new(field.span(), "index does not fit into usize")
                         }

@@ -31,15 +31,8 @@ impl Idx {
         }
     }
 
-    /// Get a property of the index that is sorted as needed to produce the encoded items:
-    /// They are sorted in their deterministic encoding.
-    ///
-    /// This produces the correct sequence both for CBOR arrays (where all items are emitted in
-    /// ascending order) and for CBOR maps (where keys need to be sorted in bytewise lexicographic
-    /// ordering).
-    ///
-    /// This is used for pre-sorting items for serialization.
-    pub fn val_for_sorting(self) -> impl Ord {
+    /// Get value in bytewise lexicographic order.
+    pub fn bytewise_lexicographic(self) -> impl Ord {
         (self.val() < 0, self.val().unsigned_abs())
     }
 }

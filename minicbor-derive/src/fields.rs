@@ -69,7 +69,7 @@ impl Fields {
             }
         }
 
-        fields.sort_unstable_by_key(|f| f.index.val_for_sorting());
+        fields.sort_unstable_by_key(|f| f.index.bytewise_lexicographic());
         idx::check_uniq(span, fields.iter().map(|f| f.index))?;
 
         Ok(Fields { fields, skipped })

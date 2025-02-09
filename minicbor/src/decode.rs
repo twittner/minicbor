@@ -137,7 +137,7 @@ where
             return Err(Error::message("expected enum (2-element array)").at(p))
         }
         let p = d.position();
-        match d.u32()? {
+        match d.i32()? {
             0 => T::decode(d, ctx).map(Ok),
             1 => E::decode(d, ctx).map(Err),
             n => Err(Error::unknown_variant(n).at(p))
@@ -623,7 +623,7 @@ impl<'b, C> Decode<'b, C> for std::net::IpAddr {
             return Err(Error::message("expected enum (2-element array)").at(p))
         }
         let p = d.position();
-        match d.u32()? {
+        match d.i32()? {
             0 => Ok(std::net::Ipv4Addr::decode(d, ctx)?.into()),
             1 => Ok(std::net::Ipv6Addr::decode(d, ctx)?.into()),
             n => Err(Error::unknown_variant(n).at(p))
@@ -655,7 +655,7 @@ impl<'b, C> Decode<'b, C> for std::net::SocketAddr {
             return Err(Error::message("expected enum (2-element array)").at(p))
         }
         let p = d.position();
-        match d.u32()? {
+        match d.i32()? {
             0 => Ok(std::net::SocketAddrV4::decode(d, ctx)?.into()),
             1 => Ok(std::net::SocketAddrV6::decode(d, ctx)?.into()),
             n => Err(Error::unknown_variant(n).at(p))
@@ -739,7 +739,7 @@ impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::ops::Bound<T> {
             return Err(Error::message("expected enum (2-element array)").at(p))
         }
         let p = d.position();
-        match d.u32()? {
+        match d.i32()? {
             0 => d.decode_with(ctx).map(core::ops::Bound::Included),
             1 => d.decode_with(ctx).map(core::ops::Bound::Excluded),
             2 => d.skip().map(|_| core::ops::Bound::Unbounded),
