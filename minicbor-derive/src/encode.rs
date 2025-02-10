@@ -107,6 +107,12 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         blacklist.extend(collect_type_params(&inp.generics, fields.fields().filter(|f| {
             f.attrs.codec().map(|c| c.is_encode()).unwrap_or(false)
         })));
+        if flat && attrs.tag().is_some() {
+            return Err(syn::Error::new(
+                var.ident.span(),
+                "tags are not allowed for variants under `flat`",
+            ))
+        };
         let con = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag = encode_tag(attrs);
@@ -116,11 +122,6 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con => {
                         __e777.u32(#idx)?;
                         Ok(())
-                    }
-                },
-                Encoding::Array if flat && attrs.tag().is_some() => quote! {
-                    #name::#con => {
-                        Err(msg("tags are not allowed for `flat` variants with no fields"))
                     }
                 },
                 Encoding::Array if flat => quote! {
