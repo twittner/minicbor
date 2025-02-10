@@ -152,14 +152,15 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             syn::Fields::Named(f) if index_only => {
                 return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
             }
-            syn::Fields::Named(_) if flat => {
+            syn::Fields::Named(f) if flat => {
                 let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
                 let idents = fields.fields().idents();
+                let not_empty: u32 = (!f.named.is_empty()).into();
                 quote! {
                     #name::#con{#(#idents,)* ..} => {
                         #tests
-                        // Adding 2 to get size (enum index and 0-based indexing).
-                        let __size777 = __max_index777.unwrap_or_default() as u64 + 2;
+                        // Get array size considering the enum index and 0-based indexing.
+                        let __size777 = (__max_index777.unwrap_or_default() + 1 + #not_empty) as u64;
                         __e777.array(__size777)?;
                         __e777.u32(#idx)?;
                         #statements
@@ -182,14 +183,15 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             syn::Fields::Unnamed(f) if index_only => {
                 return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
             }
-            syn::Fields::Unnamed(_) if flat => {
+            syn::Fields::Unnamed(f) if flat => {
                 let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
                 let idents = fields.match_idents();
+                let not_empty: u32 = (!f.unnamed.is_empty()).into();
                 quote! {
                     #name::#con(#(#idents,)*) => {
                         #tests
-                        // Adding 2 to get size (enum index and 0-based indexing).
-                        let __size777 = __max_index777.unwrap_or_default() as u64 + 2;
+                        // Get array size considering the enum index and 0-based indexing.
+                        let __size777 = (__max_index777.unwrap_or_default() + 1 + #not_empty) as u64;
                         __e777.array(__size777)?;
                         __e777.u32(#idx)?;
                         #statements

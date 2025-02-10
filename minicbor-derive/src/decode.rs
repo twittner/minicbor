@@ -221,6 +221,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             let __len777 =__d777.array()?.ok_or(minicbor::decode::Error::message(
                 "variants are definite-length arrays under `flat`"
             ).at(__p777))?;
+            if __len777 == 0 {
+                return Err(minicbor::decode::Error::message(
+                    "variants are nonempty arrays under `flat`"
+                ).at(__p777));
+            }
             let __p778 = __d777.position();
         }
     } else {
