@@ -5,7 +5,7 @@ pub mod codec;
 pub mod encoding;
 pub mod idx;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, BTreeSet};
 use std::fmt;
 use std::hash::Hash;
 use std::iter;
@@ -24,6 +24,7 @@ pub struct Attributes(Level, HashMap<Kind, Value>);
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum Kind {
+    Borrow,
     Codec,
     Encoding,
     Index,
@@ -41,6 +42,7 @@ enum Kind {
 
 #[derive(Debug, Clone)]
 enum Value {
+    Borrow(BTreeSet<syn::Lifetime>, proc_macro2::Span),
     Codec(CustomCodec, proc_macro2::Span),
     Encoding(Encoding, proc_macro2::Span),
     Index(Idx, proc_macro2::Span),
@@ -167,6 +169,15 @@ impl Attributes {
                 let s: LitStr = meta.value()?.parse()?;
                 let c = CustomCodec::Module(s.parse()?, false);
                 attrs.try_insert(Kind::Codec, Value::Codec(c, meta.path.span()))?
+            } else if meta.path.is_ident("borrow") {
+                let mut l = BTreeSet::new();
+                if meta.input.peek(syn::Token!(=)) {
+                    let s: LitStr = meta.value()?.parse()?;
+                    for b in s.value().split('+').filter(|b| !b.is_empty()) {
+                        l.insert(syn::parse_str::<syn::Lifetime>(b.trim())?);
+                    }
+                }
+                attrs.try_insert(Kind::Borrow, Value::Borrow(l, meta.path.span()))?
             } else if meta.path.is_ident("encode_bound") {
                 let s: LitStr = meta.value()?.parse()?;
                 let t: syn::TypeParam = s.parse()?;
@@ -220,6 +231,10 @@ impl Attributes {
         })?;
 
         Ok(attrs)
+    }
+
+    pub fn borrow(&self) -> Option<&BTreeSet<syn::Lifetime>> {
+        self.get(Kind::Borrow).and_then(|v| v.borrow())
     }
 
     pub fn encoding(&self) -> Option<Encoding> {
@@ -286,6 +301,7 @@ impl Attributes {
                 | Kind::ContextBound
                 | Kind::Tag
                 => {}
+                | Kind::Borrow
                 | Kind::TypeParam
                 | Kind::Codec
                 | Kind::Index
@@ -302,6 +318,7 @@ impl Attributes {
             }
             Level::Field => match key {
                 | Kind::TypeParam
+                | Kind::Borrow
                 | Kind::Codec
                 | Kind::Index
                 | Kind::Nil
@@ -326,6 +343,7 @@ impl Attributes {
                 | Kind::ContextBound
                 | Kind::Tag
                 => {}
+                | Kind::Borrow
                 | Kind::TypeParam
                 | Kind::Codec
                 | Kind::Index
@@ -345,6 +363,7 @@ impl Attributes {
                 | Kind::Index
                 | Kind::Tag
                 => {}
+                | Kind::Borrow
                 | Kind::TypeParam
                 | Kind::Codec
                 | Kind::IndexOnly
@@ -491,6 +510,18 @@ impl Attributes {
                     }
                 }
             }
+            Value::Borrow(_, s) => {
+                if let Some(idx) = self.index() {
+                    if idx.is_b() {
+                        return Err(syn::Error::new(*s, "`borrow` and `b` are mutually exclusive"))
+                    }
+                }
+            }
+            Value::Index(idx, s) if idx.is_b() => {
+                if self.contains_key(Kind::Borrow) {
+                    return Err(syn::Error::new(*s, "`b` and `borrow` are mutually exclusive"))
+                }
+            }
             _ => {}
         }
         self.1.insert(key, val);
@@ -501,6 +532,7 @@ impl Attributes {
 impl Value {
     fn span(&self) -> proc_macro2::Span {
         match self {
+            Value::Borrow(_, s)       => *s,
             Value::TypeParam(_, s)    => *s,
             Value::Codec(_, s)        => *s,
             Value::Encoding(_, s)     => *s,
@@ -514,6 +546,14 @@ impl Value {
             Value::CborLen(_, s)      => *s,
             Value::Tag(_, s)          => *s,
             Value::Skip(s)            => *s
+        }
+    }
+
+    fn borrow(&self) -> Option<&BTreeSet<syn::Lifetime>> {
+        if let Value::Borrow(l, _) = self {
+            Some(l)
+        } else {
+            None
         }
     }
 

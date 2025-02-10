@@ -37,7 +37,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let fields = Fields::try_from(name.span(), data.fields.iter())?;
 
     let mut lifetime = gen_lifetime()?;
-    for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, &f.typ))) {
+    for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, f.attrs.borrow(), &f.typ))) {
         if !lifetime.bounds.iter().any(|b| *b == l) {
             lifetime.bounds.push(l.clone())
         }
@@ -149,7 +149,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 })
             }
         } else {
-            for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, &f.typ))) {
+            for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, f.attrs.borrow(), &f.typ))) {
                 if !lifetime.bounds.iter().any(|b| *b == l) {
                     lifetime.bounds.push(l.clone())
                 }
@@ -296,7 +296,7 @@ fn gen_statements(fields: &Fields, encoding: Encoding) -> syn::Result<proc_macro
 
             let value =
                 if cfg!(any(feature = "alloc", feature = "std"))
-                    && field.index.is_b()
+                    && (field.attrs.borrow().is_some() || field.index.is_b())
                     && is_cow(&field.typ, |t| is_str(t) || is_byte_slice(t))
                 {
                     if cfg!(feature = "std") {
@@ -398,7 +398,7 @@ fn make_transparent_impl
 
     let call =
         if cfg!(any(feature = "alloc", feature = "std"))
-            && field.index.is_b()
+            && (field.attrs.borrow().is_some() || field.index.is_b())
             && is_cow(&field.typ, |t| is_str(t) || is_byte_slice(t))
         {
             let cow =
