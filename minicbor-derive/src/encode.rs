@@ -34,7 +34,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let name     = &inp.ident;
     let attrs    = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
     let encoding = attrs.encoding().unwrap_or_default();
-    let fields   = Fields::try_from(name.span(), data.fields.iter())?;
+    let fields   = Fields::try_from(name.span(), data.fields.iter(), &attrs)?;
 
     // Collect type parameters which should not have an `Encode` bound added,
     // i.e. from fields which have a custom encode function defined.
@@ -98,7 +98,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
-        let fields = Fields::try_from(var.ident.span(), var.fields.iter())?;
+        let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &enum_attrs)?;
         // Collect type parameters which should not have an `Encode` bound added,
         // i.e. from fields which have a custom encode function defined.
         blacklist.extend(collect_type_params(&inp.generics, fields.fields().filter(|f| {

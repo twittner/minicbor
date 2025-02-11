@@ -35,7 +35,7 @@ impl quote::ToTokens for Field {
 }
 
 impl Fields {
-    pub fn try_from<'a, I>(span: Span, iter: I) -> syn::Result<Self>
+    pub fn try_from<'a, I>(span: Span, iter: I, parent: &Attributes) -> syn::Result<Self>
     where
         I: IntoIterator<Item = &'a syn::Field>
     {
@@ -50,6 +50,8 @@ impl Fields {
             } else if let Some(i) = attrs.index() {
                 debug_assert!(!attrs.skip());
                 i
+            } else if parent.transparent() {
+                Idx::N(i32::MAX)
             } else {
                 let s = f.ident.as_ref().map(|i| i.span()).unwrap_or_else(|| f.ty.span());
                 return Err(syn::Error::new(s, "missing `#[n(...)]` or `#[b(...)]` attribute"))
