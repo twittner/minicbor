@@ -437,14 +437,14 @@
 //!
 //! ## Enums
 //!
-//! Unless [`#[cbor(index_only)]`](#cborindex_only) or or [`#[cbor(flat)]`](#cborflat)
+//! Unless [`#[cbor(index_only)]`](#cborindex_only) or [`#[cbor(flat)]`](#cborflat)
 //! are used, each enum variant is encoded as a two-element array. The first element
 //! is the variant index and the second the actual variant value.
 //!
 //! If enums do not have fields and the `index_only` attribute is present, only the
 //! variant index is encoded.
 //!
-//! If `flat` ise used, an enum variant is encoded as an array with the variant index
+//! If `flat` is used, an enum variant is encoded as an array with the variant index
 //! as its first element, followed directly by all variant fields (if any).
 //!
 //!
