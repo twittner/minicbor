@@ -28,7 +28,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     let name   = &inp.ident;
     let attrs  = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let fields = Fields::try_from(name.span(), data.fields.iter())?;
+    let fields = Fields::try_from(name.span(), data.fields.iter(), &attrs)?;
 
     let cbor_len_bound = gen_cbor_len_bound()?;
     let encode_bound   = gen_encode_bound()?;
@@ -82,7 +82,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
-        let fields   = Fields::try_from(var.ident.span(), var.fields.iter())?;
+        let fields   = Fields::try_from(var.ident.span(), var.fields.iter(), &enum_attrs)?;
         let con      = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag      = on_tag(attrs);

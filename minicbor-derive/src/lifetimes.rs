@@ -1,6 +1,7 @@
+use std::collections::BTreeSet;
+
 use crate::{is_str, is_byte_slice};
 use crate::attrs::Idx;
-use std::collections::HashSet;
 
 /// Generate the decode lifetime.
 pub fn gen_lifetime() -> syn::Result<syn::LifetimeParam> {
@@ -16,9 +17,9 @@ pub fn add_lifetime(g: &syn::Generics, l: syn::LifetimeParam) -> syn::Generics {
 }
 
 /// Get the set of lifetimes which need to be constrained to the decoding input lifetime.
-pub fn lifetimes_to_constrain<'a, I>(types: I) -> HashSet<syn::Lifetime>
+pub fn lifetimes_to_constrain<'a, I>(types: I) -> BTreeSet<syn::Lifetime>
 where
-    I: Iterator<Item = (&'a Idx, &'a syn::Type)>
+    I: Iterator<Item = (&'a Idx, Option<&'a BTreeSet<syn::Lifetime>>, &'a syn::Type)>
 {
     // Get the lifetime of a reference if its type matches the predicate.
     fn tyref_lifetime(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> Option<syn::Lifetime> {
@@ -31,22 +32,24 @@ where
     }
 
     // Get all lifetimes of a type.
-    fn get_lifetimes(ty: &syn::Type, set: &mut HashSet<syn::Lifetime>) {
+    fn get_lifetimes(ty: &syn::Type, set: &mut BTreeSet<syn::Lifetime>, filter: &BTreeSet<syn::Lifetime>) {
         match ty {
-            syn::Type::Array(t) => get_lifetimes(&t.elem, set),
-            syn::Type::Slice(t) => get_lifetimes(&t.elem, set),
-            syn::Type::Paren(t) => get_lifetimes(&t.elem, set),
-            syn::Type::Group(t) => get_lifetimes(&t.elem, set),
-            syn::Type::Ptr(t)   => get_lifetimes(&t.elem, set),
+            syn::Type::Array(t) => get_lifetimes(&t.elem, set, filter),
+            syn::Type::Slice(t) => get_lifetimes(&t.elem, set, filter),
+            syn::Type::Paren(t) => get_lifetimes(&t.elem, set, filter),
+            syn::Type::Group(t) => get_lifetimes(&t.elem, set, filter),
+            syn::Type::Ptr(t)   => get_lifetimes(&t.elem, set, filter),
             syn::Type::Reference(t) => {
                 if let Some(l) = &t.lifetime {
-                    set.insert(l.clone());
+                    if filter.is_empty() || filter.contains(l) {
+                        set.insert(l.clone());
+                    }
                 }
-                get_lifetimes(&t.elem, set)
+                get_lifetimes(&t.elem, set, filter)
             }
             syn::Type::Tuple(t) => {
                 for t in &t.elems {
-                    get_lifetimes(t, set)
+                    get_lifetimes(t, set, filter)
                 }
             }
             syn::Type::Path(t) => {
@@ -54,10 +57,14 @@ where
                     if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
                         for a in &b.args {
                             match a {
-                                syn::GenericArgument::Type(t)      => get_lifetimes(t, set),
-                                syn::GenericArgument::AssocType(b) => get_lifetimes(&b.ty, set),
-                                syn::GenericArgument::Lifetime(l)  => { set.insert(l.clone()); }
-                                _                                  => {}
+                                syn::GenericArgument::Type(t)      => get_lifetimes(t, set, filter),
+                                syn::GenericArgument::AssocType(b) => get_lifetimes(&b.ty, set, filter),
+                                syn::GenericArgument::Lifetime(l)  => {
+                                    if filter.is_empty() || filter.contains(l) {
+                                        set.insert(l.clone());
+                                    }
+                                }
+                                _ => {}
                             }
                         }
                     }
@@ -87,8 +94,8 @@ where
         None
     }
 
-    let mut set = HashSet::new();
-    for (i, t) in types {
+    let mut set = BTreeSet::new();
+    for (i, l, t) in types {
         if let Some(l) = tyref_lifetime(t, is_str) {
             set.insert(l);
             continue
@@ -105,8 +112,11 @@ where
             set.insert(l);
             continue
         }
+        if let Some(l) = l {
+            get_lifetimes(t, &mut set, l)
+        }
         if i.is_b() {
-            get_lifetimes(t, &mut set)
+            get_lifetimes(t, &mut set, &BTreeSet::new())
         }
     }
     set

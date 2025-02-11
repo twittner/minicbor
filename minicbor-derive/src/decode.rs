@@ -34,10 +34,10 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     let name   = &inp.ident;
     let attrs  = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let fields = Fields::try_from(name.span(), data.fields.iter())?;
+    let fields = Fields::try_from(name.span(), data.fields.iter(), &attrs)?;
 
     let mut lifetime = gen_lifetime()?;
-    for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, &f.typ))) {
+    for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, f.attrs.borrow(), &f.typ))) {
         if !lifetime.bounds.iter().any(|b| *b == l) {
             lifetime.bounds.push(l.clone())
         }
@@ -135,7 +135,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let mut lifetime = gen_lifetime()?;
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
-        let fields = Fields::try_from(var.ident.span(), var.fields.iter())?;
+        let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &enum_attrs)?;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let con = &var.ident;
         let tag = decode_tag(attrs);
@@ -150,7 +150,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 })
             }
         } else {
-            for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, &f.typ))) {
+            for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, f.attrs.borrow(), &f.typ))) {
                 if !lifetime.bounds.iter().any(|b| *b == l) {
                     lifetime.bounds.push(l.clone())
                 }
@@ -310,7 +310,7 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
 
             let value =
                 if cfg!(any(feature = "alloc", feature = "std"))
-                    && field.index.is_b()
+                    && (field.attrs.borrow().is_some() || field.index.is_b())
                     && is_cow(&field.typ, |t| is_str(t) || is_byte_slice(t))
                 {
                     if cfg!(feature = "std") {
@@ -422,7 +422,7 @@ fn make_transparent_impl
 
     let call =
         if cfg!(any(feature = "alloc", feature = "std"))
-            && field.index.is_b()
+            && (field.attrs.borrow().is_some() || field.index.is_b())
             && is_cow(&field.typ, |t| is_str(t) || is_byte_slice(t))
         {
             let cow =
