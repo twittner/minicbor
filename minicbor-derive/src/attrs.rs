@@ -23,7 +23,7 @@ pub use idx::Idx;
 pub struct Attributes(Level, HashMap<Kind, Value>);
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-enum Kind {
+pub enum Kind {
     Borrow,
     Codec,
     Encoding,
@@ -240,6 +240,10 @@ impl Attributes {
         })?;
 
         Ok(attrs)
+    }
+
+    pub fn span(&self, k: Kind) -> Option<proc_macro2::Span> {
+        self.get(k).map(|v| v.span())
     }
 
     pub fn borrow(&self) -> Option<&BTreeSet<syn::Lifetime>> {

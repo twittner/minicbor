@@ -218,13 +218,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     } else if flat {
         quote! {
             let __p777 = __d777.position();
-            let __len777 =__d777.array()?.ok_or(minicbor::decode::Error::message(
-                "variants are definite-length arrays under `flat`"
-            ).at(__p777))?;
+            let Some(__len777) = __d777.array()? else {
+                return Err(minicbor::decode::Error::message("flat enum requires definite-length array").at(__p777))
+            };
             if __len777 == 0 {
-                return Err(minicbor::decode::Error::message(
-                    "variants are nonempty arrays under `flat`"
-                ).at(__p777));
+                return Err(minicbor::decode::Error::message("flat enum requires non-empty array").at(__p777))
             }
             let __p778 = __d777.position();
         }
@@ -352,7 +350,7 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
         Encoding::Array if flat => quote! {
             #(let mut #idents : core::option::Option<#types> = #inits;)*
 
-            for __i777 in 0 .. __len777-1 {
+            for __i777 in 0 .. __len777 - 1 {
                 match __i777 {
                     #(#indices => #actions)*
                     _          => __d777.skip()?

@@ -1,7 +1,7 @@
 use crate::Mode;
 use crate::{add_bound_to_type_params, collect_type_params, is_option};
 use crate::{add_typeparam, gen_ctx_param};
-use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
+use crate::attrs::{Attributes, CustomCodec, Encoding, Kind, Level};
 use crate::fields::{Field, Fields};
 use crate::variants::Variants;
 use quote::{quote, ToTokens};
@@ -108,10 +108,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             f.attrs.codec().map(|c| c.is_encode()).unwrap_or(false)
         })));
         if flat && attrs.tag().is_some() {
-            return Err(syn::Error::new(
-                var.ident.span(),
-                "tags are not allowed for variants under `flat`",
-            ))
+            let span = attrs.span(Kind::Tag).expect("tag is some");
+            return Err(syn::Error::new(span, "`tag` and `flat` are mutually exclusive"))
         };
         let con = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
@@ -127,7 +125,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 Encoding::Array if flat => quote! {
                     #name::#con => {
                         __e777.array(1)?;
-                        __e777.u32(#idx)?;
+                        __e777.i32(#idx)?;
                         Ok(())
                     }
                 },
@@ -153,17 +151,18 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             syn::Fields::Named(f) if index_only => {
                 return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
             }
-            syn::Fields::Named(f) if flat => {
+            syn::Fields::Named(_) if flat => {
                 let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
                 let idents = fields.fields().idents();
-                let not_empty: u32 = (!f.named.is_empty()).into();
                 quote! {
                     #name::#con{#(#idents,)* ..} => {
                         #tests
-                        // Get array size considering the enum index and 0-based indexing.
-                        let __size777 = (__max_index777.unwrap_or_default() + 1 + #not_empty) as u64;
-                        __e777.array(__size777)?;
-                        __e777.u32(#idx)?;
+                        if let Some(__i777) = __max_index777 {
+                            __e777.array(u64::from(__i777) + 2)?; // max index + 1 + (1 for constructor index)
+                        } else {
+                            __e777.array(1)?;
+                        }
+                        __e777.i32(#idx)?;
                         #statements
                     }
                 }
@@ -184,17 +183,18 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             syn::Fields::Unnamed(f) if index_only => {
                 return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
             }
-            syn::Fields::Unnamed(f) if flat => {
+            syn::Fields::Unnamed(_) if flat => {
                 let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
                 let idents = fields.match_idents();
-                let not_empty: u32 = (!f.unnamed.is_empty()).into();
                 quote! {
                     #name::#con(#(#idents,)*) => {
                         #tests
-                        // Get array size considering the enum index and 0-based indexing.
-                        let __size777 = (__max_index777.unwrap_or_default() + 1 + #not_empty) as u64;
-                        __e777.array(__size777)?;
-                        __e777.u32(#idx)?;
+                        if let Some(__i777) = __max_index777 {
+                            __e777.array(u64::from(__i777) + 2)?; // max index + 1 + (1 for constructor index)
+                        } else {
+                            __e777.array(1)?;
+                        }
+                        __e777.i32(#idx)?;
                         #statements
                     }
                 }
@@ -268,12 +268,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 /// depending on the encoding.
 ///
 /// NB: The `fields` parameter is assumed to be sorted by index.
-fn encode_fields(
-    fields: &Fields,
-    has_self: bool,
-    encoding: Encoding,
-    flat: bool,
-) -> syn::Result<(proc_macro2::TokenStream, proc_macro2::TokenStream)> {
+fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool) -> syn::Result<(proc_macro2::TokenStream, proc_macro2::TokenStream)> {
     let default_encode_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::encode")?;
 
     let mut tests = Vec::new();

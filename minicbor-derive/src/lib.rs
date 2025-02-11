@@ -146,10 +146,10 @@
 //!
 //! ## `#[cbor(flat)]`
 //!
-//! This attribute can be attached to enums. It provides with a "shallow" encoding,
+//! This attribute can be attached to enums. It provides a "shallow" encoding,
 //! in such a way that each variant is a encoded as a variable-sized array
-//! containing as its first element the index of the enum, and further elements
-//! correspond to the enum fields in order.
+//! containing as its first element the index of the variant, and further elements
+//! correspond to the variant fields in order.
 //!
 //! ## `#[cbor(transparent)]`
 //!
@@ -437,12 +437,16 @@
 //!
 //! ## Enums
 //!
-//! Unless the [`#[cbor(index_only)]`](#cborindex_only) attribute is used for
-//! enums without any fields (or [`#[cbor(flat)]`](#cborflat) is in use),
-//! each enum variant is encoded as a two-element
-//! array. The first element is the variant index and the second the actual
-//! variant value. Otherwise, if enums do not have fields and the `index_only`
-//! attribute is present, only the variant index is encoded:
+//! Unless [`#[cbor(index_only)]`](#cborindex_only) or or [`#[cbor(flat)]`](#cborflat)
+//! are used, each enum variant is encoded as a two-element array. The first element
+//! is the variant index and the second the actual variant value.
+//!
+//! If enums do not have fields and the `index_only` attribute is present, only the
+//! variant index is encoded.
+//!
+//! If `flat` ise used, an enum variant is encoded as an array with the variant index
+//! as its first element, followed directly by all variant fields (if any).
+//!
 //!
 //! ```text
 //! <<enum encoding>> =
