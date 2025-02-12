@@ -2,6 +2,8 @@ use crate::{SIGNED, BYTES, TEXT, ARRAY, MAP, TAGGED, SIMPLE};
 use crate::data::{Int, Tag};
 use crate::encode::{Encode, Error, Write};
 
+use super::CborLen;
+
 /// A non-allocating CBOR encoder writing encoded bytes to the given [`Write`] sink.
 #[derive(Debug, Clone)]
 pub struct Encoder<W> { writer: W }
@@ -36,6 +38,20 @@ impl<W: Write> Encoder<W> {
     /// Encode any type that implements [`Encode`].
     pub fn encode_with<C, T: Encode<C>>(&mut self, x: T, ctx: &mut C) -> Result<&mut Self, Error<W::Error>> {
         x.encode(self, ctx)?;
+        Ok(self)
+    }
+
+    /// Encode any type that implements [`Encode`] and [`CborLen`] as a byte string where the value
+    /// of the byte string is the CBOR encoding of the value.
+    pub fn encode_as_cbor<T: Encode<()> + CborLen<()>>(&mut self, x: T) -> Result<&mut Self, Error<W::Error>> {
+        self.type_len(BYTES, x.cbor_len(&mut ()) as u64)?.encode(x)?;
+        Ok(self)
+    }
+
+    /// Encode any type that implements [`Encode`] and [`CborLen`] as a byte string where the value
+    /// of the byte string is the CBOR encoding of the value.
+    pub fn encode_as_cbor_with<C, T: Encode<C> + CborLen<C>>(&mut self, x: T, ctx: &mut C) -> Result<&mut Self, Error<W::Error>> {
+        self.type_len(BYTES, x.cbor_len(ctx) as u64)?.encode_with(x, ctx)?;
         Ok(self)
     }
 
