@@ -78,6 +78,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
+    let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
     let mut rows = Vec::new();
@@ -90,6 +91,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             syn::Fields::Unit => if index_only {
                 quote! {
                     #name::#con => { #idx.cbor_len(__ctx777) }
+                }
+            } else if flat {
+                quote! {
+                    #name::#con => { 1 + #idx.cbor_len(__ctx777) }
                 }
             } else {
                 quote! {
@@ -106,6 +111,9 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     Encoding::Map => quote! {
                         #name::#con{#(#idents,)* ..} => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
                     },
+                    Encoding::Array if flat => quote! {
+                        #name::#con{#(#idents,)* ..} => { #(#steps)* + #idx.cbor_len(__ctx777) }
+                    },
                     Encoding::Array => quote! {
                         #name::#con{#(#idents,)* ..} => { #(#steps)* + #tag + 1 + #idx.cbor_len(__ctx777) }
                     }
@@ -120,6 +128,9 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 match encoding {
                     Encoding::Map => quote! {
                         #name::#con(#(#idents,)*) => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
+                    },
+                    Encoding::Array if flat => quote! {
+                        #name::#con(#(#idents,)*) => { #(#steps)* + #idx.cbor_len(__ctx777) }
                     },
                     Encoding::Array => quote! {
                         #name::#con(#(#idents,)*) => { #(#steps)* + #tag + 1 + #idx.cbor_len(__ctx777) }
