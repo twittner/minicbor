@@ -1,7 +1,7 @@
 use crate::Mode;
 use crate::{add_bound_to_type_params, collect_type_params, is_option};
 use crate::{add_typeparam, gen_ctx_param};
-use crate::attrs::{Attributes, CustomCodec, Encoding, Kind, Level};
+use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
 use crate::fields::{Field, Fields};
 use crate::variants::Variants;
 use quote::{quote, ToTokens};
@@ -34,7 +34,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let name     = &inp.ident;
     let attrs    = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
     let encoding = attrs.encoding().unwrap_or_default();
-    let fields   = Fields::try_from(name.span(), data.fields.iter(), &attrs)?;
+    let fields   = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
 
     // Collect type parameters which should not have an `Encode` bound added,
     // i.e. from fields which have a custom encode function defined.
@@ -94,23 +94,19 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
     let flat          = enum_attrs.flat();
-    let variants      = Variants::try_from(name.span(), data.variants.iter())?;
+    let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
     let mut blacklist = HashSet::new();
     let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
 
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
-        let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &enum_attrs)?;
+        let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         // Collect type parameters which should not have an `Encode` bound added,
         // i.e. from fields which have a custom encode function defined.
         blacklist.extend(collect_type_params(&inp.generics, fields.fields().filter(|f| {
             f.attrs.codec().map(|c| c.is_encode()).unwrap_or(false)
         })));
-        if flat && attrs.tag().is_some() {
-            let span = attrs.span(Kind::Tag).expect("tag is some");
-            return Err(syn::Error::new(span, "`tag` and `flat` are mutually exclusive"))
-        };
         let con = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag = encode_tag(attrs);
@@ -284,10 +280,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                 }
                 let is_nil = is_nil(&field.typ, field.attrs.codec());
                 let n: u32 = field.index.val().try_into()
-                    .map_err(|_| {
-                        let msg = "array encoding does not support fields with negative indices";
-                        syn::Error::new(field.span(), msg)
-                    })?;
+                    .expect("index >= 0 (checked in `Fields::try_from`)");
                 let ident = &field.ident;
                 let expr =
                     if has_self {
@@ -432,10 +425,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     .unwrap_or_else(|| default_encode_fn.clone());
                 let tag = encode_tag(&field.attrs);
                 let idx: u32 = field.index.val().try_into()
-                    .map_err(|_| {
-                        let msg = "array encoding does not support fields with negative indices";
-                        syn::Error::new(field.span(), msg)
-                    })?;
+                    .expect("index >= 0 (checked in `Fields::try_from`)");
                 let gaps = if first {
                     first = false;
                     idx - k

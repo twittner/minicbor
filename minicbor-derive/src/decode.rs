@@ -34,7 +34,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     let name   = &inp.ident;
     let attrs  = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let fields = Fields::try_from(name.span(), data.fields.iter(), &attrs)?;
+    let fields = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
 
     let mut lifetime = gen_lifetime()?;
     for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, f.attrs.borrow(), &f.typ))) {
@@ -128,14 +128,14 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
     let flat          = enum_attrs.flat();
-    let variants      = Variants::try_from(name.span(), data.variants.iter())?;
+    let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
     let mut blacklist = HashSet::new();
     let mut field_attrs = Vec::new();
     let mut lifetime = gen_lifetime()?;
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
-        let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &enum_attrs)?;
+        let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let con = &var.ident;
         let tag = decode_tag(attrs);

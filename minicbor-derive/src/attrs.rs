@@ -117,9 +117,9 @@ impl Attributes {
                 return Err(syn::Error::new(*s, "`skip` does not allow other attributes"))
             }
         }
-        if let Some(Value::Flat(s)) = this.get(Kind::Flat) {
-            if let Some(Value::Encoding(Encoding::Map, _)) = this.get(Kind::Encoding) {
-                return Err(syn::Error::new(*s, "map encoding does not support `flat`"))
+        if let Some(Value::Flat(_)) = this.get(Kind::Flat) {
+            if let Some(Value::Encoding(Encoding::Map, s)) = this.get(Kind::Encoding) {
+                return Err(syn::Error::new(*s, "flat enum does not support map encoding"))
             }
         }
         Ok(this)
@@ -131,14 +131,14 @@ impl Attributes {
         // #[n(...)]
         if a.path().is_ident("n") {
             let idx = parse_i32_arg(a).map(Idx::N)?;
-            attrs.try_insert(Kind::Index, Value::Index(idx, a.span()))?;
+            attrs.try_insert(Kind::Index, Value::Index(idx, a.path().span()))?;
             return Ok(attrs)
         }
 
         // #[b(...)]
         if a.path().is_ident("b") {
             let idx = parse_i32_arg(a).map(Idx::B)?;
-            attrs.try_insert(Kind::Index, Value::Index(idx, a.span()))?;
+            attrs.try_insert(Kind::Index, Value::Index(idx, a.path().span()))?;
             return Ok(attrs)
         }
 
