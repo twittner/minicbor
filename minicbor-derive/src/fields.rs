@@ -42,12 +42,12 @@ impl Fields {
             let attrs = Attributes::try_from_iter(Level::Field, &f.attrs)?;
             let index = if attrs.skip() {
                 debug_assert!(attrs.index().is_none());
-                Idx::N(i32::MAX)
+                Idx::N(i64::MAX)
             } else if let Some(i) = attrs.index() {
                 debug_assert!(!attrs.skip());
                 i
             } else if parents.last().map(|p| p.transparent()).unwrap_or(false) {
-                Idx::N(i32::MAX)
+                Idx::N(i64::MAX)
             } else {
                 let s = f.ident.as_ref().map(|i| i.span()).unwrap_or_else(|| f.ty.span());
                 return Err(syn::Error::new(s, "missing `#[n(...)]` or `#[b(...)]` attribute"))

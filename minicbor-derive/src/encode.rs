@@ -114,21 +114,21 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             syn::Fields::Unit => match encoding {
                 Encoding::Array | Encoding::Map if index_only => quote! {
                     #name::#con => {
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         Ok(())
                     }
                 },
                 Encoding::Array if flat => quote! {
                     #name::#con => {
                         __e777.array(1)?;
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         Ok(())
                     }
                 },
                 Encoding::Array => quote! {
                     #name::#con => {
                         __e777.array(2)?;
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         #tag
                         __e777.array(0)?;
                         Ok(())
@@ -137,7 +137,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 Encoding::Map => quote! {
                     #name::#con => {
                         __e777.array(2)?;
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         #tag
                         __e777.map(0)?;
                         Ok(())
@@ -154,11 +154,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con{#(#idents,)* ..} => {
                         #tests
                         if let Some(__i777) = __max_index777 {
-                            __e777.array(u64::from(__i777) + 2)?; // max index + 1 + (1 for constructor index)
+                            __e777.array(__i777 + 2)?; // max index + 1 + (1 for constructor index)
                         } else {
                             __e777.array(1)?;
                         }
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         #statements
                     }
                 }
@@ -170,7 +170,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con{#(#idents,)* ..} => {
                         #tests
                         __e777.array(2)?;
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         #tag
                         #statements
                     }
@@ -186,11 +186,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con(#(#idents,)*) => {
                         #tests
                         if let Some(__i777) = __max_index777 {
-                            __e777.array(u64::from(__i777) + 2)?; // max index + 1 + (1 for constructor index)
+                            __e777.array(__i777 + 2)?; // max index + 1 + (1 for constructor index)
                         } else {
                             __e777.array(1)?;
                         }
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         #statements
                     }
                 }
@@ -203,7 +203,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con(#(#idents,)*) => {
                         #tests
                         __e777.array(2)?;
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         #tag
                         #statements
                     }
@@ -279,8 +279,8 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     continue
                 }
                 let is_nil = is_nil(&field.typ, field.attrs.codec());
-                let n: u32 = field.index.val().try_into()
-                    .expect("index >= 0 (checked in `Fields::try_from`)");
+                assert!(field.index.val() >= 0);
+                let n = field.index.val() as u64;
                 let ident = &field.ident;
                 let expr =
                     if has_self {
@@ -375,7 +375,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     // struct
                     (IS_NAME, HAS_SELF) => quote! {
                         if !#is_nil(&self.#ident) {
-                            __e777.i32(#idx)?;
+                            __e777.i64(#idx)?;
                             #tag
                             #encode_fn(&self.#ident, __e777, __ctx777)?
                         }
@@ -383,7 +383,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     // tuple struct
                     (IS_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
-                            __e777.i32(#idx)?;
+                            __e777.i64(#idx)?;
                             #tag
                             #encode_fn(#ident, __e777, __ctx777)?
                         }
@@ -393,7 +393,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                         let i = syn::Index::from(field.pos);
                         quote! {
                             if !#is_nil(&self.#i) {
-                                __e777.i32(#idx)?;
+                                __e777.i64(#idx)?;
                                 #tag
                                 #encode_fn(&self.#i, __e777, __ctx777)?
                             }
@@ -402,7 +402,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     // enum tuple
                     (NO_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
-                            __e777.i32(#idx)?;
+                            __e777.i64(#idx)?;
                             #tag
                             #encode_fn(#ident, __e777, __ctx777)?
                         }
@@ -424,13 +424,13 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     .and_then(|f| f.to_encode_path())
                     .unwrap_or_else(|| default_encode_fn.clone());
                 let tag = encode_tag(&field.attrs);
-                let idx: u32 = field.index.val().try_into()
-                    .expect("index >= 0 (checked in `Fields::try_from`)");
+                let idx = &field.index;
+                assert!(idx.val() >= 0);
                 let gaps = if first {
                     first = false;
-                    idx - k
+                    idx.val() - k
                 } else {
-                    idx - k - 1
+                    idx.val() - k - 1
                 };
                 let ident = &field.ident;
                 let statement =
@@ -507,7 +507,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                         }
                     };
                 statements.push(statement);
-                k = idx
+                k = idx.val()
             }
         }
     }
@@ -521,7 +521,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
     match encoding {
         Encoding::Array if flat => Ok((
             quote! {
-                let mut __max_index777: core::option::Option<u32> = None;
+                let mut __max_index777: core::option::Option<u64> = None;
 
                 #(#tests)*
             },
@@ -535,13 +535,13 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
         )),
         Encoding::Array => Ok((
             quote! {
-                let mut __max_index777: core::option::Option<u32> = None;
+                let mut __max_index777: core::option::Option<u64> = None;
 
                 #(#tests)*
             },
             quote! {
                 if let Some(__i777) = __max_index777 {
-                    __e777.array(u64::from(__i777) + 1)?;
+                    __e777.array(__i777 + 1)?;
                     #(#statements)*
                 } else {
                     __e777.array(0)?;

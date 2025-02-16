@@ -130,14 +130,14 @@ impl Attributes {
 
         // #[n(...)]
         if a.path().is_ident("n") {
-            let idx = parse_i32_arg(a).map(Idx::N)?;
+            let idx = parse_i64_arg(a).map(Idx::N)?;
             attrs.try_insert(Kind::Index, Value::Index(idx, a.path().span()))?;
             return Ok(attrs)
         }
 
         // #[b(...)]
         if a.path().is_ident("b") {
-            let idx = parse_i32_arg(a).map(Idx::B)?;
+            let idx = parse_i64_arg(a).map(Idx::B)?;
             attrs.try_insert(Kind::Index, Value::Index(idx, a.path().span()))?;
             return Ok(attrs)
         }
@@ -636,11 +636,11 @@ impl Value {
     }
 }
 
-fn parse_i32_arg(a: &syn::Attribute) -> syn::Result<i32> {
+fn parse_i64_arg(a: &syn::Attribute) -> syn::Result<i64> {
     parse_int(&a.parse_args()?)
 }
 
-fn parse_int(n: &syn::LitInt) -> syn::Result<i32> {
-    n.base10_parse().map_err(|_| syn::Error::new(n.span(), "expected `i32` value"))
+fn parse_int(n: &syn::LitInt) -> syn::Result<i64> {
+    n.base10_parse().map_err(|_| syn::Error::new(n.span(), "expected `i64` value"))
 }
 

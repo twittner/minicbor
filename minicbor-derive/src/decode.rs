@@ -243,7 +243,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #tag
                 #check
-                match __d777.i32()? {
+                match __d777.i64()? {
                     #(#rows)*
                     n => Err(minicbor::decode::Error::unknown_variant(n).at(__p778))
                 }
@@ -384,14 +384,14 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
 
             if let Some(__len777) = __d777.map()? {
                 for _ in 0 .. __len777 {
-                    match __d777.i32()? {
+                    match __d777.i64()? {
                         #(#indices => #actions)*
                         _          => __d777.skip()?
                     }
                 }
             } else {
                 while minicbor::data::Type::Break != __d777.datatype()? {
-                    match __d777.i32()? {
+                    match __d777.i64()? {
                         #(#indices => #actions)*
                         _          => __d777.skip()?
                     }
