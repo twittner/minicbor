@@ -15,7 +15,7 @@
 //!
 //! 1. The encoding does not contain any names, i.e. no field names, type names
 //!    or variant names. Instead, every field and every constructor needs to be
-//!    annotated with an (unsigned) index number, e.g. `#[n(1)]`.
+//!    annotated with an index number, e.g. `#[n(1)]`.
 //!
 //! 2. Unknown fields are ignored during decoding.[^1]
 //!
@@ -88,6 +88,7 @@
 //!
 //! - [`#[n(...)]` and `#[cbor(n(...))]`](#n-and-b-or-cborn-and-cborb)
 //! - [`#[b(...)]` and `#[cbor(b(...))]`](#n-and-b-or-cborn-and-cborb)
+//! - [`#[cbor(borrow)]`](#cborborrow)
 //! - [`#[cbor(array)]`](#cborarray)
 //! - [`#[cbor(map)]`](#cbormap)
 //! - [`#[cbor(index_only)]`](#cborindex_only)
@@ -109,16 +110,25 @@
 //! ## `#[n(...)]` and `#[b(...)]` (or `#[cbor(n(...))]` and `#[cbor(b(...))]`)
 //!
 //! Each field and variant needs to be annotated with an index number, which is
-//! used instead of the name. For the encoding it makes no difference which one
-//! to choose. For decoding, `b` indicates that the value borrows from the
-//! decoding input, whereas `n` produces non-borrowed values (but see section
-//! [Implicit borrowing](#implicit-borrowing) below). This means that if a type
-//! is annotated with `#[b(...)]`, all its lifetimes will be constrained to the
-//! input lifetime (`'bytes`). Further, if the type is a `Cow<'_, str>`,
-//! `Cow<'_, minicbor::bytes::ByteSlice>` or `Cow<'_, [u8]>` the generated code
-//! will decode the `str`, `ByteSlice` or `[u8]` and construct a `Cow::Borrowed`
-//! variant, contrary to the regular `Cow` impls of `Decode` and `DecodeBytes`
-//! which produce owned values.
+//! used instead of the name. `b` is a syntactic shorthand for writing
+//! `#[cbor(n(...), borrow)]` (see [`#[cbor(borrow)]`](#cborborrow) for details).
+//!
+//! ## `#[cbor(borrow)]`
+//!
+//! When attached to a field this attribute indicates that the value borrows from
+//! the decoding input. This means that if a field is annotated with `#[borrow(...)]`,
+//! all of its lifetimes will be constrained to the input lifetime (`'bytes`).
+//!
+//! Further, if the type is a `Cow<'_, str>`, `Cow<'_, minicbor::bytes::ByteSlice>`
+//! or `Cow<'_, [u8]>`, the generated code will decode the `str`, `ByteSlice` or
+//! `[u8]` and construct a `Cow::Borrowed` variant, contrary to the regular `Cow`
+//! impls of `Decode` and `DecodeBytes` which produce owned values.
+//!
+//! Note that some values implicitly borrow (see section
+//! [Implicit borrowing](#implicit-borrowing) below).
+//!
+//! `borrow` can also specify, which lifetimes should be constrained, e.g.
+//! `#[cbor(borrow = "'a + 'b")]`.
 //!
 //! ## `#[cbor(array)]`
 //!
@@ -143,6 +153,13 @@
 //! Enumerations which do not contain fields may have this attribute attached to
 //! them. This changes the encoding to encode only the variant index (cf. section
 //! [CBOR encoding](#cbor-encoding) for details).
+//!
+//! ## `#[cbor(flat)]`
+//!
+//! This attribute can be attached to enums. It provides a "shallow" encoding,
+//! in such a way that each variant is a encoded as a variable-sized array
+//! containing as its first element the index of the variant, and further elements
+//! correspond to the variant fields in order.
 //!
 //! ## `#[cbor(transparent)]`
 //!
@@ -408,7 +425,7 @@
 //!         item_0
 //!         item_1
 //!         ...
-//!         item_n
+//!         item_n-1
 //! ```
 //!
 //! ### Map encoding
@@ -423,25 +440,33 @@
 //!         `0` item_0
 //!         `1` item_1
 //!         ...
-//!          n  item_n
+//!         `n-1` item_n-1
 //! ```
 //!
 //! Optional fields whose value is `None` are not encoded.
 //!
 //! ## Enums
 //!
-//! Unless the [`#[cbor(index_only)]`](#cborindex_only) attribute is used for
-//! enums without any fields, each enum variant is encoded as a two-element
-//! array. The first element is the variant index and the second the actual
-//! variant value. Otherwise, if enums do not have fields and the `index_only`
-//! attribute is present, only the variant index is encoded:
+//! Unless [`#[cbor(index_only)]`](#cborindex_only) or [`#[cbor(flat)]`](#cborflat)
+//! are used, each enum variant is encoded as a two-element array. The first element
+//! is the variant index and the second the actual variant value.
+//!
+//! If enums do not have fields and the `index_only` attribute is present, only the
+//! variant index is encoded.
+//!
+//! If `flat` is used, an enum variant is encoded as an array with the variant index
+//! as its first element, followed directly by all variant fields (if any).
+//!
 //!
 //! ```text
 //! <<enum encoding>> =
 //!     | `array(2)` n <<struct-as-array encoding>> ; if #[cbor(array)]
 //!     | `array(2)` n <<struct-as-map encoding>>   ; if #[cbor(map)]
+//!     | `array(k)` n <<field encoding>>*          ; if #[cbor(flat)]
 //!     | n                                         ; if #[cbor(index_only)]
 //! ```
+//!
+//! Above, `k` is the number of variant fields plus one.
 //!
 //! ## Which encoding to use?
 //!

@@ -34,10 +34,10 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     let name   = &inp.ident;
     let attrs  = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let fields = Fields::try_from(name.span(), data.fields.iter())?;
+    let fields = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
 
     let mut lifetime = gen_lifetime()?;
-    for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, &f.typ))) {
+    for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, f.attrs.borrow(), &f.typ))) {
         if !lifetime.bounds.iter().any(|b| *b == l) {
             lifetime.bounds.push(l.clone())
         }
@@ -71,7 +71,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         return make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause)
     }
 
-    let statements = gen_statements(&fields, attrs.encoding().unwrap_or_default())?;
+    let statements = gen_statements(&fields, attrs.encoding().unwrap_or_default(), false)?;
 
     let result = if let syn::Fields::Named(_) = data.fields {
         let nils      = nils(fields.fields());
@@ -127,19 +127,20 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
-    let variants      = Variants::try_from(name.span(), data.variants.iter())?;
+    let flat          = enum_attrs.flat();
+    let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
     let mut blacklist = HashSet::new();
     let mut field_attrs = Vec::new();
     let mut lifetime = gen_lifetime()?;
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
-        let fields = Fields::try_from(var.ident.span(), var.fields.iter())?;
+        let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let con = &var.ident;
         let tag = decode_tag(attrs);
         let row = if let syn::Fields::Unit = var.fields {
-            if index_only {
+            if index_only | flat {
                 quote!(#idx => Ok(#name::#con),)
             } else {
                 quote!(#idx => {
@@ -149,7 +150,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 })
             }
         } else {
-            for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, &f.typ))) {
+            for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, f.attrs.borrow(), &f.typ))) {
                 if !lifetime.bounds.iter().any(|b| *b == l) {
                     lifetime.bounds.push(l.clone())
                 }
@@ -159,7 +160,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             blacklist.extend(collect_type_params(&inp.generics, fields.fields().filter(|f| {
                 f.attrs.codec().map(|c| c.is_decode()).unwrap_or(false)
             })));
-            let statements = gen_statements(&fields, encoding)?;
+            let statements = gen_statements(&fields, encoding, flat)?;
             if let syn::Fields::Named(_) = var.fields {
                 let nils      = nils(fields.fields());
                 let indices   = fields.fields().indices();
@@ -214,6 +215,17 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         quote! {
             let __p778 = __d777.position();
         }
+    } else if flat {
+        quote! {
+            let __p777 = __d777.position();
+            let Some(__len777) = __d777.array()? else {
+                return Err(minicbor::decode::Error::message("flat enum requires definite-length array").at(__p777))
+            };
+            if __len777 == 0 {
+                return Err(minicbor::decode::Error::message("flat enum requires non-empty array").at(__p777))
+            }
+            let __p778 = __d777.position();
+        }
     } else {
         quote! {
             let __p777 = __d777.position();
@@ -231,7 +243,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #tag
                 #check
-                match __d777.u32()? {
+                match __d777.i64()? {
                     #(#rows)*
                     n => Err(minicbor::decode::Error::unknown_variant(n).at(__p778))
                 }
@@ -258,7 +270,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 // [1]: These variables will later be deconstructed in `on_enum` and
 // `on_struct` and their inner value will be used to initialise a field.
 // If not present, an error will be produced.
-fn gen_statements(fields: &Fields, encoding: Encoding) -> syn::Result<proc_macro2::TokenStream> {
+fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Result<proc_macro2::TokenStream> {
     let default_decode_fn: syn::ExprPath = syn::parse_str("minicbor::Decode::decode")?;
 
     let actions = fields.fields().map(|field| {
@@ -296,7 +308,7 @@ fn gen_statements(fields: &Fields, encoding: Encoding) -> syn::Result<proc_macro
 
             let value =
                 if cfg!(any(feature = "alloc", feature = "std"))
-                    && field.index.is_b()
+                    && (field.attrs.borrow().is_some() || field.index.is_b())
                     && is_cow(&field.typ, |t| is_str(t) || is_byte_slice(t))
                 {
                     if cfg!(feature = "std") {
@@ -335,6 +347,16 @@ fn gen_statements(fields: &Fields, encoding: Encoding) -> syn::Result<proc_macro
     let indices = fields.fields().indices().collect::<Vec<_>>();
 
     Ok(match encoding {
+        Encoding::Array if flat => quote! {
+            #(let mut #idents : core::option::Option<#types> = #inits;)*
+
+            for __i777 in 0 .. __len777 - 1 {
+                match __i777 {
+                    #(#indices => #actions)*
+                    _          => __d777.skip()?
+                }
+            }
+        },
         Encoding::Array => quote! {
             #(let mut #idents : core::option::Option<#types> = #inits;)*
 
@@ -362,14 +384,14 @@ fn gen_statements(fields: &Fields, encoding: Encoding) -> syn::Result<proc_macro
 
             if let Some(__len777) = __d777.map()? {
                 for _ in 0 .. __len777 {
-                    match __d777.u32()? {
+                    match __d777.i64()? {
                         #(#indices => #actions)*
                         _          => __d777.skip()?
                     }
                 }
             } else {
                 while minicbor::data::Type::Break != __d777.datatype()? {
-                    match __d777.u32()? {
+                    match __d777.i64()? {
                         #(#indices => #actions)*
                         _          => __d777.skip()?
                     }
@@ -398,7 +420,7 @@ fn make_transparent_impl
 
     let call =
         if cfg!(any(feature = "alloc", feature = "std"))
-            && field.index.is_b()
+            && (field.attrs.borrow().is_some() || field.index.is_b())
             && is_cow(&field.typ, |t| is_str(t) || is_byte_slice(t))
         {
             let cow =

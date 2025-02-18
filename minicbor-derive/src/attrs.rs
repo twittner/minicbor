@@ -5,7 +5,7 @@ pub mod codec;
 pub mod encoding;
 pub mod idx;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, BTreeSet};
 use std::fmt;
 use std::hash::Hash;
 use std::iter;
@@ -23,7 +23,8 @@ pub use idx::Idx;
 pub struct Attributes(Level, HashMap<Kind, Value>);
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-enum Kind {
+pub enum Kind {
+    Borrow,
     Codec,
     Encoding,
     Index,
@@ -36,11 +37,13 @@ enum Kind {
     ContextBound,
     CborLen,
     Tag,
-    Skip
+    Skip,
+    Flat,
 }
 
 #[derive(Debug, Clone)]
 enum Value {
+    Borrow(BTreeSet<syn::Lifetime>, proc_macro2::Span),
     Codec(CustomCodec, proc_macro2::Span),
     Encoding(Encoding, proc_macro2::Span),
     Index(Idx, proc_macro2::Span),
@@ -53,7 +56,8 @@ enum Value {
     ContextBound(HashSet<syn::TraitBound>, proc_macro2::Span),
     CborLen(syn::ExprPath, proc_macro2::Span),
     Tag(u64, proc_macro2::Span),
-    Skip(proc_macro2::Span)
+    Skip(proc_macro2::Span),
+    Flat(proc_macro2::Span)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -113,6 +117,11 @@ impl Attributes {
                 return Err(syn::Error::new(*s, "`skip` does not allow other attributes"))
             }
         }
+        if let Some(Value::Flat(_)) = this.get(Kind::Flat) {
+            if let Some(Value::Encoding(Encoding::Map, s)) = this.get(Kind::Encoding) {
+                return Err(syn::Error::new(*s, "flat enum does not support map encoding"))
+            }
+        }
         Ok(this)
     }
 
@@ -121,15 +130,15 @@ impl Attributes {
 
         // #[n(...)]
         if a.path().is_ident("n") {
-            let idx = parse_u32_arg(a).map(Idx::N)?;
-            attrs.try_insert(Kind::Index, Value::Index(idx, a.span()))?;
+            let idx = parse_i64_arg(a).map(Idx::N)?;
+            attrs.try_insert(Kind::Index, Value::Index(idx, a.path().span()))?;
             return Ok(attrs)
         }
 
         // #[b(...)]
         if a.path().is_ident("b") {
-            let idx = parse_u32_arg(a).map(Idx::B)?;
-            attrs.try_insert(Kind::Index, Value::Index(idx, a.span()))?;
+            let idx = parse_i64_arg(a).map(Idx::B)?;
+            attrs.try_insert(Kind::Index, Value::Index(idx, a.path().span()))?;
             return Ok(attrs)
         }
 
@@ -167,6 +176,15 @@ impl Attributes {
                 let s: LitStr = meta.value()?.parse()?;
                 let c = CustomCodec::Module(s.parse()?, false);
                 attrs.try_insert(Kind::Codec, Value::Codec(c, meta.path.span()))?
+            } else if meta.path.is_ident("borrow") {
+                let mut l = BTreeSet::new();
+                if meta.input.peek(syn::Token!(=)) {
+                    let s: LitStr = meta.value()?.parse()?;
+                    for b in s.value().split('+').filter(|b| !b.is_empty()) {
+                        l.insert(syn::parse_str::<syn::Lifetime>(b.trim())?);
+                    }
+                }
+                attrs.try_insert(Kind::Borrow, Value::Borrow(l, meta.path.span()))?
             } else if meta.path.is_ident("encode_bound") {
                 let s: LitStr = meta.value()?.parse()?;
                 let t: syn::TypeParam = s.parse()?;
@@ -213,6 +231,8 @@ impl Attributes {
                 attrs.try_insert(Kind::Tag, Value::Tag(i, meta.path.span()))?
             } else if meta.path.is_ident("skip") {
                 attrs.try_insert(Kind::Skip, Value::Skip(meta.path.span()))?
+            } else if meta.path.is_ident("flat") {
+                attrs.try_insert(Kind::Flat, Value::Flat(meta.path.span()))?
             } else {
                 return Err(meta.error("unsupported attribute"))
             }
@@ -220,6 +240,14 @@ impl Attributes {
         })?;
 
         Ok(attrs)
+    }
+
+    pub fn span(&self, k: Kind) -> Option<proc_macro2::Span> {
+        self.get(k).map(|v| v.span())
+    }
+
+    pub fn borrow(&self) -> Option<&BTreeSet<syn::Lifetime>> {
+        self.get(Kind::Borrow).and_then(|v| v.borrow())
     }
 
     pub fn encoding(&self) -> Option<Encoding> {
@@ -262,6 +290,10 @@ impl Attributes {
         self.contains_key(Kind::Skip)
     }
 
+    pub fn flat(&self) -> bool {
+        self.contains_key(Kind::Flat)
+    }
+
     fn contains_key(&self, k: Kind) -> bool {
         self.1.contains_key(&k)
     }
@@ -286,6 +318,7 @@ impl Attributes {
                 | Kind::ContextBound
                 | Kind::Tag
                 => {}
+                | Kind::Borrow
                 | Kind::TypeParam
                 | Kind::Codec
                 | Kind::Index
@@ -295,6 +328,7 @@ impl Attributes {
                 | Kind::HasNil
                 | Kind::CborLen
                 | Kind::Skip
+                | Kind::Flat
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -302,6 +336,7 @@ impl Attributes {
             }
             Level::Field => match key {
                 | Kind::TypeParam
+                | Kind::Borrow
                 | Kind::Codec
                 | Kind::Index
                 | Kind::Nil
@@ -315,6 +350,7 @@ impl Attributes {
                 | Kind::IndexOnly
                 | Kind::Transparent
                 | Kind::ContextBound
+                | Kind::Flat
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -325,7 +361,9 @@ impl Attributes {
                 | Kind::IndexOnly
                 | Kind::ContextBound
                 | Kind::Tag
+                | Kind::Flat
                 => {}
+                | Kind::Borrow
                 | Kind::TypeParam
                 | Kind::Codec
                 | Kind::Index
@@ -345,6 +383,7 @@ impl Attributes {
                 | Kind::Index
                 | Kind::Tag
                 => {}
+                | Kind::Borrow
                 | Kind::TypeParam
                 | Kind::Codec
                 | Kind::IndexOnly
@@ -355,6 +394,7 @@ impl Attributes {
                 | Kind::ContextBound
                 | Kind::CborLen
                 | Kind::Skip
+                | Kind::Flat
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -491,6 +531,18 @@ impl Attributes {
                     }
                 }
             }
+            Value::Borrow(_, s) => {
+                if let Some(idx) = self.index() {
+                    if idx.is_b() {
+                        return Err(syn::Error::new(*s, "`borrow` and `b` are mutually exclusive"))
+                    }
+                }
+            }
+            Value::Index(idx, s) if idx.is_b() => {
+                if self.contains_key(Kind::Borrow) {
+                    return Err(syn::Error::new(*s, "`b` and `borrow` are mutually exclusive"))
+                }
+            }
             _ => {}
         }
         self.1.insert(key, val);
@@ -501,6 +553,7 @@ impl Attributes {
 impl Value {
     fn span(&self) -> proc_macro2::Span {
         match self {
+            Value::Borrow(_, s)       => *s,
             Value::TypeParam(_, s)    => *s,
             Value::Codec(_, s)        => *s,
             Value::Encoding(_, s)     => *s,
@@ -513,7 +566,16 @@ impl Value {
             Value::ContextBound(_, s) => *s,
             Value::CborLen(_, s)      => *s,
             Value::Tag(_, s)          => *s,
-            Value::Skip(s)            => *s
+            Value::Skip(s)            => *s,
+            Value::Flat(s)            => *s
+        }
+    }
+
+    fn borrow(&self) -> Option<&BTreeSet<syn::Lifetime>> {
+        if let Value::Borrow(l, _) = self {
+            Some(l)
+        } else {
+            None
         }
     }
 
@@ -574,11 +636,11 @@ impl Value {
     }
 }
 
-fn parse_u32_arg(a: &syn::Attribute) -> syn::Result<u32> {
+fn parse_i64_arg(a: &syn::Attribute) -> syn::Result<i64> {
     parse_int(&a.parse_args()?)
 }
 
-fn parse_int(n: &syn::LitInt) -> syn::Result<u32> {
-    n.base10_parse().map_err(|_| syn::Error::new(n.span(), "expected `u32` value"))
+fn parse_int(n: &syn::LitInt) -> syn::Result<i64> {
+    n.base10_parse().map_err(|_| syn::Error::new(n.span(), "expected `i64` value"))
 }
 

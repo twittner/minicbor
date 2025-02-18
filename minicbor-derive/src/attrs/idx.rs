@@ -6,14 +6,14 @@ use std::collections::HashSet;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Idx {
     /// A regular, non-borrowing index.
-    N(u32),
+    N(i64),
     /// An index which indicates that the value borrows from the decoding input.
-    B(u32)
+    B(i64)
 }
 
 impl ToTokens for Idx {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        tokens.append(proc_macro2::Literal::u32_unsuffixed(self.val()))
+        tokens.append(proc_macro2::Literal::i64_unsuffixed(self.val()))
     }
 }
 
@@ -24,11 +24,16 @@ impl Idx {
     }
 
     /// Get the numeric index value.
-    pub fn val(self) -> u32 {
+    pub fn val(self) -> i64 {
         match self {
             Idx::N(i) => i,
             Idx::B(i) => i
         }
+    }
+
+    /// Get value in bytewise lexicographic order.
+    pub fn bytewise_lexicographic(self) -> impl Ord {
+        (self.val() < 0, self.val().unsigned_abs())
     }
 }
 

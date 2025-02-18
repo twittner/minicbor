@@ -34,7 +34,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let name     = &inp.ident;
     let attrs    = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
     let encoding = attrs.encoding().unwrap_or_default();
-    let fields   = Fields::try_from(name.span(), data.fields.iter())?;
+    let fields   = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
 
     // Collect type parameters which should not have an `Encode` bound added,
     // i.e. from fields which have a custom encode function defined.
@@ -64,7 +64,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     }
 
     let tag = encode_tag(&attrs);
-    let statements = encode_fields(&fields, true, encoding)?;
+    let (tests, statements) = encode_fields(&fields, true, encoding, false)?;
 
     Ok(quote! {
         impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {
@@ -73,6 +73,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
                 __W777: minicbor::encode::Write
             {
                 #tag
+                #tests
                 #statements
             }
         }
@@ -92,13 +93,15 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
-    let variants      = Variants::try_from(name.span(), data.variants.iter())?;
+    let flat          = enum_attrs.flat();
+    let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
     let mut blacklist = HashSet::new();
     let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
+
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
-        let fields = Fields::try_from(var.ident.span(), var.fields.iter())?;
+        let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         // Collect type parameters which should not have an `Encode` bound added,
         // i.e. from fields which have a custom encode function defined.
         blacklist.extend(collect_type_params(&inp.generics, fields.fields().filter(|f| {
@@ -111,14 +114,21 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             syn::Fields::Unit => match encoding {
                 Encoding::Array | Encoding::Map if index_only => quote! {
                     #name::#con => {
-                        __e777.u32(#idx)?;
+                        __e777.i64(#idx)?;
+                        Ok(())
+                    }
+                },
+                Encoding::Array if flat => quote! {
+                    #name::#con => {
+                        __e777.array(1)?;
+                        __e777.i64(#idx)?;
                         Ok(())
                     }
                 },
                 Encoding::Array => quote! {
                     #name::#con => {
                         __e777.array(2)?;
-                        __e777.u32(#idx)?;
+                        __e777.i64(#idx)?;
                         #tag
                         __e777.array(0)?;
                         Ok(())
@@ -127,7 +137,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 Encoding::Map => quote! {
                     #name::#con => {
                         __e777.array(2)?;
-                        __e777.u32(#idx)?;
+                        __e777.i64(#idx)?;
                         #tag
                         __e777.map(0)?;
                         Ok(())
@@ -137,13 +147,30 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             syn::Fields::Named(f) if index_only => {
                 return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
             }
-            syn::Fields::Named(_) => {
-                let statements = encode_fields(&fields, false, encoding)?;
+            syn::Fields::Named(_) if flat => {
+                let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
                 let idents = fields.fields().idents();
                 quote! {
                     #name::#con{#(#idents,)* ..} => {
+                        #tests
+                        if let Some(__i777) = __max_index777 {
+                            __e777.array(__i777 + 2)?; // max index + 1 + (1 for constructor index)
+                        } else {
+                            __e777.array(1)?;
+                        }
+                        __e777.i64(#idx)?;
+                        #statements
+                    }
+                }
+            }
+            syn::Fields::Named(_) => {
+                let (tests, statements) = encode_fields(&fields, false, encoding, false)?;
+                let idents = fields.fields().idents();
+                quote! {
+                    #name::#con{#(#idents,)* ..} => {
+                        #tests
                         __e777.array(2)?;
-                        __e777.u32(#idx)?;
+                        __e777.i64(#idx)?;
                         #tag
                         #statements
                     }
@@ -152,13 +179,31 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             syn::Fields::Unnamed(f) if index_only => {
                 return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
             }
-            syn::Fields::Unnamed(_) => {
-                let statements = encode_fields(&fields, false, encoding)?;
+            syn::Fields::Unnamed(_) if flat => {
+                let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
                 let idents = fields.match_idents();
                 quote! {
                     #name::#con(#(#idents,)*) => {
+                        #tests
+                        if let Some(__i777) = __max_index777 {
+                            __e777.array(__i777 + 2)?; // max index + 1 + (1 for constructor index)
+                        } else {
+                            __e777.array(1)?;
+                        }
+                        __e777.i64(#idx)?;
+                        #statements
+                    }
+                }
+            }
+            syn::Fields::Unnamed(_) => {
+                let (tests, statements) = encode_fields(&fields, false, encoding, false)?;
+
+                let idents = fields.match_idents();
+                quote! {
+                    #name::#con(#(#idents,)*) => {
+                        #tests
                         __e777.array(2)?;
-                        __e777.u32(#idx)?;
+                        __e777.i64(#idx)?;
                         #tag
                         #statements
                     }
@@ -219,7 +264,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 /// depending on the encoding.
 ///
 /// NB: The `fields` parameter is assumed to be sorted by index.
-fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result<proc_macro2::TokenStream> {
+fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool) -> syn::Result<(proc_macro2::TokenStream, proc_macro2::TokenStream)> {
     let default_encode_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::encode")?;
 
     let mut tests = Vec::new();
@@ -234,7 +279,8 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                     continue
                 }
                 let is_nil = is_nil(&field.typ, field.attrs.codec());
-                let n = field.index.val();
+                assert!(field.index.val() >= 0);
+                let n = field.index.val() as u64;
                 let ident = &field.ident;
                 let expr =
                     if has_self {
@@ -329,7 +375,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                     // struct
                     (IS_NAME, HAS_SELF) => quote! {
                         if !#is_nil(&self.#ident) {
-                            __e777.u32(#idx)?;
+                            __e777.i64(#idx)?;
                             #tag
                             #encode_fn(&self.#ident, __e777, __ctx777)?
                         }
@@ -337,7 +383,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                     // tuple struct
                     (IS_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
-                            __e777.u32(#idx)?;
+                            __e777.i64(#idx)?;
                             #tag
                             #encode_fn(#ident, __e777, __ctx777)?
                         }
@@ -347,7 +393,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                         let i = syn::Index::from(field.pos);
                         quote! {
                             if !#is_nil(&self.#i) {
-                                __e777.u32(#idx)?;
+                                __e777.i64(#idx)?;
                                 #tag
                                 #encode_fn(&self.#i, __e777, __ctx777)?
                             }
@@ -356,7 +402,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                     // enum tuple
                     (NO_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
-                            __e777.u32(#idx)?;
+                            __e777.i64(#idx)?;
                             #tag
                             #encode_fn(#ident, __e777, __ctx777)?
                         }
@@ -379,6 +425,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
                     .unwrap_or_else(|| default_encode_fn.clone());
                 let tag = encode_tag(&field.attrs);
                 let idx = &field.index;
+                assert!(idx.val() >= 0);
                 let gaps = if first {
                     first = false;
                     idx.val() - k
@@ -472,31 +519,51 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Re
         })?;
 
     match encoding {
-        Encoding::Array => Ok(quote! {
-            let mut __max_index777: core::option::Option<u32> = None;
+        Encoding::Array if flat => Ok((
+            quote! {
+                let mut __max_index777: core::option::Option<u64> = None;
 
-            #(#tests)*
+                #(#tests)*
+            },
+            quote! {
+                if let Some(__i777) = __max_index777 {
+                    #(#statements)*
+                }
 
-            if let Some(__i777) = __max_index777 {
-                __e777.array(u64::from(__i777) + 1)?;
-                #(#statements)*
-            } else {
-                __e777.array(0)?;
+                Ok(())
             }
+        )),
+        Encoding::Array => Ok((
+            quote! {
+                let mut __max_index777: core::option::Option<u64> = None;
 
-            Ok(())
-        }),
-        Encoding::Map => Ok(quote! {
-            let mut __max_fields777 = #max_fields;
+                #(#tests)*
+            },
+            quote! {
+                if let Some(__i777) = __max_index777 {
+                    __e777.array(__i777 + 1)?;
+                    #(#statements)*
+                } else {
+                    __e777.array(0)?;
+                }
 
-            #(#tests)*
+                Ok(())
+            }
+        )),
+        Encoding::Map => Ok((
+            quote! {
+                let mut __max_fields777 = #max_fields;
 
-            __e777.map(u64::from(__max_fields777))?;
+                #(#tests)*
+            },
+            quote! {
+                __e777.map(u64::from(__max_fields777))?;
 
-            #(#statements)*
+                #(#statements)*
 
-            Ok(())
-        })
+                Ok(())
+            }
+        )),
     }
 }
 

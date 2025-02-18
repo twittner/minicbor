@@ -1,4 +1,4 @@
-use crate::attrs::{Attributes, Idx, Level};
+use crate::attrs::{Attributes, Idx, Kind, Level};
 use crate::attrs::idx;
 use proc_macro2::Span;
 use syn::{Ident, Type};
@@ -29,25 +29,35 @@ pub struct Field {
 }
 
 impl Fields {
-    pub fn try_from<'a, I>(span: Span, iter: I) -> syn::Result<Self>
+    pub fn try_from<'a, I>(span: Span, iter: I, parents: &[&Attributes]) -> syn::Result<Self>
     where
         I: IntoIterator<Item = &'a syn::Field>
     {
         let mut fields  = Vec::new();
         let mut skipped = Vec::new();
 
+        let encoding = parents.iter().find_map(|p| p.encoding()).unwrap_or_default();
+
         for (pos, f) in iter.into_iter().enumerate() {
             let attrs = Attributes::try_from_iter(Level::Field, &f.attrs)?;
             let index = if attrs.skip() {
                 debug_assert!(attrs.index().is_none());
-                Idx::N(u32::MAX)
+                Idx::N(i64::MAX)
             } else if let Some(i) = attrs.index() {
                 debug_assert!(!attrs.skip());
                 i
+            } else if parents.last().map(|p| p.transparent()).unwrap_or(false) {
+                Idx::N(i64::MAX)
             } else {
                 let s = f.ident.as_ref().map(|i| i.span()).unwrap_or_else(|| f.ty.span());
                 return Err(syn::Error::new(s, "missing `#[n(...)]` or `#[b(...)]` attribute"))
             };
+            if index.val().is_negative() && encoding.is_array() {
+                let s = attrs.span(Kind::Index)
+                    .or_else(|| f.ident.as_ref().map(|i| i.span()))
+                    .unwrap_or_else(|| f.ty.span());
+                return Err(syn::Error::new(s, "array encoding does not support fields with negative indices"))
+            }
             let (ident, is_name) = match &f.ident {
                 Some(n) => (n.clone(), true),
                 None    => (quote::format_ident!("_{}", pos), false)
@@ -63,7 +73,7 @@ impl Fields {
             }
         }
 
-        fields.sort_unstable_by_key(|f| f.index.val());
+        fields.sort_unstable_by_key(|f| f.index.bytewise_lexicographic());
         idx::check_uniq(span, fields.iter().map(|f| f.index))?;
 
         Ok(Fields { fields, skipped })

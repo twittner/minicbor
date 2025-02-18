@@ -64,49 +64,51 @@ fn encode_as_map() {
     struct T {
         #[n(0)] a: Option<u8>,
         #[n(2)] b: Option<u8>,
-        #[n(5)] c: Option<u8>
+        #[n(5)] c: Option<u8>,
+        #[n(-1)] d: Option<u8>,
+        #[n(-100)] e: Option<u8>
     }
 
     // empty value => empty map
-    let v = T { a: None, b: None, c: None };
+    let v = T { a: None, b: None, c: None, d: None, e: None };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa0][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // empty suffix is not encoded
-    let v = T { a: Some(1), b: None, c: None };
+    let v = T { a: Some(1), b: None, c: None, d: None, e: None };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa1, 0, 1][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
-    let v = T { a: Some(1), b: Some(2), c: None };
+    let v = T { a: Some(1), b: Some(2), c: None, d: None, e: None };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa2, 0, 1, 2, 2][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
-    let v = T { a: Some(1), b: Some(2), c: Some(3) };
+    let v = T { a: Some(1), b: Some(2), c: Some(3), d: Some(4), e: Some(5) };
 
     let bytes = minicbor::to_vec(&v).unwrap();
-    assert_eq!(&[0xa3, 0, 1, 2, 2, 5, 3][..], &bytes[..]);
+    assert_eq!(&[0xa5, 0, 1, 2, 2, 5, 3, 32, 4, 56, 99, 5][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
-    let v = T { a: Some(1), b: None, c: Some(3) };
+    let v = T { a: Some(1), b: None, c: Some(3), d: Some(4), e: Some(5) };
 
     let bytes = minicbor::to_vec(&v).unwrap();
-    assert_eq!(&[0xa2, 0, 1, 5, 3][..], &bytes[..]);
+    assert_eq!(&[0xa4, 0, 1, 5, 3, 32, 4, 56, 99, 5][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
-    let v = T { a: None, b: None, c: Some(3) };
+    let v = T { a: None, b: None, c: Some(3), d: Some(4), e: Some(5) };
 
     let bytes = minicbor::to_vec(&v).unwrap();
-    assert_eq!(&[0xa1, 5, 3][..], &bytes[..]);
+    assert_eq!(&[0xa3, 5, 3, 32, 4, 56, 99, 5][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap())
 }
 
@@ -251,6 +253,65 @@ fn regular_enum() {
     d.skip().unwrap();
     assert_eq!(E::B, d.probe().decode().unwrap());
     assert_eq!(Some(2), d.probe().array().unwrap());
+    d.skip().unwrap();
+    assert_eq!(32u8, d.probe().decode().unwrap());
+    d.skip().unwrap();
+    assert_eq!("foo", d.probe().str().unwrap());
+    d.skip().unwrap();
+    assert!(d.skip().unwrap_err().is_end_of_input())
+}
+
+#[test]
+fn flat_enum() {
+    #[derive(Debug, Encode, Decode, PartialEq, Eq)]
+    #[cbor(map)]
+    struct S {
+        #[n(0)] x: bool,
+        #[n(1)] y: bool
+    }
+
+    #[derive(Debug, Encode, Decode, PartialEq, Eq)]
+    #[cbor(flat)]
+    enum E {
+        #[n(0)] A,
+        #[n(1)] B,
+        #[n(2)] C {
+            #[n(0)] x: bool,
+            #[n(1)] y: bool
+        },
+        #[n(3)] D(#[n(0)] S)
+    }
+
+    let bytes = minicbor::to_vec(E::A).unwrap();
+    assert_eq!(&[0x81, 0][..], &bytes[..]);
+    assert_eq!(E::A, minicbor::decode(&bytes).unwrap());
+
+    let bytes = minicbor::to_vec(E::B).unwrap();
+    assert_eq!(&[0x81, 1][..], &bytes[..]);
+    assert_eq!(E::B, minicbor::decode(&bytes).unwrap());
+
+    let bytes = minicbor::to_vec(E::C { x: true, y: false }).unwrap();
+    assert_eq!(&[0x83, 2, 0xF5, 0xF4][..], &bytes[..]);
+    assert_eq!(E::C { x: true, y: false }, minicbor::decode(&bytes).unwrap());
+
+    let bytes = minicbor::to_vec(E::D(S { x: true, y: false })).unwrap();
+    assert_eq!(&[0x82, 3, 0xA2, 0, 0xF5, 1, 0xF4][..], &bytes[..]);
+    assert_eq!(E::D(S { x: true, y: false }), minicbor::decode(&bytes).unwrap());
+
+    let mut e = minicbor::Encoder::new(Vec::new());
+    e.array(4).unwrap()
+        .encode(E::A).unwrap()
+        .encode(E::B).unwrap()
+        .encode(32u8).unwrap()
+        .encode("foo").unwrap();
+
+    let mut d = minicbor::Decoder::new(e.writer());
+    assert_eq!(Some(4), d.array().unwrap());
+    assert_eq!(E::A, d.probe().decode().unwrap());
+    assert_eq!(Some(1), d.probe().array().unwrap());
+    d.skip().unwrap();
+    assert_eq!(E::B, d.probe().decode().unwrap());
+    assert_eq!(Some(1), d.probe().array().unwrap());
     d.skip().unwrap();
     assert_eq!(32u8, d.probe().decode().unwrap());
     d.skip().unwrap();

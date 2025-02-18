@@ -7,6 +7,10 @@
 
 # minicbor
 
+## `0.26.0`
+
+- Depends on `minicbor-derive-0.16.0`.
+
 ## `0.25.1`
 
 - Update documentation.
@@ -349,6 +353,23 @@
 
 # minicbor-derive
 
+## `0.16.0`
+
+- Indices of fields and constructors can now also be negative when map encoding is used. Note
+  that previous versions would always error when encontering a negative index value (e.g. for an
+  enum variant). This version will decode the numeric index successfully but errors just like with
+  any other unexpected index. Further details can be found in the respective GitHub issue
+  [#8](https://github.com/twittner/minicbor/issues/8) and original pull request
+  [#9](https://github.com/twittner/minicbor/pull/9) by @chrysn.
+- A new attribute `flat` has been added that can be attached to enums and changes the encoding
+  of enum variants to inline the fields. The attribute is only available for array encodings.
+  See the documentation and pull request [#12](https://github.com/twittner/minicbor/pull/12) by
+  @sterraf for details.
+- A new attribute `borrow` has been added. It is similar to the one found in serde. As a
+  consequence, the existing attribute `b` can now be thought of as an alias for `#[cbor(n(...),
+  borrow)]`. See the documentation and pull request
+  [#15](https://github.com/twittner/minicbor/pull/15) for details.
+
 ## `0.15.3`
 
 - Update documentation.
@@ -474,6 +495,10 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.21.0`
+
+- Require `minicbor-0.26.0`.
 
 ## `0.20.1`
 
@@ -608,6 +633,10 @@
 - Initial release which provides some I/O utilities.
 
 # minicbor-serde
+
+## `0.4.0`
+
+- Requires `minicbor-0.26.0`.
 
 ## `0.3.2`
 
