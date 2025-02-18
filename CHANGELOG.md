@@ -7,9 +7,9 @@
 
 # minicbor
 
-## `NEXT`
+## `0.26.0`
 
-- Depends on `minicbor-derive-NEXT`.
+- Depends on `minicbor-derive-0.16.0`.
 
 ## `0.25.1`
 
@@ -353,7 +353,7 @@
 
 # minicbor-derive
 
-## `NEXT`
+## `0.16.0`
 
 - Indices of fields and constructors can now also be negative when map encoding is used. Note
   that previous versions would always error when encontering a negative index value (e.g. for an
@@ -496,9 +496,9 @@
 
 # minicbor-io
 
-## `NEXT`
+## `0.21.0`
 
-- Require `minicbor-NEXT`.
+- Require `minicbor-0.26.0`.
 
 ## `0.20.1`
 
@@ -633,6 +633,10 @@
 - Initial release which provides some I/O utilities.
 
 # minicbor-serde
+
+## `0.4.0`
+
+- Requires `minicbor-0.26.0`.
 
 ## `0.3.2`
 
