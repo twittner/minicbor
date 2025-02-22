@@ -28,7 +28,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     let name   = &inp.ident;
     let attrs  = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let fields = Fields::try_from(name.span(), data.fields.iter(), &attrs)?;
+    let fields = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
 
     let cbor_len_bound = gen_cbor_len_bound()?;
     let encode_bound   = gen_encode_bound()?;
@@ -78,11 +78,12 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
-    let variants      = Variants::try_from(name.span(), data.variants.iter())?;
+    let flat          = enum_attrs.flat();
+    let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
-        let fields   = Fields::try_from(var.ident.span(), var.fields.iter(), &enum_attrs)?;
+        let fields   = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         let con      = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag      = on_tag(attrs);
@@ -90,6 +91,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             syn::Fields::Unit => if index_only {
                 quote! {
                     #name::#con => { #idx.cbor_len(__ctx777) }
+                }
+            } else if flat {
+                quote! {
+                    #name::#con => { 1 + #idx.cbor_len(__ctx777) }
                 }
             } else {
                 quote! {
@@ -106,6 +111,9 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     Encoding::Map => quote! {
                         #name::#con{#(#idents,)* ..} => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
                     },
+                    Encoding::Array if flat => quote! {
+                        #name::#con{#(#idents,)* ..} => { #(#steps)* + #idx.cbor_len(__ctx777) }
+                    },
                     Encoding::Array => quote! {
                         #name::#con{#(#idents,)* ..} => { #(#steps)* + #tag + 1 + #idx.cbor_len(__ctx777) }
                     }
@@ -120,6 +128,9 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 match encoding {
                     Encoding::Map => quote! {
                         #name::#con(#(#idents,)*) => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
+                    },
+                    Encoding::Array if flat => quote! {
+                        #name::#con(#(#idents,)*) => { #(#steps)* + #idx.cbor_len(__ctx777) }
                     },
                     Encoding::Array => quote! {
                         #name::#con(#(#idents,)*) => { #(#steps)* + #tag + 1 + #idx.cbor_len(__ctx777) }
@@ -222,15 +233,9 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                 if field.attrs.skip() {
                     continue
                 }
-                let n: usize = field.index.val().try_into()
-                    .map_err(|_| {
-                        if field.index.val().is_negative() {
-                            let msg = "array encoding does not support fields with negative indices";
-                            syn::Error::new(field.span(), msg)
-                        } else {
-                            syn::Error::new(field.span(), "index does not fit into usize")
-                        }
-                    })?;
+                let n: usize = field.index.val()
+                    .try_into()
+                    .map_err(|_| syn::Error::new(field.orig.span(), "index does not fit into usize"))?;
                 let cbor_len = cbor_len(field.attrs.cbor_len(), field.attrs.codec());
                 let is_nil   = is_nil(&field.typ, field.attrs.codec());
                 let ident    = &field.ident;

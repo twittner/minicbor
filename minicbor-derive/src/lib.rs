@@ -88,6 +88,7 @@
 //!
 //! - [`#[n(...)]` and `#[cbor(n(...))]`](#n-and-b-or-cborn-and-cborb)
 //! - [`#[b(...)]` and `#[cbor(b(...))]`](#n-and-b-or-cborn-and-cborb)
+//! - [`#[cbor(borrow)]`](#cborborrow)
 //! - [`#[cbor(array)]`](#cborarray)
 //! - [`#[cbor(map)]`](#cbormap)
 //! - [`#[cbor(index_only)]`](#cborindex_only)
@@ -109,16 +110,25 @@
 //! ## `#[n(...)]` and `#[b(...)]` (or `#[cbor(n(...))]` and `#[cbor(b(...))]`)
 //!
 //! Each field and variant needs to be annotated with an index number, which is
-//! used instead of the name. For the encoding it makes no difference which one
-//! to choose. For decoding, `b` indicates that the value borrows from the
-//! decoding input, whereas `n` produces non-borrowed values (but see section
-//! [Implicit borrowing](#implicit-borrowing) below). This means that if a type
-//! is annotated with `#[b(...)]`, all its lifetimes will be constrained to the
-//! input lifetime (`'bytes`). Further, if the type is a `Cow<'_, str>`,
-//! `Cow<'_, minicbor::bytes::ByteSlice>` or `Cow<'_, [u8]>` the generated code
-//! will decode the `str`, `ByteSlice` or `[u8]` and construct a `Cow::Borrowed`
-//! variant, contrary to the regular `Cow` impls of `Decode` and `DecodeBytes`
-//! which produce owned values.
+//! used instead of the name. `b` is a syntactic shorthand for writing
+//! `#[cbor(n(...), borrow)]` (see [`#[cbor(borrow)]`](#cborborrow) for details).
+//!
+//! ## `#[cbor(borrow)]`
+//!
+//! When attached to a field this attribute indicates that the value borrows from
+//! the decoding input. This means that if a field is annotated with `#[borrow(...)]`,
+//! all of its lifetimes will be constrained to the input lifetime (`'bytes`).
+//!
+//! Further, if the type is a `Cow<'_, str>`, `Cow<'_, minicbor::bytes::ByteSlice>`
+//! or `Cow<'_, [u8]>`, the generated code will decode the `str`, `ByteSlice` or
+//! `[u8]` and construct a `Cow::Borrowed` variant, contrary to the regular `Cow`
+//! impls of `Decode` and `DecodeBytes` which produce owned values.
+//!
+//! Note that some values implicitly borrow (see section
+//! [Implicit borrowing](#implicit-borrowing) below).
+//!
+//! `borrow` can also specify, which lifetimes should be constrained, e.g.
+//! `#[cbor(borrow = "'a + 'b")]`.
 //!
 //! ## `#[cbor(array)]`
 //!

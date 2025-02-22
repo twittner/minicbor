@@ -88,7 +88,7 @@ impl Error {
 
     /// An unknown enum variant (denoted by the given index) was encountered.
     #[doc(hidden)]
-    pub fn unknown_variant(idx: i32) -> Self {
+    pub fn unknown_variant(idx: i64) -> Self {
         Error {
             err: ErrorImpl::UnknownVariant(idx),
             pos: None,
@@ -98,7 +98,7 @@ impl Error {
 
     /// A value, expected at the given index, was missing.
     #[doc(hidden)]
-    pub fn missing_value(idx: i32) -> Self {
+    pub fn missing_value(idx: i64) -> Self {
         Error {
             err: ErrorImpl::MissingValue(idx),
             pos: None,
@@ -211,9 +211,9 @@ enum ErrorImpl {
     /// An unexpected tag was encountered.
     TagMismatch(Tag),
     /// An unknown enum variant was encountered.
-    UnknownVariant(i32),
+    UnknownVariant(i64),
     /// A value was missing at the specified index.
-    MissingValue(i32),
+    MissingValue(i64),
     /// Generic error message.
     Message,
     /// Custom error.

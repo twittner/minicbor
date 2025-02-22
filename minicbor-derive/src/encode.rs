@@ -1,7 +1,7 @@
 use crate::Mode;
 use crate::{add_bound_to_type_params, collect_type_params, is_option};
 use crate::{add_typeparam, gen_ctx_param};
-use crate::attrs::{Attributes, CustomCodec, Encoding, Kind, Level};
+use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
 use crate::fields::{Field, Fields};
 use crate::variants::Variants;
 use quote::{quote, ToTokens};
@@ -34,7 +34,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let name     = &inp.ident;
     let attrs    = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
     let encoding = attrs.encoding().unwrap_or_default();
-    let fields   = Fields::try_from(name.span(), data.fields.iter(), &attrs)?;
+    let fields   = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
 
     // Collect type parameters which should not have an `Encode` bound added,
     // i.e. from fields which have a custom encode function defined.
@@ -94,23 +94,19 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
     let flat          = enum_attrs.flat();
-    let variants      = Variants::try_from(name.span(), data.variants.iter())?;
+    let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
     let mut blacklist = HashSet::new();
     let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
 
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
-        let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &enum_attrs)?;
+        let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         // Collect type parameters which should not have an `Encode` bound added,
         // i.e. from fields which have a custom encode function defined.
         blacklist.extend(collect_type_params(&inp.generics, fields.fields().filter(|f| {
             f.attrs.codec().map(|c| c.is_encode()).unwrap_or(false)
         })));
-        if flat && attrs.tag().is_some() {
-            let span = attrs.span(Kind::Tag).expect("tag is some");
-            return Err(syn::Error::new(span, "`tag` and `flat` are mutually exclusive"))
-        };
         let con = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag = encode_tag(attrs);
@@ -118,21 +114,21 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             syn::Fields::Unit => match encoding {
                 Encoding::Array | Encoding::Map if index_only => quote! {
                     #name::#con => {
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         Ok(())
                     }
                 },
                 Encoding::Array if flat => quote! {
                     #name::#con => {
                         __e777.array(1)?;
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         Ok(())
                     }
                 },
                 Encoding::Array => quote! {
                     #name::#con => {
                         __e777.array(2)?;
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         #tag
                         __e777.array(0)?;
                         Ok(())
@@ -141,7 +137,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 Encoding::Map => quote! {
                     #name::#con => {
                         __e777.array(2)?;
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         #tag
                         __e777.map(0)?;
                         Ok(())
@@ -158,11 +154,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con{#(#idents,)* ..} => {
                         #tests
                         if let Some(__i777) = __max_index777 {
-                            __e777.array(u64::from(__i777) + 2)?; // max index + 1 + (1 for constructor index)
+                            __e777.array(__i777 + 2)?; // max index + 1 + (1 for constructor index)
                         } else {
                             __e777.array(1)?;
                         }
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         #statements
                     }
                 }
@@ -174,7 +170,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con{#(#idents,)* ..} => {
                         #tests
                         __e777.array(2)?;
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         #tag
                         #statements
                     }
@@ -190,11 +186,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con(#(#idents,)*) => {
                         #tests
                         if let Some(__i777) = __max_index777 {
-                            __e777.array(u64::from(__i777) + 2)?; // max index + 1 + (1 for constructor index)
+                            __e777.array(__i777 + 2)?; // max index + 1 + (1 for constructor index)
                         } else {
                             __e777.array(1)?;
                         }
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         #statements
                     }
                 }
@@ -207,7 +203,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con(#(#idents,)*) => {
                         #tests
                         __e777.array(2)?;
-                        __e777.i32(#idx)?;
+                        __e777.i64(#idx)?;
                         #tag
                         #statements
                     }
@@ -283,11 +279,8 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     continue
                 }
                 let is_nil = is_nil(&field.typ, field.attrs.codec());
-                let n: u32 = field.index.val().try_into()
-                    .map_err(|_| {
-                        let msg = "array encoding does not support fields with negative indices";
-                        syn::Error::new(field.span(), msg)
-                    })?;
+                assert!(field.index.val() >= 0);
+                let n = field.index.val() as u64;
                 let ident = &field.ident;
                 let expr =
                     if has_self {
@@ -382,7 +375,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     // struct
                     (IS_NAME, HAS_SELF) => quote! {
                         if !#is_nil(&self.#ident) {
-                            __e777.i32(#idx)?;
+                            __e777.i64(#idx)?;
                             #tag
                             #encode_fn(&self.#ident, __e777, __ctx777)?
                         }
@@ -390,7 +383,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     // tuple struct
                     (IS_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
-                            __e777.i32(#idx)?;
+                            __e777.i64(#idx)?;
                             #tag
                             #encode_fn(#ident, __e777, __ctx777)?
                         }
@@ -400,7 +393,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                         let i = syn::Index::from(field.pos);
                         quote! {
                             if !#is_nil(&self.#i) {
-                                __e777.i32(#idx)?;
+                                __e777.i64(#idx)?;
                                 #tag
                                 #encode_fn(&self.#i, __e777, __ctx777)?
                             }
@@ -409,7 +402,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     // enum tuple
                     (NO_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
-                            __e777.i32(#idx)?;
+                            __e777.i64(#idx)?;
                             #tag
                             #encode_fn(#ident, __e777, __ctx777)?
                         }
@@ -431,16 +424,13 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     .and_then(|f| f.to_encode_path())
                     .unwrap_or_else(|| default_encode_fn.clone());
                 let tag = encode_tag(&field.attrs);
-                let idx: u32 = field.index.val().try_into()
-                    .map_err(|_| {
-                        let msg = "array encoding does not support fields with negative indices";
-                        syn::Error::new(field.span(), msg)
-                    })?;
+                let idx = &field.index;
+                assert!(idx.val() >= 0);
                 let gaps = if first {
                     first = false;
-                    idx - k
+                    idx.val() - k
                 } else {
-                    idx - k - 1
+                    idx.val() - k - 1
                 };
                 let ident = &field.ident;
                 let statement =
@@ -517,7 +507,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                         }
                     };
                 statements.push(statement);
-                k = idx
+                k = idx.val()
             }
         }
     }
@@ -531,7 +521,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
     match encoding {
         Encoding::Array if flat => Ok((
             quote! {
-                let mut __max_index777: core::option::Option<u32> = None;
+                let mut __max_index777: core::option::Option<u64> = None;
 
                 #(#tests)*
             },
@@ -545,13 +535,13 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
         )),
         Encoding::Array => Ok((
             quote! {
-                let mut __max_index777: core::option::Option<u32> = None;
+                let mut __max_index777: core::option::Option<u64> = None;
 
                 #(#tests)*
             },
             quote! {
                 if let Some(__i777) = __max_index777 {
-                    __e777.array(u64::from(__i777) + 1)?;
+                    __e777.array(__i777 + 1)?;
                     #(#statements)*
                 } else {
                     __e777.array(0)?;

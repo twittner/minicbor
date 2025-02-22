@@ -34,7 +34,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     let name   = &inp.ident;
     let attrs  = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let fields = Fields::try_from(name.span(), data.fields.iter(), &attrs)?;
+    let fields = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
 
     let mut lifetime = gen_lifetime()?;
     for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, f.attrs.borrow(), &f.typ))) {
@@ -128,14 +128,14 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
     let flat          = enum_attrs.flat();
-    let variants      = Variants::try_from(name.span(), data.variants.iter())?;
+    let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
     let mut blacklist = HashSet::new();
     let mut field_attrs = Vec::new();
     let mut lifetime = gen_lifetime()?;
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
-        let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &enum_attrs)?;
+        let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let con = &var.ident;
         let tag = decode_tag(attrs);
@@ -243,7 +243,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #tag
                 #check
-                match __d777.i32()? {
+                match __d777.i64()? {
                     #(#rows)*
                     n => Err(minicbor::decode::Error::unknown_variant(n).at(__p778))
                 }
@@ -384,14 +384,14 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
 
             if let Some(__len777) = __d777.map()? {
                 for _ in 0 .. __len777 {
-                    match __d777.i32()? {
+                    match __d777.i64()? {
                         #(#indices => #actions)*
                         _          => __d777.skip()?
                     }
                 }
             } else {
                 while minicbor::data::Type::Break != __d777.datatype()? {
-                    match __d777.i32()? {
+                    match __d777.i64()? {
                         #(#indices => #actions)*
                         _          => __d777.skip()?
                     }
