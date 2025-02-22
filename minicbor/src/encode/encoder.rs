@@ -41,20 +41,6 @@ impl<W: Write> Encoder<W> {
         Ok(self)
     }
 
-    /// Encode any type that implements [`Encode`] and [`CborLen`] as a byte string where the value
-    /// of the byte string is the CBOR encoding of the value.
-    pub fn encode_as_cbor<T: Encode<()> + CborLen<()>>(&mut self, x: T) -> Result<&mut Self, Error<W::Error>> {
-        self.type_len(BYTES, x.cbor_len(&mut ()) as u64)?.encode(x)?;
-        Ok(self)
-    }
-
-    /// Encode any type that implements [`Encode`] and [`CborLen`] as a byte string where the value
-    /// of the byte string is the CBOR encoding of the value.
-    pub fn encode_as_cbor_with<C, T: Encode<C> + CborLen<C>>(&mut self, x: T, ctx: &mut C) -> Result<&mut Self, Error<W::Error>> {
-        self.type_len(BYTES, x.cbor_len(ctx) as u64)?.encode_with(x, ctx)?;
-        Ok(self)
-    }
-
     /// Encode a `u8` value.
     pub fn u8(&mut self, x: u8) -> Result<&mut Self, Error<W::Error>> {
         if let 0 ..= 0x17 = x {
@@ -259,6 +245,14 @@ impl<W: Write> Encoder<W> {
     /// Use [`Encoder::end`] to terminate.
     pub fn begin_bytes(&mut self) -> Result<&mut Self, Error<W::Error>> {
         self.put(&[0x5f])
+    }
+
+    /// Begin encoding a string of `len` bytes.
+    ///
+    /// In contrast to [`Encoder::bytes`] which also encodes a byte string, this
+    /// method writes only the CBOR item head.
+    pub fn bytes_len(&mut self, len: u64) -> Result<&mut Self, Error<W::Error>> {
+        self.type_len(BYTES, len)
     }
 
     /// Begin encoding a map of unknown size.
