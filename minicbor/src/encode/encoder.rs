@@ -2,8 +2,6 @@ use crate::{SIGNED, BYTES, TEXT, ARRAY, MAP, TAGGED, SIMPLE};
 use crate::data::{Int, Tag};
 use crate::encode::{Encode, Error, Write};
 
-use super::CborLen;
-
 /// A non-allocating CBOR encoder writing encoded bytes to the given [`Write`] sink.
 #[derive(Debug, Clone)]
 pub struct Encoder<W> { writer: W }
