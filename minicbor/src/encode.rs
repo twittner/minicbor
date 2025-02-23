@@ -600,7 +600,7 @@ encode_nonzero! {
     core::num::NonZeroI64
 }
 
-#[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
+#[cfg(any(target_pointer_width = "16", target_pointer_width = "32", target_pointer_width = "64"))]
 encode_nonzero! {
     core::num::NonZeroUsize
     core::num::NonZeroIsize
