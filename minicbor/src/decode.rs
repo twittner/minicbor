@@ -252,6 +252,13 @@ impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::num::Wrapping<T> {
     }
 }
 
+#[cfg(target_pointer_width = "16")]
+impl<'b, C> Decode<'b, C> for usize {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
+        d.u16().map(|n| n as usize)
+    }
+}
+
 #[cfg(target_pointer_width = "32")]
 impl<'b, C> Decode<'b, C> for usize {
     fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
@@ -263,6 +270,13 @@ impl<'b, C> Decode<'b, C> for usize {
 impl<'b, C> Decode<'b, C> for usize {
     fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         d.u64().map(|n| n as usize)
+    }
+}
+
+#[cfg(target_pointer_width = "16")]
+impl<'b, C> Decode<'b, C> for isize {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
+        d.i16().map(|n| n as isize)
     }
 }
 
@@ -345,7 +359,7 @@ decode_nonzero! {
     core::num::NonZeroI64, "unexpected 0 when decoding a `NonZeroI64`"
 }
 
-#[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
+#[cfg(any(target_pointer_width = "16", target_pointer_width = "32", target_pointer_width = "64"))]
 decode_nonzero! {
     core::num::NonZeroUsize,  "unexpected 0 when decoding a `NonZeroUsize`"
     core::num::NonZeroIsize,  "unexpected 0 when decoding a `NonZeroIsize`"

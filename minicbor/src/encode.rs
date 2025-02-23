@@ -333,6 +333,20 @@ impl<C, T: CborLen<C>> CborLen<C> for core::num::Wrapping<T> {
     }
 }
 
+#[cfg(target_pointer_width = "16")]
+impl<C> Encode<C> for usize {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), Error<W::Error>> {
+        e.u16(*self as u16)?.ok()
+    }
+}
+
+#[cfg(target_pointer_width = "16")]
+impl<C> CborLen<C> for usize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        (*self as u16).cbor_len(ctx)
+    }
+}
+
 #[cfg(target_pointer_width = "32")]
 impl<C> Encode<C> for usize {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), Error<W::Error>> {
@@ -358,6 +372,20 @@ impl<C> Encode<C> for usize {
 impl<C> CborLen<C> for usize {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         (*self as u64).cbor_len(ctx)
+    }
+}
+
+#[cfg(target_pointer_width = "16")]
+impl<C> Encode<C> for isize {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), Error<W::Error>> {
+        e.i16(*self as i16)?.ok()
+    }
+}
+
+#[cfg(target_pointer_width = "16")]
+impl<C> CborLen<C> for isize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        (*self as i16).cbor_len(ctx)
     }
 }
 
@@ -572,7 +600,7 @@ encode_nonzero! {
     core::num::NonZeroI64
 }
 
-#[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
+#[cfg(any(target_pointer_width = "16", target_pointer_width = "32", target_pointer_width = "64"))]
 encode_nonzero! {
     core::num::NonZeroUsize
     core::num::NonZeroIsize
