@@ -273,6 +273,13 @@ impl<'b, C> Decode<'b, C> for usize {
     }
 }
 
+#[cfg(target_pointer_width = "16")]
+impl<'b, C> Decode<'b, C> for isize {
+    fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
+        d.i16().map(|n| n as isize)
+    }
+}
+
 #[cfg(target_pointer_width = "32")]
 impl<'b, C> Decode<'b, C> for isize {
     fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {

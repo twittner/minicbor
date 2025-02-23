@@ -375,6 +375,20 @@ impl<C> CborLen<C> for usize {
     }
 }
 
+#[cfg(target_pointer_width = "16")]
+impl<C> Encode<C> for isize {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), Error<W::Error>> {
+        e.i16(*self as i16)?.ok()
+    }
+}
+
+#[cfg(target_pointer_width = "16")]
+impl<C> CborLen<C> for isize {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        (*self as i16).cbor_len(ctx)
+    }
+}
+
 #[cfg(target_pointer_width = "32")]
 impl<C> Encode<C> for isize {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), Error<W::Error>> {
