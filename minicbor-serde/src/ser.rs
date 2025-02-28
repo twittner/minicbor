@@ -20,7 +20,7 @@ pub fn to_vec<T: Serialize>(val: T) -> Result<Vec<u8>, EncodeError<core::convert
 #[derive(Debug, Clone)]
 pub struct Serializer<W> {
     encoder: Encoder<W>,
-    serialize_unit_as_null: bool,
+    unit_as_null: bool
 }
 
 impl<W: Write> Serializer<W> {
@@ -36,9 +36,8 @@ impl<W: Write> Serializer<W> {
         &mut self.encoder
     }
 
-    #[must_use]
-    pub fn with_serialize_unit_as_null(&mut self, enable: bool) -> &mut Self {
-        self.serialize_unit_as_null = enable;
+    pub fn serialize_unit_as_null(&mut self, enable: bool) -> &mut Self {
+        self.unit_as_null = enable;
         self
     }
 
@@ -49,7 +48,10 @@ impl<W: Write> Serializer<W> {
 
 impl<W: Write> From<Encoder<W>> for Serializer<W> {
     fn from(e: Encoder<W>) -> Self {
-        Self { encoder: e, serialize_unit_as_null: false }
+        Self {
+            encoder: e,
+            unit_as_null: false
+        }
     }
 }
 
@@ -151,7 +153,7 @@ where
     }
 
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
-        if self.serialize_unit_as_null {
+        if self.unit_as_null {
             self.encoder.null()?;
         } else {
             self.encoder.encode(())?;
