@@ -216,6 +216,14 @@ impl<W: Write> Encoder<W> {
         self.type_len(BYTES, x.len() as u64)?.put(x)
     }
 
+    /// Begin encoding `len` bytes.
+    ///
+    /// In contrast to [`Encoder::bytes`] which also encodes a byte string, this
+    /// method writes only the CBOR item head.
+    pub fn bytes_len(&mut self, len: u64) -> Result<&mut Self, Error<W::Error>> {
+        self.type_len(BYTES, len)
+    }
+
     /// Encode a string slice.
     pub fn str(&mut self, x: &str) -> Result<&mut Self, Error<W::Error>> {
         self.type_len(TEXT, x.len() as u64)?.put(x.as_bytes())

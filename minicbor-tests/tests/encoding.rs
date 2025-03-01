@@ -1,6 +1,6 @@
 #![cfg(feature = "std")]
 
-use minicbor::{Encode, Decode};
+use minicbor::{Encode, Decode, CborLen};
 
 const NULL: u8 = 0xf6;
 
@@ -320,3 +320,28 @@ fn flat_enum() {
     assert!(d.skip().unwrap_err().is_end_of_input())
 }
 
+#[test]
+fn encode_as_cbor_bytes() {
+    #[derive(Debug, Encode, Decode, PartialEq, Eq, CborLen)]
+    #[cbor(map)]
+    struct T {
+        #[n(0)] a: u8,
+        #[n(1)] b: u8,
+    }
+
+    let value = T { a: 1, b: 2 };
+
+    let mut e = minicbor::Encoder::new(Vec::new());
+    e.bytes_len(minicbor::len(&value) as u64)
+        .unwrap()
+        .encode(&value)
+        .unwrap();
+
+    let bytes = e.into_writer();
+
+    let mut d = minicbor::Decoder::new(&bytes);
+    let bytes = d.bytes().unwrap();
+
+    let out: T = minicbor::decode(bytes).unwrap();
+    assert_eq!(value, out);
+}
