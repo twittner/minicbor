@@ -7,6 +7,18 @@
 
 # minicbor
 
+## `0.26.1`
+
+- The method `Encoder::bytes_len` has been added. Like `Encoder::bytes`, it writes the CBOR item
+  head of a byte string. However, unlike `Encoder::bytes`, it does not require the actual bytes as
+  a parameter, leaving their encoding to the application. This mirrors the approach of
+  `Encoder::array` and `Encoder::map`, which also encode only the CBOR item head, with applications
+  encoding the elements via subsequent encoder method calls. For further details, see pull request
+  [#16](https://github.com/twittner/minicbor/pull/16) by @carloskiki.
+- `Encode` and `Decode` impls for `usize`, `isize`, `NonZeroUsize` and `NonZeroIsize` on 16-bit
+  architectures have been added by @chrysn. See pull request
+  [#19](https://github.com/twittner/minicbor/pull/19) for details.
+
 ## `0.26.0`
 
 - Depends on `minicbor-derive-0.16.0`.
@@ -633,6 +645,12 @@
 - Initial release which provides some I/O utilities.
 
 # minicbor-serde
+
+## `0.4.1`
+
+- The option to serialize the unit value as null has been added to `Serializer` by @Finistere.
+  See pull request [#20](https://github.com/twittner/minicbor/pull/20) for details.
+- Requires `minicbor-0.26.1`.
 
 ## `0.4.0`
 
