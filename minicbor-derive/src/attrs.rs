@@ -29,6 +29,7 @@ pub enum Kind {
     Encoding,
     Index,
     IndexOnly,
+    Tagged,
     Transparent,
     TypeParam,
     Nil,
@@ -48,6 +49,7 @@ enum Value {
     Encoding(Encoding, proc_macro2::Span),
     Index(Idx, proc_macro2::Span),
     IndexOnly(proc_macro2::Span),
+    Tagged(proc_macro2::Span),
     Transparent(proc_macro2::Span),
     TypeParam(TypeParams, proc_macro2::Span),
     Nil(syn::ExprPath, proc_macro2::Span),
@@ -110,6 +112,18 @@ impl Attributes {
             }
             if this.contains_key(Kind::Transparent) {
                 return Err(syn::Error::new(*s, "`tag` and `transparent` are mutually exclusive"))
+            }
+            if this.contains_key(Kind::Tagged) {
+                return Err(syn::Error::new(*s, "`tag` and `tagged` are mutually exclusive"))
+            }
+        }
+        
+        if let Some(Value::Tagged(s)) = this.get(Kind::Tagged) {
+            if this.contains_key(Kind::IndexOnly) {
+                return Err(syn::Error::new(*s, "`tagged` and `index_only` are mutually exclusive"))
+            }
+            if this.contains_key(Kind::Flat) {
+                return Err(syn::Error::new(*s, "`tagged` and `flat` are mutually exclusive"))
             }
         }
         if let Some(Value::Skip(s)) = this.get(Kind::Skip) {
@@ -229,6 +243,8 @@ impl Attributes {
                 let n: LitInt = content.parse()?;
                 let i = n.base10_parse()?;
                 attrs.try_insert(Kind::Tag, Value::Tag(i, meta.path.span()))?
+            } else if meta.path.is_ident("tagged") {
+                attrs.try_insert(Kind::Tagged, Value::Tagged(meta.path.span()))?
             } else if meta.path.is_ident("skip") {
                 attrs.try_insert(Kind::Skip, Value::Skip(meta.path.span()))?
             } else if meta.path.is_ident("flat") {
@@ -286,6 +302,10 @@ impl Attributes {
         self.get(Kind::Tag).and_then(|v| v.tag())
     }
 
+    pub fn tagged(&self) -> bool {
+        self.contains_key(Kind::Tagged)
+    }
+
     pub fn skip(&self) -> bool {
         self.contains_key(Kind::Skip)
     }
@@ -319,6 +339,7 @@ impl Attributes {
                 | Kind::Tag
                 => {}
                 | Kind::Borrow
+                | Kind::Tagged
                 | Kind::TypeParam
                 | Kind::Codec
                 | Kind::Index
@@ -347,6 +368,7 @@ impl Attributes {
                 | Kind::Skip
                 => {}
                 | Kind::Encoding
+                | Kind::Tagged
                 | Kind::IndexOnly
                 | Kind::Transparent
                 | Kind::ContextBound
@@ -362,6 +384,7 @@ impl Attributes {
                 | Kind::ContextBound
                 | Kind::Tag
                 | Kind::Flat
+                | Kind::Tagged
                 => {}
                 | Kind::Borrow
                 | Kind::TypeParam
@@ -387,6 +410,7 @@ impl Attributes {
                 | Kind::TypeParam
                 | Kind::Codec
                 | Kind::IndexOnly
+                | Kind::Tagged
                 | Kind::Transparent
                 | Kind::Nil
                 | Kind::IsNil
@@ -559,6 +583,7 @@ impl Value {
             Value::Encoding(_, s)     => *s,
             Value::Index(_, s)        => *s,
             Value::IndexOnly(s)       => *s,
+            Value::Tagged(s)          => *s,
             Value::Transparent(s)     => *s,
             Value::Nil(_, s)          => *s,
             Value::IsNil(_, s)        => *s,

@@ -345,3 +345,66 @@ fn encode_as_cbor_bytes() {
     let out: T = minicbor::decode(bytes).unwrap();
     assert_eq!(value, out);
 }
+
+#[test]
+fn tagged_enum() {
+    #[derive(Debug, Encode, Decode, PartialEq, Eq)]
+    #[cbor(tagged)]
+    enum E {
+        #[n(0)] A,
+        #[n(1)] B,
+        #[n(2)] C(#[n(0)] u8, #[n(1)] String),
+        #[cbor(map)] #[n(3)] D {
+            #[n(0)] x: bool,
+            #[n(1)] y: String
+        }
+    }
+
+    // Test unit variant - should be encoded with tag 121 (BASE_TAG + 0)
+    let bytes = minicbor::to_vec(&E::A).unwrap();
+    // d8 = tag, 79 = 121, 80 = empty array
+    assert_eq!(&[0xd8, 0x79, 0x80][..], &bytes[..]);
+    assert_eq!(E::A, minicbor::decode(&bytes).unwrap());
+    
+    let bytes = minicbor::to_vec(&E::B).unwrap();
+    assert_eq!(&[0xd8, 0x7a, 0x80][..], &bytes[..]);
+    assert_eq!(E::B, minicbor::decode(&bytes).unwrap());
+    
+    let c = E::C(42, "hello".to_string());
+    let bytes = minicbor::to_vec(&c).unwrap();
+    let mut d = minicbor::Decoder::new(&bytes);
+    
+    assert_eq!(minicbor::data::Tag::new(123), d.tag().unwrap());
+    assert_eq!(Some(2), d.array().unwrap());
+    assert_eq!(42u8, d.u8().unwrap());
+    assert_eq!("hello", d.str().unwrap());
+    
+    assert_eq!(c, minicbor::decode(&bytes).unwrap());
+    
+    let d = E::D { x: true, y: "test".to_string() };
+    let bytes = minicbor::to_vec(&d).unwrap();
+    let mut decoder = minicbor::Decoder::new(&bytes);
+    
+    assert_eq!(minicbor::data::Tag::new(124), decoder.tag().unwrap());
+    assert_eq!(Some(2), decoder.map().unwrap());
+    assert_eq!(0, decoder.i64().unwrap());
+    assert_eq!(true, decoder.bool().unwrap());
+    assert_eq!(1, decoder.i64().unwrap());
+    assert_eq!("test", decoder.str().unwrap());
+    
+    assert_eq!(d, minicbor::decode(&bytes).unwrap());
+    
+    let mut e = minicbor::Encoder::new(Vec::new());
+    e.array(4).unwrap()
+        .encode(&E::A).unwrap()
+        .encode(&E::B).unwrap()
+        .encode(32u8).unwrap()
+        .encode("foo").unwrap();
+    
+    let mut d = minicbor::Decoder::new(e.writer());
+    assert_eq!(Some(4), d.array().unwrap());
+    assert_eq!(E::A, d.decode().unwrap());
+    assert_eq!(E::B, d.decode().unwrap());
+    assert_eq!(32u8, d.decode().unwrap());
+    assert_eq!("foo", d.str().unwrap());
+}

@@ -93,12 +93,16 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
+    let tagged        = enum_attrs.tagged();
     let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
     let mut blacklist = HashSet::new();
     let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
+    
+    // Base tag for tagged enums (CBOR tag 121)
+    const BASE_TAG: u64 = 121;
 
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
@@ -110,6 +114,9 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let con = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag = encode_tag(attrs);
+        
+        let variant_tag = BASE_TAG + idx.val() as u64;
+        
         let row = match &var.fields {
             syn::Fields::Unit => match encoding {
                 Encoding::Array | Encoding::Map if index_only => quote! {
@@ -125,12 +132,26 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         Ok(())
                     }
                 },
+                Encoding::Array if tagged => quote! {
+                    #name::#con => {
+                        __e777.tag(minicbor::data::Tag::new(#variant_tag))?;
+                        __e777.array(0)?;
+                        Ok(())
+                    }
+                },
                 Encoding::Array => quote! {
                     #name::#con => {
                         __e777.array(2)?;
                         __e777.i64(#idx)?;
                         #tag
                         __e777.array(0)?;
+                        Ok(())
+                    }
+                },
+                Encoding::Map if tagged => quote! {
+                    #name::#con => {
+                        __e777.tag(minicbor::data::Tag::new(#variant_tag))?;
+                        __e777.map(0)?;
                         Ok(())
                     }
                 },
@@ -163,6 +184,17 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     }
                 }
             }
+            syn::Fields::Named(_) if tagged => {
+                let (tests, statements) = encode_fields(&fields, false, encoding, false)?;
+                let idents = fields.fields().idents();
+                quote! {
+                    #name::#con{#(#idents,)* ..} => {
+                        #tests
+                        __e777.tag(minicbor::data::Tag::new(#variant_tag))?;
+                        #statements
+                    }
+                }
+            }
             syn::Fields::Named(_) => {
                 let (tests, statements) = encode_fields(&fields, false, encoding, false)?;
                 let idents = fields.fields().idents();
@@ -191,6 +223,17 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                             __e777.array(1)?;
                         }
                         __e777.i64(#idx)?;
+                        #statements
+                    }
+                }
+            }
+            syn::Fields::Unnamed(_) if tagged => {
+                let (tests, statements) = encode_fields(&fields, false, encoding, false)?;
+                let idents = fields.match_idents();
+                quote! {
+                    #name::#con(#(#idents,)*) => {
+                        #tests
+                        __e777.tag(minicbor::data::Tag::new(#variant_tag))?;
                         #statements
                     }
                 }

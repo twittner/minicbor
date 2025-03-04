@@ -127,6 +127,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
     let index_only    = enum_attrs.index_only();
+    let tagged        = enum_attrs.tagged();
     let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
@@ -134,6 +135,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let mut field_attrs = Vec::new();
     let mut lifetime = gen_lifetime()?;
     let mut rows = Vec::new();
+    
+    // Base tag for tagged enums (CBOR tag 121)
+    const BASE_TAG: u64 = 121;
+
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
@@ -226,6 +231,20 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             }
             let __p778 = __d777.position();
         }
+    } else if tagged {
+        quote! {
+            let __p777 = __d777.position();
+            let __tag777 = __d777.tag()?;
+            let __tag_val777 = __tag777.as_u64();
+            
+            if __tag_val777 < #BASE_TAG {
+                return Err(minicbor::decode::Error::message("invalid tag value for tagged enum").at(__p777))
+            }
+            
+            // The index to match against is the tag value minus the base tag
+            let __idx777 = (__tag_val777 - #BASE_TAG) as i64;
+            let __p778 = __p777;
+        }
     } else {
         quote! {
             let __p777 = __d777.position();
@@ -238,12 +257,19 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let tag = decode_tag(&enum_attrs);
 
+    let match_expr = if tagged {
+        quote!(__idx777 as i64)
+    } else {
+        quote!(__d777.i64()?)
+    };
+
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
             fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #tag
                 #check
-                match __d777.i64()? {
+                
+                match #match_expr {
                     #(#rows)*
                     n => Err(minicbor::decode::Error::unknown_variant(n).at(__p778))
                 }
