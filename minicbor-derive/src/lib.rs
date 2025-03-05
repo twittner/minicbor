@@ -92,6 +92,7 @@
 //! - [`#[cbor(array)]`](#cborarray)
 //! - [`#[cbor(map)]`](#cbormap)
 //! - [`#[cbor(index_only)]`](#cborindex_only)
+//! - [`#[cbor(tagged)]`](#cbortagged)
 //! - [`#[cbor(transparent)]`](#cbortransparent)
 //! - [`#[cbor(skip)]`](#cborskip)
 //! - [`#[cbor(tag(...))]`](#cbortag)
@@ -153,6 +154,14 @@
 //! Enumerations which do not contain fields may have this attribute attached to
 //! them. This changes the encoding to encode only the variant index (cf. section
 //! [CBOR encoding](#cbor-encoding) for details).
+//!
+//! ## `#[cbor(tagged)]`
+//!
+//! This attribute can be attached to enums. It provides a "tagged" encoding,
+//! such that the first 7 variants are stored using tags 120..127, the next
+//! 121 variants are stored using tags 1280..1400. The spec supports more than
+//! 128 variants via tag 101 with an array like [uint, any], but this is currently
+//! not supported.
 //!
 //! ## `#[cbor(flat)]`
 //!
