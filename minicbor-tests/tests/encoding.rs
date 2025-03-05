@@ -354,10 +354,11 @@ fn tagged_enum() {
         #[n(0)] A,
         #[n(1)] B,
         #[n(2)] C(#[n(0)] u8, #[n(1)] String),
-        #[cbor(map)] #[n(3)] D {
+        #[cbor(map)] #[n(3)] F {
             #[n(0)] x: bool,
             #[n(1)] y: String
-        }
+        },
+        #[n(7)] G,
     }
 
     // Test unit variant - should be encoded with tag 121 (BASE_TAG + 0)
@@ -381,18 +382,24 @@ fn tagged_enum() {
     
     assert_eq!(c, minicbor::decode(&bytes).unwrap());
     
-    let d = E::D { x: true, y: "test".to_string() };
-    let bytes = minicbor::to_vec(&d).unwrap();
-    let mut decoder = minicbor::Decoder::new(&bytes);
+    let f = E::F { x: true, y: "test".to_string() };
+    let bytes = minicbor::to_vec(&f).unwrap();
+    let mut d = minicbor::Decoder::new(&bytes);
     
-    assert_eq!(minicbor::data::Tag::new(124), decoder.tag().unwrap());
-    assert_eq!(Some(2), decoder.map().unwrap());
-    assert_eq!(0, decoder.i64().unwrap());
-    assert_eq!(true, decoder.bool().unwrap());
-    assert_eq!(1, decoder.i64().unwrap());
-    assert_eq!("test", decoder.str().unwrap());
+    assert_eq!(minicbor::data::Tag::new(124), d.tag().unwrap());
+    assert_eq!(Some(2), d.map().unwrap());
+    assert_eq!(0, d.i64().unwrap());
+    assert_eq!(true, d.bool().unwrap());
+    assert_eq!(1, d.i64().unwrap());
+    assert_eq!("test", d.str().unwrap());
     
-    assert_eq!(d, minicbor::decode(&bytes).unwrap());
+    assert_eq!(f, minicbor::decode(&bytes).unwrap());
+
+    let g = E::G;
+    let bytes = minicbor::to_vec(&g).unwrap();
+    // d9 = tag, 05 + 00 = 1280, 80 = empty array
+    assert_eq!(&[0xd9, 0x05, 0x00, 0x80][..], &bytes[..]);
+    assert_eq!(E::G, minicbor::decode(&bytes).unwrap());
     
     let mut e = minicbor::Encoder::new(Vec::new());
     e.array(4).unwrap()

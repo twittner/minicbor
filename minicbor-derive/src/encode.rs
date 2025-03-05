@@ -100,9 +100,6 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let mut blacklist = HashSet::new();
     let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
-    
-    // Base tag for tagged enums (CBOR tag 121)
-    const BASE_TAG: u64 = 121;
 
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
@@ -115,7 +112,14 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag = encode_tag(attrs);
         
-        let variant_tag = BASE_TAG + idx.val() as u64;
+        let variant_tag = match idx.val() as u64 {
+            0..=6 => Ok(121 + idx.val() as u64),
+            7..=127 => Ok(1280 + idx.val() as u64 - 7),
+            _ => Err(syn::Error::new(
+                proc_macro2::Span::call_site(),
+                "enums with more than 128 variants are currently not supported with tagged encoding",
+            )),
+        }?;
         
         let row = match &var.fields {
             syn::Fields::Unit => match encoding {

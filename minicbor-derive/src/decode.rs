@@ -136,8 +136,6 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let mut lifetime = gen_lifetime()?;
     let mut rows = Vec::new();
     
-    // Base tag for tagged enums (CBOR tag 121)
-    const BASE_TAG: u64 = 121;
 
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
@@ -237,12 +235,13 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             let __tag777 = __d777.tag()?;
             let __tag_val777 = __tag777.as_u64();
             
-            if __tag_val777 < #BASE_TAG {
-                return Err(minicbor::decode::Error::message("invalid tag value for tagged enum").at(__p777))
-            }
+            let __tag_val_offset777 = match __tag_val777 {
+                121..127 => Ok(121),
+                1280..1400 => Ok(1280 - 7),
+                _ => Err(minicbor::decode::Error::message("invalid tag value for tagged enum").at(__p777))
+            }?;
             
-            // The index to match against is the tag value minus the base tag
-            let __idx777 = (__tag_val777 - #BASE_TAG) as i64;
+            let __idx777 = (__tag_val777 - __tag_val_offset777) as i64;
             let __p778 = __p777;
         }
     } else {
