@@ -58,6 +58,59 @@ fn encode_as_array() {
 }
 
 #[test]
+fn encode_as_array_indefinite() {
+    #[derive(Debug, Encode, Decode, PartialEq, Eq)]
+    #[cbor(array(indefinite))]
+    struct T {
+        #[n(0)] a: Option<u8>,
+        #[n(2)] b: Option<u8>,
+        #[n(5)] c: Option<u8>
+    }
+
+    // empty value => empty array
+    let v = T { a: None, b: None, c: None };
+
+    let bytes = minicbor::to_vec(&v).unwrap();
+    assert_eq!(&[0x9f, 0xff][..], &bytes[..]);
+    assert_eq!(v, minicbor::decode(&bytes).unwrap());
+
+    // empty suffix is not encoded
+    let v = T { a: Some(1), b: None, c: None };
+
+    let bytes = minicbor::to_vec(&v).unwrap();
+    assert_eq!(&[0x9f, 1, 0xff][..], &bytes[..]);
+    assert_eq!(v, minicbor::decode(&bytes).unwrap());
+
+    // gaps are filled with nulls
+    let v = T { a: Some(1), b: Some(2), c: None };
+
+    let bytes = minicbor::to_vec(&v).unwrap();
+    assert_eq!(&[0x9f, 1, NULL, 2, 0xff][..], &bytes[..]);
+    assert_eq!(v, minicbor::decode(&bytes).unwrap());
+
+    // more gaps to fill
+    let v = T { a: Some(1), b: Some(2), c: Some(3) };
+
+    let bytes = minicbor::to_vec(&v).unwrap();
+    assert_eq!(&[0x9f, 1, NULL, 2, NULL, NULL, 3, 0xff][..], &bytes[..]);
+    assert_eq!(v, minicbor::decode(&bytes).unwrap());
+
+    // and even more
+    let v = T { a: Some(1), b: None, c: Some(3) };
+
+    let bytes = minicbor::to_vec(&v).unwrap();
+    assert_eq!(&[0x9f, 1, NULL, NULL, NULL, NULL, 3, 0xff][..], &bytes[..]);
+    assert_eq!(v, minicbor::decode(&bytes).unwrap());
+
+    // empty prefix is filled with nulls too
+    let v = T { a: None, b: None, c: Some(3) };
+
+    let bytes = minicbor::to_vec(&v).unwrap();
+    assert_eq!(&[0x9f, NULL, NULL, NULL, NULL, NULL, 3, 0xff][..], &bytes[..]);
+    assert_eq!(v, minicbor::decode(&bytes).unwrap())
+}
+
+#[test]
 fn encode_as_map() {
     #[derive(Debug, Encode, Decode, PartialEq, Eq)]
     #[cbor(map)]

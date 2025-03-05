@@ -155,7 +155,18 @@ impl Attributes {
             } else if meta.path.is_ident("map") {
                 attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Map, meta.path.span()))?
             } else if meta.path.is_ident("array") {
-                attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Array, meta.path.span()))?
+                if meta.input.peek(syn::token::Paren) {
+                    let content;
+                    syn::parenthesized!(content in meta.input);
+                    let s = content.parse::<syn::Ident>()?;
+                    match s.to_string().as_str() {
+                        "indefinite" => attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::IndefiniteArray, meta.path.span()))?,
+                        "definite" => attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Array, meta.path.span()))?,
+                        _ => return Err(meta.error("expected `array(indefinite)`, `array(definite)` or `array` (equivalent to `array(definite)`)"))
+                    }
+                } else {
+                    attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Array, meta.path.span()))?;
+                }
             } else if meta.path.is_ident("has_nil") {
                 attrs.try_insert(Kind::HasNil, Value::HasNil(meta.path.span()))?
             } else if meta.path.is_ident("encode_with") {

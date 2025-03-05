@@ -112,20 +112,20 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let tag = encode_tag(attrs);
         let row = match &var.fields {
             syn::Fields::Unit => match encoding {
-                Encoding::Array | Encoding::Map if index_only => quote! {
+                Encoding::Array | Encoding::IndefiniteArray | Encoding::Map if index_only => quote! {
                     #name::#con => {
                         __e777.i64(#idx)?;
                         Ok(())
                     }
                 },
-                Encoding::Array if flat => quote! {
+                Encoding::Array | Encoding::IndefiniteArray if flat => quote! {
                     #name::#con => {
                         __e777.array(1)?;
                         __e777.i64(#idx)?;
                         Ok(())
                     }
                 },
-                Encoding::Array => quote! {
+                Encoding::Array | Encoding::IndefiniteArray => quote! {
                     #name::#con => {
                         __e777.array(2)?;
                         __e777.i64(#idx)?;
@@ -273,7 +273,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
         // Under array encoding the number of elements is the highest
         // index + 1. Each value is checked if it is not nil and if so,
         // the highest index is incremented.
-        Encoding::Array => {
+        Encoding::Array | Encoding::IndefiniteArray => {
             for field in fields.fields() {
                 if field.attrs.skip() {
                     continue
@@ -413,7 +413,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
         // Under array encoding only field values are encoded and their
         // index is represented as the array position. Gaps between indexes
         // need to be filled with null.
-        Encoding::Array => {
+        Encoding::Array | Encoding::IndefiniteArray => {
             let mut first = true;
             let mut k = 0;
             for field in fields.fields() {
@@ -519,7 +519,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
         })?;
 
     match encoding {
-        Encoding::Array if flat => Ok((
+        Encoding::Array | Encoding::IndefiniteArray if flat => Ok((
             quote! {
                 let mut __max_index777: core::option::Option<u64> = None;
 
@@ -546,6 +546,22 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                 } else {
                     __e777.array(0)?;
                 }
+
+                Ok(())
+            }
+        )),
+        Encoding::IndefiniteArray => Ok((
+            quote! {
+                let mut __max_index777: core::option::Option<u64> = None;
+
+                #(#tests)*
+            },
+            quote! {
+                __e777.begin_array()?;
+                if let Some(__i777) = __max_index777 {
+                    #(#statements)*
+                }
+                __e777.end()?;
 
                 Ok(())
             }

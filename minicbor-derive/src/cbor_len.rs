@@ -111,10 +111,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     Encoding::Map => quote! {
                         #name::#con{#(#idents,)* ..} => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
                     },
-                    Encoding::Array if flat => quote! {
+                    Encoding::Array | Encoding::IndefiniteArray if flat => quote! {
                         #name::#con{#(#idents,)* ..} => { #(#steps)* + #idx.cbor_len(__ctx777) }
                     },
-                    Encoding::Array => quote! {
+                    Encoding::Array | Encoding::IndefiniteArray => quote! {
                         #name::#con{#(#idents,)* ..} => { #(#steps)* + #tag + 1 + #idx.cbor_len(__ctx777) }
                     }
                 }
@@ -129,10 +129,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     Encoding::Map => quote! {
                         #name::#con(#(#idents,)*) => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
                     },
-                    Encoding::Array if flat => quote! {
+                    Encoding::Array | Encoding::IndefiniteArray if flat => quote! {
                         #name::#con(#(#idents,)*) => { #(#steps)* + #idx.cbor_len(__ctx777) }
                     },
-                    Encoding::Array => quote! {
+                    Encoding::Array | Encoding::IndefiniteArray => quote! {
                         #name::#con(#(#idents,)*) => { #(#steps)* + #tag + 1 + #idx.cbor_len(__ctx777) }
                     }
                 }
@@ -223,7 +223,7 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
             }
             steps
         }
-        Encoding::Array => {
+        Encoding::Array | Encoding::IndefiniteArray => {
             let mut steps = Vec::new();
             steps.push(quote! {
                 let mut __num777 = 0;

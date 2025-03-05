@@ -139,6 +139,13 @@
 //! If neither `#[cbor(array)]` nor `#[cbor(map)]` are specified, `#[cbor(array)]`
 //! is used by default.
 //!
+//! ## `#[cbor(array(indefinite))]`
+//!
+//! Similar to `#[cbor(array)]` but encodes the array as an indefinite number of
+//! CBOR items. This has no effect on decoding as oth `#[cbor(array)]` and
+//! `#[cbor(array(indefinite))]` are able to decode definite and indefinite length
+//! arrays.
+//!
 //! ## `#[cbor(map)]`
 //!
 //! Use a CBOR map to encode the annotated struct, enum or enum variant.
