@@ -1,7 +1,7 @@
 use crate::Mode;
 use crate::{add_bound_to_type_params, collect_type_params, is_option};
 use crate::{add_typeparam, gen_ctx_param};
-use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
+use crate::attrs::{Attributes, CustomCodec, Encoding, Len, Level};
 use crate::fields::{Field, Fields};
 use crate::variants::Variants;
 use quote::{quote, ToTokens};
@@ -112,20 +112,20 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let tag = encode_tag(attrs);
         let row = match &var.fields {
             syn::Fields::Unit => match encoding {
-                Encoding::Array | Encoding::IndefiniteArray | Encoding::Map if index_only => quote! {
+                Encoding::Array(_) | Encoding::Map(_) if index_only => quote! {
                     #name::#con => {
                         __e777.i64(#idx)?;
                         Ok(())
                     }
                 },
-                Encoding::Array | Encoding::IndefiniteArray if flat => quote! {
+                Encoding::Array(_) if flat => quote! {
                     #name::#con => {
                         __e777.array(1)?;
                         __e777.i64(#idx)?;
                         Ok(())
                     }
                 },
-                Encoding::Array | Encoding::IndefiniteArray => quote! {
+                Encoding::Array(Len::Def) => quote! {
                     #name::#con => {
                         __e777.array(2)?;
                         __e777.i64(#idx)?;
@@ -134,12 +134,32 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         Ok(())
                     }
                 },
-                Encoding::Map => quote! {
+                Encoding::Array(Len::Indef) => quote! {
+                    #name::#con => {
+                        __e777.array(2)?;
+                        __e777.i64(#idx)?;
+                        #tag
+                        __e777.begin_array()?;
+                        __e777.end()?;
+                        Ok(())
+                    }
+                },
+                Encoding::Map(Len::Def) => quote! {
                     #name::#con => {
                         __e777.array(2)?;
                         __e777.i64(#idx)?;
                         #tag
                         __e777.map(0)?;
+                        Ok(())
+                    }
+                },
+                Encoding::Map(Len::Indef) => quote! {
+                    #name::#con => {
+                        __e777.array(2)?;
+                        __e777.i64(#idx)?;
+                        #tag
+                        __e777.begin_map()?;
+                        __e777.end()?;
                         Ok(())
                     }
                 }
@@ -273,7 +293,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
         // Under array encoding the number of elements is the highest
         // index + 1. Each value is checked if it is not nil and if so,
         // the highest index is incremented.
-        Encoding::Array | Encoding::IndefiniteArray => {
+        Encoding::Array(_) => {
             for field in fields.fields() {
                 if field.attrs.skip() {
                     continue
@@ -312,7 +332,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
         // of fields minus those which are nil. Further down we define
         // the total number of fields and here for each nil value we
         // substract 1 from the total.
-        Encoding::Map => {
+        Encoding::Map(Len::Def) => {
             for field in fields.fields() {
                 if field.attrs.skip() {
                     continue
@@ -345,6 +365,8 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                 tests.push(expr);
             }
         }
+        Encoding::Map(Len::Indef) => {
+        }
     }
 
     let mut statements = Vec::new();
@@ -359,7 +381,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
     match encoding {
         // Under map encoding each field is encoded with its index.
         // Only field values which are not nil are encoded.
-        Encoding::Map => for field in fields.fields() {
+        Encoding::Map(_) => for field in fields.fields() {
             if field.attrs.skip() {
                 continue
             }
@@ -413,7 +435,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
         // Under array encoding only field values are encoded and their
         // index is represented as the array position. Gaps between indexes
         // need to be filled with null.
-        Encoding::Array | Encoding::IndefiniteArray => {
+        Encoding::Array(_) => {
             let mut first = true;
             let mut k = 0;
             for field in fields.fields() {
@@ -519,7 +541,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
         })?;
 
     match encoding {
-        Encoding::Array | Encoding::IndefiniteArray if flat => Ok((
+        Encoding::Array(Len::Def) if flat => Ok((
             quote! {
                 let mut __max_index777: core::option::Option<u64> = None;
 
@@ -533,7 +555,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                 Ok(())
             }
         )),
-        Encoding::Array => Ok((
+        Encoding::Array(Len::Def) => Ok((
             quote! {
                 let mut __max_index777: core::option::Option<u64> = None;
 
@@ -550,7 +572,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                 Ok(())
             }
         )),
-        Encoding::IndefiniteArray => Ok((
+        Encoding::Array(Len::Indef) => Ok((
             quote! {
                 let mut __max_index777: core::option::Option<u64> = None;
 
@@ -566,7 +588,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                 Ok(())
             }
         )),
-        Encoding::Map => Ok((
+        Encoding::Map(Len::Def) => Ok((
             quote! {
                 let mut __max_fields777 = #max_fields;
 
@@ -576,6 +598,16 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                 __e777.map(u64::from(__max_fields777))?;
 
                 #(#statements)*
+
+                Ok(())
+            }
+        )),
+        Encoding::Map(Len::Indef) => Ok((
+            quote! {},
+            quote! {
+                __e777.begin_map()?;
+                #(#statements)*
+                __e777.end()?;
 
                 Ok(())
             }

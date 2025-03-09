@@ -347,7 +347,7 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
     let indices = fields.fields().indices().collect::<Vec<_>>();
 
     Ok(match encoding {
-        Encoding::Array | Encoding::IndefiniteArray if flat => quote! {
+        Encoding::Array(_) if flat => quote! {
             #(let mut #idents : core::option::Option<#types> = #inits;)*
 
             for __i777 in 0 .. __len777 - 1 {
@@ -357,7 +357,7 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
                 }
             }
         },
-        Encoding::Array | Encoding::IndefiniteArray => quote! {
+        Encoding::Array(_) => quote! {
             #(let mut #idents : core::option::Option<#types> = #inits;)*
 
             if let Some(__len777) = __d777.array()? {
@@ -379,7 +379,7 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
                 __d777.skip()?
             }
         },
-        Encoding::Map => quote! {
+        Encoding::Map(_) => quote! {
             #(let mut #idents : core::option::Option<#types> = #inits;)*
 
             if let Some(__len777) = __d777.map()? {

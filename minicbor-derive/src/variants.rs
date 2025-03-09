@@ -1,4 +1,5 @@
 use crate::attrs::{Attributes, Idx, Kind, Level};
+use crate::attrs::encoding::{Encoding, Len};
 use crate::attrs::idx;
 use proc_macro2::Span;
 
@@ -30,9 +31,13 @@ impl Variants {
                     let span = attr.span(Kind::Tag).unwrap_or_else(|| v.ident.span());
                     return Err(syn::Error::new(span, "flat enum does not support tags on constructors"))
                 }
-                if attr.encoding().unwrap_or(parent_encoding).is_map() {
+                if let Encoding::Map(_) = attr.encoding().unwrap_or(parent_encoding) {
                     let span = attr.span(Kind::Encoding).unwrap_or_else(|| v.ident.span());
                     return Err(syn::Error::new(span, "flat enum does not support map encoding"))
+                }
+                if let Encoding::Array(Len::Indef) = attr.encoding().unwrap_or(parent_encoding) {
+                    let span = attr.span(Kind::Encoding).unwrap_or_else(|| v.ident.span());
+                    return Err(syn::Error::new(span, "flat enum does not support indefinite array encoding"))
                 }
             }
             indices.push(idex);

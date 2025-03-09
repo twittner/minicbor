@@ -1,4 +1,5 @@
-use crate::{attrs::{Attributes, Level, Encoding, CustomCodec}, fields::Fields, add_typeparam, gen_ctx_param, variants::Variants, encode::is_nil};
+use crate::attrs::{Attributes, Level, Encoding, CustomCodec};
+use crate::{fields::Fields, add_typeparam, gen_ctx_param, variants::Variants, encode::is_nil};
 use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
 use crate::fields::Field;
@@ -108,13 +109,16 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 let steps = on_fields(&fields, false, encoding)?;
                 let idents = fields.fields().idents();
                 match encoding {
-                    Encoding::Map => quote! {
+                    Encoding::Map(_) => quote! {
                         #name::#con{#(#idents,)* ..} => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
                     },
-                    Encoding::Array | Encoding::IndefiniteArray if flat => quote! {
-                        #name::#con{#(#idents,)* ..} => { #(#steps)* + #idx.cbor_len(__ctx777) }
-                    },
-                    Encoding::Array | Encoding::IndefiniteArray => quote! {
+                    Encoding::Array(_) if flat => {
+                        assert!(encoding.len().is_def());
+                        quote! {
+                            #name::#con{#(#idents,)* ..} => { #idx.cbor_len(__ctx777) + #(#steps)* }
+                        }
+                    }
+                    Encoding::Array(_) => quote! {
                         #name::#con{#(#idents,)* ..} => { #(#steps)* + #tag + 1 + #idx.cbor_len(__ctx777) }
                     }
                 }
@@ -126,13 +130,16 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 let steps  = on_fields(&fields, false, encoding)?;
                 let idents = fields.match_idents();
                 match encoding {
-                    Encoding::Map => quote! {
+                    Encoding::Map(_) => quote! {
                         #name::#con(#(#idents,)*) => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
                     },
-                    Encoding::Array | Encoding::IndefiniteArray if flat => quote! {
-                        #name::#con(#(#idents,)*) => { #(#steps)* + #idx.cbor_len(__ctx777) }
-                    },
-                    Encoding::Array | Encoding::IndefiniteArray => quote! {
+                    Encoding::Array(_) if flat => {
+                        assert!(encoding.len().is_def());
+                        quote! {
+                            #name::#con(#(#idents,)*) => { #idx.cbor_len(__ctx777) + #(#steps)* }
+                        }
+                    }
+                    Encoding::Array(_) => quote! {
                         #name::#con(#(#idents,)*) => { #(#steps)* + #tag + 1 + #idx.cbor_len(__ctx777) }
                     }
                 }
@@ -179,10 +186,14 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
 fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result<Vec<proc_macro2::TokenStream>> {
     let steps = match encoding {
-        Encoding::Map => {
+        Encoding::Map(_) => {
             let mut steps = Vec::new();
-            let len = fields.fields().len();
-            steps.push(quote!(#len.cbor_len(__ctx777)));
+            if encoding.len().is_indef() {
+                steps.push(quote!(2))
+            } else {
+                let len = fields.fields().len();
+                steps.push(quote!(#len.cbor_len(__ctx777)))
+            }
             for field in fields.fields() {
                 if field.attrs.skip() {
                     continue
@@ -223,7 +234,7 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
             }
             steps
         }
-        Encoding::Array | Encoding::IndefiniteArray => {
+        Encoding::Array(_) => {
             let mut steps = Vec::new();
             steps.push(quote! {
                 let mut __num777 = 0;
@@ -266,7 +277,11 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                     })
                 }
             }
-            steps.push(quote! { __num777.cbor_len(__ctx777) + __len777 });
+            if encoding.len().is_def() {
+                steps.push(quote! { __num777.cbor_len(__ctx777) + __len777 })
+            } else {
+                steps.push(quote! { __len777 + 2 })
+            }
             steps
         }
     };

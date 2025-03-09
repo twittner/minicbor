@@ -15,7 +15,7 @@ use syn::spanned::Spanned;
 
 pub use typeparam::TypeParams;
 pub use codec::CustomCodec;
-pub use encoding::Encoding;
+pub use encoding::{Encoding, Len};
 pub use idx::Idx;
 
 /// Recognised attributes.
@@ -118,8 +118,11 @@ impl Attributes {
             }
         }
         if let Some(Value::Flat(_)) = this.get(Kind::Flat) {
-            if let Some(Value::Encoding(Encoding::Map, s)) = this.get(Kind::Encoding) {
+            if let Some(Value::Encoding(Encoding::Map(_), s)) = this.get(Kind::Encoding) {
                 return Err(syn::Error::new(*s, "flat enum does not support map encoding"))
+            }
+            if let Some(Value::Encoding(Encoding::Array(Len::Indef), s)) = this.get(Kind::Encoding) {
+                return Err(syn::Error::new(*s, "flat enum does not support indefinite array encoding"))
             }
         }
         Ok(this)
@@ -153,20 +156,11 @@ impl Attributes {
             } else if meta.path.is_ident("transparent") {
                 attrs.try_insert(Kind::Transparent, Value::Transparent(meta.path.span()))?
             } else if meta.path.is_ident("map") {
-                attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Map, meta.path.span()))?
+                let len = parse_len(&meta)?;
+                attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Map(len), meta.path.span()))?;
             } else if meta.path.is_ident("array") {
-                if meta.input.peek(syn::token::Paren) {
-                    let content;
-                    syn::parenthesized!(content in meta.input);
-                    let s = content.parse::<syn::Ident>()?;
-                    match s.to_string().as_str() {
-                        "indefinite" => attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::IndefiniteArray, meta.path.span()))?,
-                        "definite" => attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Array, meta.path.span()))?,
-                        _ => return Err(meta.error("expected `array(indefinite)`, `array(definite)` or `array` (equivalent to `array(definite)`)"))
-                    }
-                } else {
-                    attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Array, meta.path.span()))?;
-                }
+                let len = parse_len(&meta)?;
+                attrs.try_insert(Kind::Encoding, Value::Encoding(Encoding::Array(len), meta.path.span()))?;
             } else if meta.path.is_ident("has_nil") {
                 attrs.try_insert(Kind::HasNil, Value::HasNil(meta.path.span()))?
             } else if meta.path.is_ident("encode_with") {
@@ -655,3 +649,17 @@ fn parse_int(n: &syn::LitInt) -> syn::Result<i64> {
     n.base10_parse().map_err(|_| syn::Error::new(n.span(), "expected `i64` value"))
 }
 
+fn parse_len(meta: &syn::meta::ParseNestedMeta<'_>) -> syn::Result<Len> {
+    if meta.input.peek(syn::token::Paren) {
+        let content;
+        syn::parenthesized!(content in meta.input);
+        let option = content.parse::<syn::Ident>()?;
+        if "indefinite" == option.to_string() {
+            Ok(Len::Indef)
+        } else {
+            Err(meta.error("unknown option"))
+        }
+    } else {
+        Ok(Len::Def)
+    }
+}
