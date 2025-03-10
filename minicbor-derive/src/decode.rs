@@ -1,6 +1,6 @@
 use crate::Mode;
 use crate::{add_bound_to_type_params, collect_type_params, is_cow, is_option, is_str, is_byte_slice};
-use crate::{add_typeparam, gen_ctx_param};
+use crate::{add_typeparam, gen_ctx_param, add_bound_to_matching_type_params};
 use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
 use crate::fields::{Field, Fields};
 use crate::variants::Variants;
@@ -49,11 +49,22 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         f.attrs.codec().map(|c| c.is_decode()).unwrap_or(false)
     }));
 
-    {
-        let bound  = gen_decode_bound()?;
-        let params = inp.generics.type_params_mut();
-        add_bound_to_type_params(bound, params, &blacklist, fields.fields().attributes(), Mode::Decode);
-    }
+    // Collect type parameters which require a `Default` bound.
+    let default_types =
+        collect_type_params(&inp.generics, fields.fields().chain(fields.skipped()).filter(|f| {
+            f.attrs.default() || f.attrs.skip()
+        }))
+        .into_iter()
+        .map(|t| t.ident)
+        .collect();
+
+    let bound  = gen_decode_bound()?;
+    let params = inp.generics.type_params_mut();
+    add_bound_to_type_params(bound, params, &blacklist, fields.fields().attributes(), Mode::Decode);
+
+    let bound  = gen_default_bound()?;
+    let params = inp.generics.type_params_mut();
+    add_bound_to_matching_type_params(bound, params, &default_types);
 
     let gen = add_lifetime(&inp.generics, lifetime);
     let gen = add_typeparam(&gen, gen_ctx_param()?, attrs.context_bound());
@@ -74,6 +85,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let statements = gen_statements(&fields, attrs.encoding().unwrap_or_default(), false)?;
 
     let result = if let syn::Fields::Named(_) = data.fields {
+        let defs      = defs(fields.fields());
         let nils      = nils(fields.fields());
         let indices   = fields.fields().indices();
         let idents    = fields.fields().idents();
@@ -83,6 +95,8 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             Ok(#name {
                 #(#idents : if let Some(x) = #idents {
                     x
+                } else if let Some(def) = #defs {
+                    def
                 } else if let Some(z) = #nils {
                     z
                 } else {
@@ -131,6 +145,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
     let mut blacklist = HashSet::new();
+    let mut defaults = HashSet::new();
     let mut field_attrs = Vec::new();
     let mut lifetime = gen_lifetime()?;
     let mut rows = Vec::new();
@@ -157,11 +172,22 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             }
             // Collect type parameters which should not have an `Decode` bound added,
             // i.e. from fields which have a custom decode function defined.
-            blacklist.extend(collect_type_params(&inp.generics, fields.fields().filter(|f| {
-                f.attrs.codec().map(|c| c.is_decode()).unwrap_or(false)
-            })));
+            blacklist.extend(
+                collect_type_params(&inp.generics, fields.fields().filter(|f| {
+                    f.attrs.codec().map(|c| c.is_decode()).unwrap_or(false)
+                }))
+            );
+            // Collect type parameters which require a `Default` bound.
+            defaults.extend(
+                collect_type_params(&inp.generics, fields.fields().chain(fields.skipped()).filter(|f| {
+                    f.attrs.default() || f.attrs.skip()
+                }))
+                .into_iter()
+                .map(|t| t.ident)
+            );
             let statements = gen_statements(&fields, encoding, flat)?;
             if let syn::Fields::Named(_) = var.fields {
+                let defs      = defs(fields.fields());
                 let nils      = nils(fields.fields());
                 let indices   = fields.fields().indices();
                 let idents    = fields.fields().idents();
@@ -174,6 +200,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         Ok(#name::#con {
                             #(#idents : if let Some(x) = #idents {
                                 x
+                            } else if let Some(def) = #defs {
+                                def
                             } else if let Some(z) = #nils {
                                 z
                             } else {
@@ -199,11 +227,13 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         rows.push(row)
     }
 
-    {
-        let bound  = gen_decode_bound()?;
-        let params = inp.generics.type_params_mut();
-        add_bound_to_type_params(bound, params, &blacklist, &field_attrs, Mode::Decode);
-    }
+    let bound  = gen_decode_bound()?;
+    let params = inp.generics.type_params_mut();
+    add_bound_to_type_params(bound, params, &blacklist, &field_attrs, Mode::Decode);
+
+    let bound  = gen_default_bound()?;
+    let params = inp.generics.type_params_mut();
+    add_bound_to_matching_type_params(bound, params, &defaults);
 
     let gen = add_lifetime(&inp.generics, lifetime);
     let gen = add_typeparam(&gen, gen_ctx_param()?, enum_attrs.context_bound());
@@ -471,6 +501,25 @@ fn gen_decode_bound() -> syn::Result<syn::TypeParamBound> {
     syn::parse_str("minicbor::Decode<'bytes, Ctx>")
 }
 
+fn gen_default_bound() -> syn::Result<syn::TypeParamBound> {
+    syn::parse_str("Default")
+}
+
+fn defs<'a, T>(fields: T) -> Vec<proc_macro2::TokenStream>
+where
+    T: IntoIterator<Item = &'a Field>
+{
+    fields.into_iter()
+        .map(|f| {
+            if f.attrs.default() {
+                quote!(Some(Default::default()))
+            } else {
+                quote!(None)
+            }
+        })
+        .collect()
+}
+
 fn nils<'a, T>(fields: T) -> Vec<proc_macro2::TokenStream>
 where
     T: IntoIterator<Item = &'a Field>
@@ -531,9 +580,16 @@ fn field_inits(name: &str, fields: &Fields) -> proc_macro2::TokenStream {
         let idt = &field.ident;
         let idx = field.index;
         let str = format!("{name}::{idt}");
+        let def = if field.attrs.default() {
+            quote!(Some(Default::default()))
+        } else {
+            quote!(None)
+        };
         fragments.push((field.pos, quote! {
             if let Some(x) = #idt {
                 x
+            } else if let Some(def) = #def {
+                def
             } else if let Some(z) = #nil {
                 z
             } else {

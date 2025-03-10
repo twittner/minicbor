@@ -39,6 +39,7 @@ pub enum Kind {
     Tag,
     Skip,
     Flat,
+    Default
 }
 
 #[derive(Debug, Clone)]
@@ -57,7 +58,8 @@ enum Value {
     CborLen(syn::ExprPath, proc_macro2::Span),
     Tag(u64, proc_macro2::Span),
     Skip(proc_macro2::Span),
-    Flat(proc_macro2::Span)
+    Flat(proc_macro2::Span),
+    Default(proc_macro2::Span)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -233,6 +235,8 @@ impl Attributes {
                 attrs.try_insert(Kind::Skip, Value::Skip(meta.path.span()))?
             } else if meta.path.is_ident("flat") {
                 attrs.try_insert(Kind::Flat, Value::Flat(meta.path.span()))?
+            } else if meta.path.is_ident("default") {
+                attrs.try_insert(Kind::Default, Value::Default(meta.path.span()))?
             } else {
                 return Err(meta.error("unsupported attribute"))
             }
@@ -294,6 +298,10 @@ impl Attributes {
         self.contains_key(Kind::Flat)
     }
 
+    pub fn default(&self) -> bool {
+        self.contains_key(Kind::Default)
+    }
+
     fn contains_key(&self, k: Kind) -> bool {
         self.1.contains_key(&k)
     }
@@ -329,6 +337,7 @@ impl Attributes {
                 | Kind::CborLen
                 | Kind::Skip
                 | Kind::Flat
+                | Kind::Default
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -345,6 +354,7 @@ impl Attributes {
                 | Kind::CborLen
                 | Kind::Tag
                 | Kind::Skip
+                | Kind::Default
                 => {}
                 | Kind::Encoding
                 | Kind::IndexOnly
@@ -373,6 +383,7 @@ impl Attributes {
                 | Kind::HasNil
                 | Kind::CborLen
                 | Kind::Skip
+                | Kind::Default
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -395,6 +406,7 @@ impl Attributes {
                 | Kind::CborLen
                 | Kind::Skip
                 | Kind::Flat
+                | Kind::Default
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.0);
                     return Err(syn::Error::new(val.span(), msg))
@@ -567,7 +579,8 @@ impl Value {
             Value::CborLen(_, s)      => *s,
             Value::Tag(_, s)          => *s,
             Value::Skip(s)            => *s,
-            Value::Flat(s)            => *s
+            Value::Flat(s)            => *s,
+            Value::Default(s)         => *s
         }
     }
 

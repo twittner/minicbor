@@ -686,6 +686,21 @@ where
     }
 }
 
+fn add_bound_to_matching_type_params<'a, I>
+    ( bound: syn::TypeParamBound
+    , params: I
+    , whitelist: &HashSet<syn::Ident>
+    )
+where
+    I: IntoIterator<Item = &'a mut syn::TypeParam>,
+{
+    for p in params {
+        if whitelist.contains(&p.ident) {
+            p.bounds.push(bound.clone())
+        }
+    }
+}
+
 fn add_typeparam<'a, I>(g: &syn::Generics, mut t: syn::TypeParam, b: Option<I>) -> syn::Generics
 where
     I: Iterator<Item = &'a syn::TraitBound>
