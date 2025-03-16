@@ -7,6 +7,12 @@
 
 # minicbor
 
+## `0.26.2`
+
+- Fixes issue with `minicbor::display` (see issue
+  [#25](https://github.com/twittner/minicbor/issues/25)) for details.
+- Depends on `minicbor-derive-0.16.1`.
+
 ## `0.26.1`
 
 - The method `Encoder::bytes_len` has been added. Like `Encoder::bytes`, it writes the CBOR item
@@ -364,6 +370,12 @@
 - Added `Encode` and `Decode` impls for tuples (see merge request [1][mr1] by @koushiro).
 
 # minicbor-derive
+
+## `0.16.1`
+
+- Added attribute `default` for fields which uses `Default::default()` when encountering
+  missing values during decoding. See pull request
+  [#24](https://github.com/twittner/minicbor/pull/24) for details.
 
 ## `0.16.0`
 

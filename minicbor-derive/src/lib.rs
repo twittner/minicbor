@@ -94,6 +94,7 @@
 //! - [`#[cbor(index_only)]`](#cborindex_only)
 //! - [`#[cbor(transparent)]`](#cbortransparent)
 //! - [`#[cbor(skip)]`](#cborskip)
+//! - [`#[cbor(default)]`](#cbordefault)
 //! - [`#[cbor(tag(...))]`](#cbortag)
 //! - [`#[cbor(decode_with)]`](#cbordecode_with--path)
 //! - [`#[cbor(encode_with)]`](#cborencode_with--path)
@@ -171,8 +172,14 @@
 //! ## `#[cbor(skip)]`
 //!
 //! This attribute can be attached to fields in structs and enums and prevents
-//! those fields from being encoded. Field types must implements [`Default`] and
+//! those fields from being encoded. Field types must implement [`Default`] and
 //! when decoding the fields are initialised with `Default::default()`.
+//!
+//! ## `#[cbor(default)]`
+//!
+//! This attribute can be attached to fields in structs and enums. When decoding,
+//! missing values do not cause an error, but the [`Default`] value of the field's
+//! type is used to initialise the field.
 //!
 //! ## `#[cbor(tag(...))]`
 //!
@@ -681,6 +688,21 @@ where
         if let Some(t) = find_type_param(p) {
             p.bounds.extend(t.bounds.iter().cloned())
         } else if !blacklist.contains(p) {
+            p.bounds.push(bound.clone())
+        }
+    }
+}
+
+fn add_bound_to_matching_type_params<'a, I>
+    ( bound: syn::TypeParamBound
+    , params: I
+    , whitelist: &HashSet<syn::Ident>
+    )
+where
+    I: IntoIterator<Item = &'a mut syn::TypeParam>,
+{
+    for p in params {
+        if whitelist.contains(&p.ident) {
             p.bounds.push(bound.clone())
         }
     }

@@ -66,7 +66,7 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         /// Control stack element.
         enum E {
-            N,               // get next token
+            N(bool),         // get next token (true => token is required)
             T,               // tag
             A(Option<u64>),  // array
             M(Option<u64>),  // map
@@ -80,10 +80,10 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
         let mut stack = alloc::vec::Vec::new();
 
         while iter.peek().is_some() {
-            stack.push(E::N);
+            stack.push(E::N(false));
             while let Some(elt) = stack.pop() {
                 match elt {
-                    E::N => match iter.next() {
+                    E::N(required) => match iter.next() {
                         Some(Ok(Token::Array(n))) => {
                             stack.push(E::A(Some(n)));
                             f.write_str("[")?
@@ -123,7 +123,12 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                             write!(f, " !!! decoding error: {}", e)?;
                             return Ok(())
                         }
-                        None => continue
+                        None => if required {
+                            f.write_str(" !!! decoding error: unexpected end of input")?;
+                            return Ok(())
+                        } else {
+                            continue
+                        }
                     }
                     E::S(s) => f.write_str(s)?,
                     E::X(s) => match iter.peek() {
@@ -136,21 +141,21 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                     }
                     E::T => {
                         stack.push(E::S(")"));
-                        stack.push(E::N)
+                        stack.push(E::N(true))
                     }
                     E::A(Some(0)) => f.write_str("]")?,
                     E::A(Some(1)) => {
                         stack.push(E::A(Some(0)));
-                        stack.push(E::N)
+                        stack.push(E::N(true))
                     }
                     E::A(Some(n)) => {
                         stack.push(E::A(Some(n - 1)));
                         stack.push(E::S(", "));
-                        stack.push(E::N)
+                        stack.push(E::N(true))
                     }
                     E::A(None) => match iter.peek() {
                         None => {
-                            write!(f, " !!! indefinite array not closed")?;
+                            f.write_str(" !!! indefinite array not closed")?;
                             return Ok(())
                         }
                         Some(Ok(Token::Break)) => {
@@ -160,26 +165,26 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                         _ => {
                             stack.push(E::A(None));
                             stack.push(E::X(", "));
-                            stack.push(E::N)
+                            stack.push(E::N(true))
                         }
                     }
                     E::M(Some(0)) => f.write_str("}")?,
                     E::M(Some(1)) => {
                         stack.push(E::M(Some(0)));
-                        stack.push(E::N);
+                        stack.push(E::N(true));
                         stack.push(E::S(": "));
-                        stack.push(E::N)
+                        stack.push(E::N(true))
                     }
                     E::M(Some(n)) => {
                         stack.push(E::M(Some(n - 1)));
                         stack.push(E::S(", "));
-                        stack.push(E::N);
+                        stack.push(E::N(true));
                         stack.push(E::S(": "));
-                        stack.push(E::N)
+                        stack.push(E::N(true))
                     }
                     E::M(None) => match iter.peek() {
                         None => {
-                            write!(f, " !!! indefinite map not closed")?;
+                            f.write_str(" !!! indefinite map not closed")?;
                             return Ok(())
                         }
                         Some(Ok(Token::Break)) => {
@@ -189,14 +194,14 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                         _ => {
                             stack.push(E::M(None));
                             stack.push(E::X(", "));
-                            stack.push(E::N);
+                            stack.push(E::N(true));
                             stack.push(E::S(": "));
-                            stack.push(E::N)
+                            stack.push(E::N(true))
                         }
                     }
                     E::B => match iter.peek() {
                         None => {
-                            write!(f, " !!! indefinite byte string not closed")?;
+                            f.write_str(" !!! indefinite byte string not closed")?;
                             return Ok(())
                         }
                         Some(Ok(Token::Break)) => {
@@ -206,12 +211,12 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                         _ => {
                             stack.push(E::B);
                             stack.push(E::X(", "));
-                            stack.push(E::N)
+                            stack.push(E::N(true))
                         }
                     }
                     E::D => match iter.peek() {
                         None => {
-                            write!(f, " !!! indefinite string not closed")?;
+                            f.write_str(" !!! indefinite string not closed")?;
                             return Ok(())
                         }
                         Some(Ok(Token::Break)) => {
@@ -221,7 +226,7 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                         _ => {
                             stack.push(E::D);
                             stack.push(E::X(", "));
-                            stack.push(E::N)
+                            stack.push(E::N(true))
                         }
                     }
                 }
