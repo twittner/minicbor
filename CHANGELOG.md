@@ -7,6 +7,11 @@
 
 # minicbor
 
+## `0.26.3`
+
+- Depends on `minicbor-derive-0.16.2`.
+
+
 ## `0.26.2`
 
 - Fixes issue with `minicbor::display` (see issue
@@ -370,6 +375,11 @@
 - Added `Encode` and `Decode` impls for tuples (see merge request [1][mr1] by @koushiro).
 
 # minicbor-derive
+
+## `0.16.2`
+
+- Bugfix release (see pull request [#26](https://github.com/twittner/minicbor/pull/26) by
+  @carloskiki for details)
 
 ## `0.16.1`
 
