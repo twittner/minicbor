@@ -311,11 +311,11 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
         let unknown_var_err =
             if let Some(cd) = field.attrs.codec() {
                 if let Some(p) = cd.to_nil_path() {
-                    let field_type = &field.typ;
+                    let ty = &field.typ;
                     quote! {
                         Err(e) if e.is_unknown_variant() && {
-                            let maybe_nil: Option<#field_type> = #p();
-                            maybe_nil.is_some()
+                            let __nil777: Option<#ty> = #p();
+                            __nil777.is_some()
                         } => {
                             __d777.skip()?
                         }
