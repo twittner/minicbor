@@ -764,6 +764,12 @@ impl<'a, 'b> Iterator for BytesIter<'a, 'b> {
             }
         }
     }
+    
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.len
+            .map(|n| (n, Some(n)))
+            .unwrap_or_default()
+    }
 }
 
 /// An iterator over string slices.
@@ -792,6 +798,12 @@ impl<'a, 'b> Iterator for StrIter<'a, 'b> {
                 Some(self.decoder.read_slice(n).and_then(|d| str::from_utf8(d).map_err(|e| Error::utf8(e).at(self.pos))))
             }
         }
+    }
+    
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.len
+            .map(|n| (n, Some(n)))
+            .unwrap_or_default()
     }
 }
 
@@ -822,6 +834,12 @@ impl<'a, 'b, T: Decode<'b, ()>> Iterator for ArrayIter<'a, 'b, T> {
             }
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.len
+            .map(|n| (n as usize, Some(n as usize)))
+            .unwrap_or_default()
+    }
 }
 
 /// An iterator over array elements.
@@ -851,6 +869,12 @@ impl<'a, 'b, C, T: Decode<'b, C>> Iterator for ArrayIterWithCtx<'a, 'b, C, T> {
                 Some(T::decode(self.decoder, self.ctx))
             }
         }
+    }
+    
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.len
+            .map(|n| (n as usize, Some(n as usize)))
+            .unwrap_or_default()
     }
 }
 
@@ -892,6 +916,12 @@ where
             }
         }
     }
+    
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.len
+            .map(|n| (n as usize, Some(n as usize)))
+            .unwrap_or_default()
+    }
 }
 
 /// An iterator over map entries.
@@ -932,6 +962,12 @@ where
                 Some(pair(self.decoder, self.ctx))
             }
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.len
+            .map(|n| (n as usize, Some(n as usize)))
+            .unwrap_or_default()
     }
 }
 
