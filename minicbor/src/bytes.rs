@@ -22,7 +22,7 @@ use core::ops::{Deref, DerefMut};
 use alloc::vec::Vec;
 
 #[cfg(all(feature = "alloc", feature = "derive"))]
-use alloc::borrow::{Cow, ToOwned};
+use alloc::{boxed::Box, borrow::{Cow, ToOwned}};
 
 /// Newtype for `[u8]`.
 ///
