@@ -7,6 +7,10 @@
 
 # minicbor
 
+## [Unreleased]
+
+- Implement `EncodeBytes`, `DecodeBytes` and `CborLenBytes` for `Box<[u8]>`.
+
 ## `0.26.2`
 
 - Fixes issue with `minicbor::display` (see issue
