@@ -7,6 +7,11 @@
 
 # minicbor
 
+## [Unreleased]
+
+- More accurate implementation of `size_hint` for the following iterators:
+  `decode::ArrayIter`, `decode::ArrayIterWithCtx`, `decode::MapIter`, `decode::MapIterWithCtx`, `decode::BytesIter`, `decode::StrIter`
+
 ## `0.26.2`
 
 - Fixes issue with `minicbor::display` (see issue
