@@ -11,6 +11,12 @@
 
 - More accurate implementation of `size_hint` for the following iterators:
   `decode::ArrayIter`, `decode::ArrayIterWithCtx`, `decode::MapIter`, `decode::MapIterWithCtx`, `decode::BytesIter`, `decode::StrIter`
+- Implement `EncodeBytes`, `DecodeBytes` and `CborLenBytes` for `Box<[u8]>`
+
+## `0.26.3`
+
+- Depends on `minicbor-derive-0.16.2`.
+
 
 ## `0.26.2`
 
@@ -375,6 +381,11 @@
 - Added `Encode` and `Decode` impls for tuples (see merge request [1][mr1] by @koushiro).
 
 # minicbor-derive
+
+## `0.16.2`
+
+- Bugfix release (see pull request [#26](https://github.com/twittner/minicbor/pull/26) by
+  @carloskiki for details)
 
 ## `0.16.1`
 
