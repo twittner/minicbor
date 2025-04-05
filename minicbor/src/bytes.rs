@@ -22,7 +22,7 @@ use core::ops::{Deref, DerefMut};
 use alloc::vec::Vec;
 
 #[cfg(all(feature = "alloc", feature = "derive"))]
-use alloc::borrow::{Cow, ToOwned};
+use alloc::{boxed::Box, borrow::{Cow, ToOwned}};
 
 /// Newtype for `[u8]`.
 ///
@@ -372,6 +372,28 @@ impl<'b, C> DecodeBytes<'b, C> for Vec<u8> {
 
 #[cfg(all(feature = "alloc", feature = "derive"))]
 impl<C> CborLenBytes<C> for Vec<u8> {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        let n = self.len();
+        n.cbor_len(ctx) + n
+    }
+}
+
+#[cfg(all(feature = "alloc", feature = "derive"))]
+impl<C> EncodeBytes<C> for Box<[u8]> {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
+        e.bytes(self)?.ok()
+    }
+}
+
+#[cfg(all(feature = "alloc", feature = "derive"))]
+impl<'b, C> DecodeBytes<'b, C> for Box<[u8]> {
+    fn decode_bytes(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, decode::Error> {
+        d.bytes().map(Box::from)
+    }
+}
+
+#[cfg(all(feature = "alloc", feature = "derive"))]
+impl<C> CborLenBytes<C> for Box<[u8]> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         let n = self.len();
         n.cbor_len(ctx) + n

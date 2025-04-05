@@ -7,10 +7,14 @@
 
 # minicbor
 
+
+## [Unreleased]
+
+- Implement `EncodeBytes`, `DecodeBytes` and `CborLenBytes` for `Box<[u8]>`.
+
 ## `0.26.3`
 
 - Depends on `minicbor-derive-0.16.2`.
-
 
 ## `0.26.2`
 
