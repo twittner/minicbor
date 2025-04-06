@@ -7,14 +7,16 @@
 
 # minicbor
 
-
 ## [Unreleased]
 
-- Implement `EncodeBytes`, `DecodeBytes` and `CborLenBytes` for `Box<[u8]>`.
+- More accurate implementation of `size_hint` for the following iterators:
+  `decode::ArrayIter`, `decode::ArrayIterWithCtx`, `decode::MapIter`, `decode::MapIterWithCtx`, `decode::BytesIter`, `decode::StrIter`
+- Implement `EncodeBytes`, `DecodeBytes` and `CborLenBytes` for `Box<[u8]>`
 
 ## `0.26.3`
 
 - Depends on `minicbor-derive-0.16.2`.
+
 
 ## `0.26.2`
 
