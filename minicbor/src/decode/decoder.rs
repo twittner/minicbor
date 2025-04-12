@@ -282,10 +282,10 @@ impl<'b> Decoder<'b> {
                 .at(p))
         }
         match info_of(b) {
-            31 => Ok(BytesIter { decoder: self, len: None }),
+            31 => Ok(BytesIter { decoder: self, state: State::Indef }),
             n  => {
                 let len = u64_to_usize(self.unsigned(n, p)?, p)?;
-                Ok(BytesIter { decoder: self, len: Some(len) })
+                Ok(BytesIter { decoder: self, state: State::Def(len) })
             }
         }
     }
@@ -321,10 +321,10 @@ impl<'b> Decoder<'b> {
                 .at(p))
         }
         match info_of(b) {
-            31 => Ok(StrIter { decoder: self, len: None, pos: p }),
+            31 => Ok(StrIter { decoder: self, state: State::Indef, pos: p }),
             n  => {
                 let len = u64_to_usize(self.unsigned(n, p)?, p)?;
-                Ok(StrIter { decoder: self, len: Some(len), pos: p })
+                Ok(StrIter { decoder: self, state: State::Def(len), pos: p })
             }
         }
     }
@@ -358,7 +358,7 @@ impl<'b> Decoder<'b> {
         T: Decode<'b, ()>
     {
         let len = self.array()?;
-        Ok(ArrayIter { decoder: self, len, _mark: marker::PhantomData })
+        Ok(ArrayIter { decoder: self, state: len.into(), _mark: marker::PhantomData })
     }
 
     /// Iterate over all array elements.
@@ -371,7 +371,7 @@ impl<'b> Decoder<'b> {
         T: Decode<'b, C>
     {
         let len = self.array()?;
-        Ok(ArrayIterWithCtx { decoder: self, ctx, len, _mark: marker::PhantomData })
+        Ok(ArrayIterWithCtx { decoder: self, ctx, state: len.into(), _mark: marker::PhantomData })
     }
 
     /// Begin decoding a map.
@@ -404,7 +404,7 @@ impl<'b> Decoder<'b> {
         V: Decode<'b, ()>
     {
         let len = self.map()?;
-        Ok(MapIter { decoder: self, len, _mark: marker::PhantomData })
+        Ok(MapIter { decoder: self, state: len.into(), _mark: marker::PhantomData })
     }
 
     /// Iterate over all map entries.
@@ -418,7 +418,7 @@ impl<'b> Decoder<'b> {
         V: Decode<'b, C>
     {
         let len = self.map()?;
-        Ok(MapIterWithCtx { decoder: self, ctx, len, _mark: marker::PhantomData })
+        Ok(MapIterWithCtx { decoder: self, ctx, state: len.into(), _mark: marker::PhantomData })
     }
 
     /// Decode a CBOR tag.
@@ -744,24 +744,35 @@ impl<'b> Decoder<'b> {
 #[derive(Debug)]
 pub struct BytesIter<'a, 'b> {
     decoder: &'a mut Decoder<'b>,
-    len: Option<usize>
+    state: State<usize>
 }
 
 impl<'a, 'b> Iterator for BytesIter<'a, 'b> {
     type Item = Result<&'b [u8], Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.len {
-            None => match self.decoder.current() {
-                Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
-                Ok(_)     => Some(self.decoder.bytes()),
-                Err(e)    => Some(Err(e))
+        match self.state {
+            State::Indef => match self.decoder.current() {
+                Ok(BREAK) => {
+                    self.state = State::End;
+                    self.decoder.read().map(|_| None).transpose()
+                }
+                Ok(_)  => Some(self.decoder.bytes()),
+                Err(e) => Some(Err(e))
             }
-            Some(0) => None,
-            Some(n) => {
-                self.len = Some(0);
+            State::End    => None,
+            State::Def(n) => {
+                self.state = State::End;
                 Some(self.decoder.read_slice(n))
             }
+        }
+    }
+    
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self.state {
+            State::Def(_) => (1, Some(1)),
+            State::End    => (0, Some(0)),
+            State::Indef  => (0, None)
         }
     }
 }
@@ -772,7 +783,7 @@ impl<'a, 'b> Iterator for BytesIter<'a, 'b> {
 #[derive(Debug)]
 pub struct StrIter<'a, 'b> {
     decoder: &'a mut Decoder<'b>,
-    len: Option<usize>,
+    state: State<usize>,
     pos: usize
 }
 
@@ -780,17 +791,30 @@ impl<'a, 'b> Iterator for StrIter<'a, 'b> {
     type Item = Result<&'b str, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.len {
-            None => match self.decoder.current() {
-                Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
-                Ok(_)     => Some(self.decoder.str()),
-                Err(e)    => Some(Err(e))
+        match self.state {
+            State::Indef => match self.decoder.current() {
+                Ok(BREAK) => {
+                    self.state = State::End;
+                    self.decoder.read().map(|_| None).transpose()
+                }
+                Ok(_)  => Some(self.decoder.str()),
+                Err(e) => Some(Err(e))
             }
-            Some(0) => None,
-            Some(n) => {
-                self.len = Some(0);
-                Some(self.decoder.read_slice(n).and_then(|d| str::from_utf8(d).map_err(|e| Error::utf8(e).at(self.pos))))
+            State::End    => None,
+            State::Def(n) => {
+                self.state = State::End;
+                Some(self.decoder.read_slice(n).and_then(|d| {
+                    str::from_utf8(d).map_err(|e| Error::utf8(e).at(self.pos))
+                }))
             }
+        }
+    }
+    
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self.state {
+            State::Def(_) => (1, Some(1)),
+            State::End    => (0, Some(0)),
+            State::Indef  => (0, None)
         }
     }
 }
@@ -801,7 +825,7 @@ impl<'a, 'b> Iterator for StrIter<'a, 'b> {
 #[derive(Debug)]
 pub struct ArrayIter<'a, 'b, T> {
     decoder: &'a mut Decoder<'b>,
-    len: Option<u64>,
+    state: State<u64>,
     _mark: marker::PhantomData<fn(T)>
 }
 
@@ -809,18 +833,25 @@ impl<'a, 'b, T: Decode<'b, ()>> Iterator for ArrayIter<'a, 'b, T> {
     type Item = Result<T, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.len {
-            None => match self.decoder.current() {
-                Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
-                Ok(_)     => Some(T::decode(self.decoder, &mut ())),
-                Err(e)    => Some(Err(e))
+        match self.state {
+            State::Indef => match self.decoder.current() {
+                Ok(BREAK) => {
+                    self.state = State::End;
+                    self.decoder.read().map(|_| None).transpose()
+                }
+                Ok(_)  => Some(T::decode(self.decoder, &mut ())),
+                Err(e) => Some(Err(e))
             }
-            Some(0) => None,
-            Some(n) => {
-                self.len = Some(n - 1);
+            State::Def(0) | State::End => None,
+            State::Def(n) => {
+                self.state = State::Def(n - 1);
                 Some(T::decode(self.decoder, &mut ()))
             }
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.state.as_size_hint()
     }
 }
 
@@ -831,7 +862,7 @@ impl<'a, 'b, T: Decode<'b, ()>> Iterator for ArrayIter<'a, 'b, T> {
 pub struct ArrayIterWithCtx<'a, 'b, C, T> {
     decoder: &'a mut Decoder<'b>,
     ctx: &'a mut C,
-    len: Option<u64>,
+    state: State<u64>,
     _mark: marker::PhantomData<fn(T)>
 }
 
@@ -839,18 +870,25 @@ impl<'a, 'b, C, T: Decode<'b, C>> Iterator for ArrayIterWithCtx<'a, 'b, C, T> {
     type Item = Result<T, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.len {
-            None => match self.decoder.current() {
-                Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
-                Ok(_)     => Some(T::decode(self.decoder, self.ctx)),
-                Err(e)    => Some(Err(e))
+        match self.state {
+            State::Indef => match self.decoder.current() {
+                Ok(BREAK) => {
+                    self.state = State::End;
+                    self.decoder.read().map(|_| None).transpose()
+                }
+                Ok(_)  => Some(T::decode(self.decoder, self.ctx)),
+                Err(e) => Some(Err(e))
             }
-            Some(0) => None,
-            Some(n) => {
-                self.len = Some(n - 1);
+            State::Def(0) | State::End => None,
+            State::Def(n) => {
+                self.state = State::Def(n - 1);
                 Some(T::decode(self.decoder, self.ctx))
             }
         }
+    }
+    
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.state.as_size_hint()
     }
 }
 
@@ -860,7 +898,7 @@ impl<'a, 'b, C, T: Decode<'b, C>> Iterator for ArrayIterWithCtx<'a, 'b, C, T> {
 #[derive(Debug)]
 pub struct MapIter<'a, 'b, K, V> {
     decoder: &'a mut Decoder<'b>,
-    len: Option<u64>,
+    state: State<u64>,
     _mark: marker::PhantomData<fn(K, V)>
 }
 
@@ -879,18 +917,25 @@ where
         {
             Ok((K::decode(d, &mut ())?, V::decode(d, &mut ())?))
         }
-        match self.len {
-            None => match self.decoder.current() {
-                Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
+        match self.state {
+            State::Indef => match self.decoder.current() {
+                Ok(BREAK) => {
+                    self.state = State::End;
+                    self.decoder.read().map(|_| None).transpose()
+                }
                 Ok(_)  => Some(pair(self.decoder)),
                 Err(e) => Some(Err(e))
             }
-            Some(0) => None,
-            Some(n) => {
-                self.len = Some(n - 1);
+            State::Def(0) | State::End => None,
+            State::Def(n) => {
+                self.state = State::Def(n - 1);
                 Some(pair(self.decoder))
             }
         }
+    }
+    
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.state.as_size_hint()
     }
 }
 
@@ -901,7 +946,7 @@ where
 pub struct MapIterWithCtx<'a, 'b, C, K, V> {
     decoder: &'a mut Decoder<'b>,
     ctx: &'a mut C,
-    len: Option<u64>,
+    state: State<u64>,
     _mark: marker::PhantomData<fn(K, V)>
 }
 
@@ -920,17 +965,62 @@ where
         {
             Ok((K::decode(d, ctx)?, V::decode(d, ctx)?))
         }
-        match self.len {
-            None => match self.decoder.current() {
-                Ok(BREAK) => self.decoder.read().map(|_| None).transpose(),
+        match self.state {
+            State::Indef => match self.decoder.current() {
+                Ok(BREAK) => {
+                    self.state = State::End;
+                    self.decoder.read().map(|_| None).transpose()
+                }
                 Ok(_)  => Some(pair(self.decoder, self.ctx)),
                 Err(e) => Some(Err(e))
             }
-            Some(0) => None,
-            Some(n) => {
-                self.len = Some(n - 1);
+            State::Def(0) | State::End => None,
+            State::Def(n) => {
+                self.state = State::Def(n - 1);
                 Some(pair(self.decoder, self.ctx))
             }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.state.as_size_hint()
+    }
+}
+
+/// Iterator state.
+#[derive(Debug, Copy, Clone)]
+enum State<T> {
+    /// Definite length.
+    Def(T),
+    /// End of iteration.
+    End,
+    /// Indefinite length.
+    Indef
+}
+
+impl<T> From<Option<T>> for State<T> {
+    fn from(val: Option<T>) -> Self {
+        if let Some(n) = val {
+            Self::Def(n)
+        } else {
+            Self::Indef
+        }
+    }
+}
+
+impl<T> State<T>
+where
+    usize: TryFrom<T>
+{
+    fn as_size_hint(self) -> (usize, Option<usize>) {
+        match self {
+            Self::Def(n) =>
+                usize::try_from(n)
+                    .ok()
+                    .map(|n| (n, Some(n)))
+                    .unwrap_or_default(),
+            Self::End   => (0, Some(0)),
+            Self::Indef => (0, None)
         }
     }
 }

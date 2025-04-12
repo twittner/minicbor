@@ -7,10 +7,21 @@
 
 # minicbor
 
+## `0.26.4`
+
+- Implementations of `Iterator::size_hint` for `decode::{ArrayIter, ArrayIterWithCtx},
+  `decode::{MapIter, MapIterWithCtx}` and `decode::{BytesIter, StrIter}` (see pull request
+  [#27](https://github.com/twittner/minicbor/pull/27) by @carloskiki for details).
+- Fixes an issue with `decode::{BytesIter, StrIter}`, both of which would yield `None` for
+  definite but empty bytes or text. They now yield `Some(&[])` or `Some("")` respectively.
+  Note that the behaviour for non-empty definite bytes or text values and for indefinite ones
+  does not change.
+- Implements `EncodeBytes`, `DecodeBytes` and `CborLenBytes` for `Box<[u8]>` (see pull request
+  [#28](https://github.com/twittner/minicbor/pull/28) by @carloskiki for details).
+
 ## `0.26.3`
 
 - Depends on `minicbor-derive-0.16.2`.
-
 
 ## `0.26.2`
 
