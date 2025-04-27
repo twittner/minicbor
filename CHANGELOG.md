@@ -7,6 +7,10 @@
 
 # minicbor
 
+## `0.26.5`
+
+- Add `encode::write::Cursor::set_position`.
+
 ## `0.26.4`
 
 - Implementations of `Iterator::size_hint` for `decode::{ArrayIter, ArrayIterWithCtx},
