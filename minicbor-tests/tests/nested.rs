@@ -72,12 +72,12 @@ struct Rec<'a, 'b>(Tokenizer<'a, 'b>);
 
 impl fmt::Display for Rec<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fn gen(it: &mut Tokenizer<'_, '_>, f: &mut fmt::Formatter) -> fmt::Result {
+        fn mk(it: &mut Tokenizer<'_, '_>, f: &mut fmt::Formatter) -> fmt::Result {
             match it.next() {
                 Some(Ok(Token::Array(n))) => {
                     f.write_str("[")?;
                     for i in 0 .. n {
-                        gen(it, f)?;
+                        mk(it, f)?;
                         if i < n - 1 {
                             f.write_str(", ")?
                         }
@@ -87,9 +87,9 @@ impl fmt::Display for Rec<'_, '_> {
                 Some(Ok(Token::Map(n))) => {
                     f.write_str("{")?;
                     for i in 0 .. n {
-                        gen(it, f)?;
+                        mk(it, f)?;
                         f.write_str(": ")?;
-                        gen(it, f)?;
+                        mk(it, f)?;
                         if i < n - 1 {
                             f.write_str(", ")?
                         }
@@ -102,7 +102,7 @@ impl fmt::Display for Rec<'_, '_> {
             }
         }
         let mut this = self.0.clone();
-        gen(&mut this, f)
+        mk(&mut this, f)
     }
 }
 

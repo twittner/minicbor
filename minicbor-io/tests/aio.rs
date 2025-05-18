@@ -70,9 +70,9 @@ async fn read_write_identity() {
     let (addr, server) = server().await.unwrap();
     let join = tokio::spawn(echo::<Record>(server));
 
-    let mut gen = Gen::new(20);
-    let mut rng = rand::rng();
-    let rounds  = rng.random_range(10 .. 30);
+    let mut g  = Gen::new(20);
+    let mut r  = rand::rng();
+    let rounds = r.random_range(10 .. 30);
 
     for n in 0u8 .. rounds {
         let mut client = TcpStream::connect(addr).await.unwrap();
@@ -80,8 +80,8 @@ async fn read_write_identity() {
         let mut reader = AsyncReader::new(reader.compat());
         let mut writer = AsyncWriter::new(writer.compat_write());
 
-        for _ in 0u8 .. rng.random_range(1 .. 50) {
-            let a = Record::arbitrary(&mut gen);
+        for _ in 0u8 .. r.random_range(1 .. 50) {
+            let a = Record::arbitrary(&mut g);
             writer.write(Command::Value(&a)).await.unwrap();
             let b: RecordView<'_> = reader.read().await.unwrap().unwrap();
             assert_eq!(a.firstname, b.firstname);

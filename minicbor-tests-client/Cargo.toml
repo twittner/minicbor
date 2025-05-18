@@ -2,7 +2,7 @@
 publish = false
 name    = "minicbor-tests-client"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [features]
 alloc  = ["minicbor/alloc"]
