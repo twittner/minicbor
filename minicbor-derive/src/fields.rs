@@ -121,23 +121,23 @@ impl ExactSizeIterator for FieldIter<'_> {
 }
 
 impl<'a> FieldIter<'a> {
-    pub fn attributes(&self) -> impl Iterator<Item = &'a Attributes> + Clone {
+    pub fn attributes(&self) -> impl Iterator<Item = &'a Attributes> + Clone + use<'a> {
         self.clone().map(|f| &f.attrs)
     }
 
-    pub fn idents(&self) -> impl Iterator<Item = &'a Ident> + Clone {
+    pub fn idents(&self) -> impl Iterator<Item = &'a Ident> + Clone + use<'a> {
         self.clone().map(|f| &f.ident)
     }
 
-    pub fn types(&self) -> impl Iterator<Item = &'a Type> {
+    pub fn types(&self) -> impl Iterator<Item = &'a Type> + use<'a> {
         self.clone().map(|f| &f.typ)
     }
 
-    pub fn indices(&self) -> impl Iterator<Item = Idx> + 'a {
+    pub fn indices(&self) -> impl Iterator<Item = Idx> + use<'a> {
         self.clone().map(|f| f.index)
     }
 
-    pub fn positions(&self) -> impl Iterator<Item = usize> + 'a {
+    pub fn positions(&self) -> impl Iterator<Item = usize> + use<'a> {
         self.clone().map(|f| f.pos)
     }
 }

@@ -37,8 +37,8 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         p.bounds.push(encode_bound.clone())
     }
 
-    let gen = add_typeparam(&inp.generics, gen_ctx_param()?, attrs.context_bound());
-    let impl_generics = gen.split_for_impl().0;
+    let generics = add_typeparam(&inp.generics, gen_ctx_param()?, attrs.context_bound());
+    let impl_generics = generics.split_for_impl().0;
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     // If transparent, just forward the len call to the inner type.
@@ -147,8 +147,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         p.bounds.push(cbor_len_bound.clone());
         p.bounds.push(encode_bound.clone())
     }
-    let gen = add_typeparam(&inp.generics, gen_ctx_param()?, enum_attrs.context_bound());
-    let impl_generics = gen.split_for_impl().0;
+    let generics = add_typeparam(&inp.generics, gen_ctx_param()?, enum_attrs.context_bound());
+    let impl_generics = generics.split_for_impl().0;
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
     let body = if rows.is_empty() {
