@@ -395,7 +395,7 @@
 
 # minicbor-derive
 
-## `1.0.0`
+## `0.17.0`
 
 - Updated to 2024 edition.
 
