@@ -7,6 +7,10 @@
 
 # minicbor
 
+## `1.0.0`
+
+- Updated to 2024 edition.
+
 ## `0.26.5`
 
 - Add `encode::write::Cursor::set_position`.
@@ -391,6 +395,10 @@
 
 # minicbor-derive
 
+## `0.17.0`
+
+- Updated to 2024 edition.
+
 ## `0.16.2`
 
 - Bugfix release (see pull request [#26](https://github.com/twittner/minicbor/pull/26) by
@@ -545,6 +553,11 @@
 
 # minicbor-io
 
+## `0.22.0`
+
+- Updated to 2024 edition.
+- Require `minicbor-1.0.0`.
+
 ## `0.21.0`
 
 - Require `minicbor-0.26.0`.
@@ -682,6 +695,11 @@
 - Initial release which provides some I/O utilities.
 
 # minicbor-serde
+
+## `0.5.0`
+
+- Updated to 2024 edition.
+- Require `minicbor-1.0.0`.
 
 ## `0.4.1`
 
