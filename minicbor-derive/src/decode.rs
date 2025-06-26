@@ -89,7 +89,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         let nils      = nils(fields.fields());
         let indices   = fields.fields().indices();
         let idents    = fields.fields().idents();
-        let field_str = fields.fields().idents().map(|n| format!("{}::{}", name, n));
+        let field_str = fields.fields().idents().map(|n| format!("{name}::{n}"));
         let skipped   = fields.skipped().idents();
         quote! {
             Ok(#name {
@@ -191,7 +191,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 let nils      = nils(fields.fields());
                 let indices   = fields.fields().indices();
                 let idents    = fields.fields().idents();
-                let field_str = fields.fields().idents().map(|n| format!("{}::{}::{}", name, con, n));
+                let field_str = fields.fields().idents().map(|n| format!("{name}::{con}::{n}"));
                 let skipped   = fields.skipped().idents();
                 quote! {
                     #idx => {

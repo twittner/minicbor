@@ -18,9 +18,9 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::Io(e) => write!(f, "i/o error: {}", e),
-            Error::Decode(e) => write!(f, "decode error: {}", e),
-            Error::Encode(e) => write!(f, "encode error: {}", e),
+            Error::Io(e) => write!(f, "i/o error: {e}"),
+            Error::Decode(e) => write!(f, "decode error: {e}"),
+            Error::Encode(e) => write!(f, "encode error: {e}"),
             Error::InvalidLen => f.write_str("invalid length")
         }
     }

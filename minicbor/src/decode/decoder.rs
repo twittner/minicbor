@@ -767,7 +767,7 @@ impl<'a, 'b> Iterator for BytesIter<'a, 'b> {
             }
         }
     }
-    
+
     fn size_hint(&self) -> (usize, Option<usize>) {
         match self.state {
             State::Def(_) => (1, Some(1)),
@@ -809,7 +809,7 @@ impl<'a, 'b> Iterator for StrIter<'a, 'b> {
             }
         }
     }
-    
+
     fn size_hint(&self) -> (usize, Option<usize>) {
         match self.state {
             State::Def(_) => (1, Some(1)),
@@ -851,7 +851,7 @@ impl<'a, 'b, T: Decode<'b, ()>> Iterator for ArrayIter<'a, 'b, T> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.state.as_size_hint()
+        self.state.into_size_hint()
     }
 }
 
@@ -886,9 +886,9 @@ impl<'a, 'b, C, T: Decode<'b, C>> Iterator for ArrayIterWithCtx<'a, 'b, C, T> {
             }
         }
     }
-    
+
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.state.as_size_hint()
+        self.state.into_size_hint()
     }
 }
 
@@ -933,9 +933,9 @@ where
             }
         }
     }
-    
+
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.state.as_size_hint()
+        self.state.into_size_hint()
     }
 }
 
@@ -983,7 +983,7 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.state.as_size_hint()
+        self.state.into_size_hint()
     }
 }
 
@@ -1012,7 +1012,7 @@ impl<T> State<T>
 where
     usize: TryFrom<T>
 {
-    fn as_size_hint(self) -> (usize, Option<usize>) {
+    fn into_size_hint(self) -> (usize, Option<usize>) {
         match self {
             Self::Def(n) =>
                 usize::try_from(n)
