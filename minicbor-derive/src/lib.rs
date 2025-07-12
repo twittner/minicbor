@@ -513,7 +513,7 @@ pub(crate) mod fields;
 pub(crate) mod lifetimes;
 pub(crate) mod variants;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Derive the `minicbor::Decode` trait for a struct or enum.
 ///
@@ -618,8 +618,8 @@ fn is_byte_slice(ty: &syn::Type) -> bool {
     }
 }
 
-/// Traverse all field types and collect all type parameters along the way.
-fn collect_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashSet<syn::TypeParam>
+/// Traverse all field types and count all type parameters along the way.
+fn count_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashMap<syn::TypeParam, usize>
 where
     I: Iterator<Item = &'a fields::Field>
 {
@@ -627,7 +627,7 @@ where
 
     struct Collector {
         all: Vec<syn::Ident>,
-        found: HashSet<syn::TypeParam>
+        found: HashMap<syn::TypeParam, usize>
     }
 
     impl<'a> Visit<'a> for Collector {
@@ -635,7 +635,7 @@ where
             if let syn::Type::Path(ty) = &f.ty {
                 if let Some(t) = ty.path.segments.first() {
                     if self.all.contains(&t.ident) {
-                        self.found.insert(syn::TypeParam::from(t.ident.clone()));
+                        *self.found.entry(syn::TypeParam::from(t.ident.clone())).or_default() += 1
                     }
                 }
             }
@@ -646,7 +646,7 @@ where
             if p.leading_colon.is_none() && p.segments.len() == 1 {
                 let id = &p.segments[0].ident;
                 if self.all.contains(id) {
-                    self.found.insert(syn::TypeParam::from(id.clone()));
+                    *self.found.entry(syn::TypeParam::from(id.clone())).or_default() += 1
                 }
             }
             syn::visit::visit_path(self, p)
@@ -655,7 +655,7 @@ where
 
     let mut c = Collector {
         all: all.type_params().map(|tp| tp.ident.clone()).collect(),
-        found: HashSet::new()
+        found: HashMap::new()
     };
 
     for f in fields {
@@ -663,6 +663,14 @@ where
     }
 
     c.found
+}
+
+/// Traverse all field types and collect all type parameters along the way.
+fn collect_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashSet<syn::TypeParam>
+where
+    I: Iterator<Item = &'a fields::Field>
+{
+    count_type_params(all, fields).into_keys().collect()
 }
 
 fn add_bound_to_type_params<'a, I, A>
@@ -722,4 +730,20 @@ where
 
 fn gen_ctx_param() -> syn::Result<syn::TypeParam> {
     syn::parse_str("Ctx")
+}
+
+fn is_phantom_data(t: &syn::Type) -> bool {
+    let syn::Type::Path(path) = t else {
+        return false
+    };
+    let Some(last) = path.path.segments.last() else {
+        return false
+    };
+    if last.ident != "PhantomData" || !matches!(last.arguments, syn::PathArguments::AngleBracketed(_)) {
+        return false
+    }
+    let prefix = path.path.segments.iter().map(|s| &s.ident).rev().skip(1);
+    let a = ["marker", "std"];
+    let b = ["marker", "core"];
+    prefix.clone().zip(a).all(|(p, a)| p == a) || prefix.zip(b).all(|(p, b)| p == b)
 }

@@ -1,7 +1,9 @@
-use crate::{attrs::{Attributes, Level, Encoding, CustomCodec}, fields::Fields, add_typeparam, gen_ctx_param, variants::Variants, encode::is_nil};
 use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
-use crate::fields::Field;
+
+use crate::{add_typeparam, encode::is_nil, fields::Fields, gen_ctx_param, variants::Variants};
+use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
+use crate::fields::{Blacklist, Field};
 
 /// Entry point to derive `minicbor::CborLen` on structs and enums.
 pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -26,15 +28,18 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             unreachable!("`derive_from` matched against `syn::Data::Struct`")
         };
 
-    let name   = &inp.ident;
-    let attrs  = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let fields = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
+    let name      = &inp.ident;
+    let attrs     = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
+    let fields    = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
+    let blacklist = fields.gen_blacklist(&inp.generics, None);
 
     let cbor_len_bound = gen_cbor_len_bound()?;
     let encode_bound   = gen_encode_bound()?;
     for p in inp.generics.type_params_mut() {
-        p.bounds.push(cbor_len_bound.clone());
-        p.bounds.push(encode_bound.clone())
+        if !blacklist.contains(p) {
+            p.bounds.push(cbor_len_bound.clone());
+            p.bounds.push(encode_bound.clone())
+        }
     }
 
     let generics = add_typeparam(&inp.generics, gen_ctx_param()?, attrs.context_bound());
@@ -81,9 +86,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
+    let mut blacklist = Blacklist::default();
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
-        let fields   = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
+        let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
+        blacklist.merge(&inp.generics, None, &fields);
         let con      = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag      = on_tag(attrs);
@@ -144,8 +151,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let cbor_len_bound = gen_cbor_len_bound()?;
     let encode_bound   = gen_encode_bound()?;
     for p in inp.generics.type_params_mut() {
-        p.bounds.push(cbor_len_bound.clone());
-        p.bounds.push(encode_bound.clone())
+        if !blacklist.contains(p) {
+            p.bounds.push(cbor_len_bound.clone());
+            p.bounds.push(encode_bound.clone())
+        }
     }
     let generics = add_typeparam(&inp.generics, gen_ctx_param()?, enum_attrs.context_bound());
     let impl_generics = generics.split_for_impl().0;
@@ -331,4 +340,3 @@ fn on_tag(a: &Attributes) -> proc_macro2::TokenStream {
         quote!(0)
     }
 }
-
