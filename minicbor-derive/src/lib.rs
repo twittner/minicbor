@@ -619,7 +619,7 @@ fn is_byte_slice(ty: &syn::Type) -> bool {
 }
 
 /// Traverse all field types and count all type parameters along the way.
-fn count_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashMap<syn::TypeParam, usize>
+fn count_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashMap<syn::Ident, usize>
 where
     I: Iterator<Item = &'a fields::Field>
 {
@@ -627,7 +627,7 @@ where
 
     struct Collector {
         all: HashSet<syn::Ident>,
-        found: HashMap<syn::TypeParam, usize>
+        found: HashMap<syn::Ident, usize>
     }
 
     impl<'a> Visit<'a> for Collector {
@@ -635,7 +635,7 @@ where
             if p.path.leading_colon.is_none() && p.path.segments.len() == 1 {
                 let id = &p.path.segments[0].ident;
                 if self.all.contains(id) {
-                    *self.found.entry(syn::TypeParam::from(id.clone())).or_default() += 1
+                    *self.found.entry(id.clone()).or_default() += 1
                 }
             }
             syn::visit::visit_type_path(self, p)
@@ -655,7 +655,7 @@ where
 }
 
 /// Traverse all field types and collect all type parameters along the way.
-fn collect_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashSet<syn::TypeParam>
+fn collect_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashSet<syn::Ident>
 where
     I: Iterator<Item = &'a fields::Field>
 {
@@ -665,7 +665,7 @@ where
 fn add_bound_to_type_params<'a, I, A>
     ( bound: syn::TypeParamBound
     , params: I
-    , blacklist: &HashSet<syn::TypeParam>
+    , blacklist: &HashSet<syn::Ident>
     , attrs: A
     , mode: Mode
     )
@@ -684,7 +684,7 @@ where
     for p in params {
         if let Some(t) = find_type_param(p) {
             p.bounds.extend(t.bounds.iter().cloned())
-        } else if !blacklist.contains(p) {
+        } else if !blacklist.contains(&p.ident) {
             p.bounds.push(bound.clone())
         }
     }

@@ -192,7 +192,7 @@ impl<'a> FieldIter<'a> {
 }
 
 #[derive(Default)]
-pub(crate) struct Blacklist(HashSet<syn::TypeParam>);
+pub(crate) struct Blacklist(HashSet<syn::Ident>);
 
 impl Blacklist {
     pub(crate) fn merge<M>(&mut self, g: &syn::Generics, m: M, f: &Fields)
@@ -209,14 +209,14 @@ impl Blacklist {
     }
 }
 
-impl From<Blacklist> for HashSet<syn::TypeParam> {
+impl From<Blacklist> for HashSet<syn::Ident> {
     fn from(b: Blacklist) -> Self {
         b.0
     }
 }
 
 impl Deref for Blacklist {
-    type Target = HashSet<syn::TypeParam>;
+    type Target = HashSet<syn::Ident>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

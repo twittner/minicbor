@@ -51,7 +51,6 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             (f.attrs.default() || f.attrs.skip()) && !is_phantom_data(&f.typ)
         }))
         .into_iter()
-        .map(|t| t.ident)
         .collect();
 
     let bound  = gen_decode_bound()?;
@@ -173,7 +172,6 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     (f.attrs.default() || f.attrs.skip()) && !is_phantom_data(&f.typ)
                 }))
                 .into_iter()
-                .map(|t| t.ident)
             );
             let statements = gen_statements(&fields, encoding, flat)?;
             if let syn::Fields::Named(_) = var.fields {

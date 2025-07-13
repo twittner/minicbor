@@ -36,7 +36,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let cbor_len_bound = gen_cbor_len_bound()?;
     let encode_bound   = gen_encode_bound()?;
     for p in inp.generics.type_params_mut() {
-        if !blacklist.contains(p) {
+        if !blacklist.contains(&p.ident) {
             p.bounds.push(cbor_len_bound.clone());
             p.bounds.push(encode_bound.clone())
         }
@@ -151,7 +151,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let cbor_len_bound = gen_cbor_len_bound()?;
     let encode_bound   = gen_encode_bound()?;
     for p in inp.generics.type_params_mut() {
-        if !blacklist.contains(p) {
+        if !blacklist.contains(&p.ident) {
             p.bounds.push(cbor_len_bound.clone());
             p.bounds.push(encode_bound.clone())
         }
