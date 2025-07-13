@@ -626,30 +626,19 @@ where
     use syn::visit::Visit;
 
     struct Collector {
-        all: Vec<syn::Ident>,
+        all: HashSet<syn::Ident>,
         found: HashMap<syn::TypeParam, usize>
     }
 
     impl<'a> Visit<'a> for Collector {
-        fn visit_field(&mut self, f: &'a syn::Field) {
-            if let syn::Type::Path(ty) = &f.ty {
-                if let Some(t) = ty.path.segments.first() {
-                    if self.all.contains(&t.ident) {
-                        *self.found.entry(syn::TypeParam::from(t.ident.clone())).or_default() += 1
-                    }
-                }
-            }
-            self.visit_type(&f.ty)
-        }
-
-        fn visit_path(&mut self, p: &'a syn::Path) {
-            if p.leading_colon.is_none() && p.segments.len() == 1 {
-                let id = &p.segments[0].ident;
+        fn visit_type_path(&mut self, p: &'a syn::TypePath) {
+            if p.path.leading_colon.is_none() && p.path.segments.len() == 1 {
+                let id = &p.path.segments[0].ident;
                 if self.all.contains(id) {
                     *self.found.entry(syn::TypeParam::from(id.clone())).or_default() += 1
                 }
             }
-            syn::visit::visit_path(self, p)
+            syn::visit::visit_type_path(self, p)
         }
     }
 
