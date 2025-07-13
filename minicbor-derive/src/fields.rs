@@ -109,7 +109,7 @@ impl Fields {
     /// - Type parameters of fields with a custom encode or decode function.
     /// - Fields that are skipped over.
     /// - Fields with a `PhantomData` type.
-    pub(crate) fn gen_blacklist<M>(&self, g: &syn::Generics, mode: M) -> Blacklist
+    pub(crate) fn blacklist<M>(&self, g: &syn::Generics, mode: M) -> Blacklist
     where
         M: Into<Option<Mode>>
     {
@@ -199,7 +199,7 @@ impl Blacklist {
     where
         M: Into<Option<Mode>>
     {
-        let b = f.gen_blacklist(g, m);
+        let b = f.blacklist(g, m);
         for t in collect_type_params(g, f.fields()).difference(&b) {
             self.0.remove(t);
         }

@@ -36,7 +36,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let name      = &inp.ident;
     let attrs     = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
     let fields    = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
-    let blacklist = fields.gen_blacklist(&inp.generics, Mode::Decode);
+    let blacklist = fields.blacklist(&inp.generics, Mode::Decode);
 
     let mut lifetime = gen_lifetime()?;
     for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, f.attrs.borrow(), &f.typ))) {

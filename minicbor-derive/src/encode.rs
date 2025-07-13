@@ -35,7 +35,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let attrs     = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
     let encoding  = attrs.encoding().unwrap_or_default();
     let fields    = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
-    let blacklist = fields.gen_blacklist(&inp.generics, Mode::Encode);
+    let blacklist = fields.blacklist(&inp.generics, Mode::Encode);
 
     {
         let bound  = gen_encode_bound()?;

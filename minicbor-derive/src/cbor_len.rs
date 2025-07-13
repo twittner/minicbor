@@ -31,7 +31,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let name      = &inp.ident;
     let attrs     = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
     let fields    = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
-    let blacklist = fields.gen_blacklist(&inp.generics, None);
+    let blacklist = fields.blacklist(&inp.generics, None);
 
     let cbor_len_bound = gen_cbor_len_bound()?;
     let encode_bound   = gen_encode_bound()?;
