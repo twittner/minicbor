@@ -446,13 +446,18 @@ fn make_transparent_impl
     ) -> syn::Result<proc_macro2::TokenStream>
 {
     let default_decode_fn: syn::ExprPath = syn::parse_str("minicbor::Decode::decode")?;
+    let default_nil_fn: syn::ExprPath = syn::parse_str("minicbor::Decode::<Ctx>::nil")?;
 
     let decode_fn = field.attrs.codec()
         .filter(|cc| cc.is_decode())
         .and_then(CustomCodec::to_decode_path)
         .unwrap_or_else(|| default_decode_fn.clone());
 
-    let call =
+    let nil_fn = field.attrs.codec()
+        .and_then(|cc| cc.to_nil_path())
+        .unwrap_or_else(|| default_nil_fn.clone());
+
+    let decode_call =
         if cfg!(any(feature = "alloc", feature = "std"))
             && (field.attrs.borrow().is_some() || field.index.is_b())
             && is_cow(&field.typ, |t| is_str(t) || is_byte_slice(t))
@@ -492,10 +497,26 @@ fn make_transparent_impl
             }
         };
 
+    let nil_call =
+        if field.is_name {
+            let id = &field.ident;
+            quote! {
+                #nil_fn().map(|v| Self { #id: v })
+            }
+        } else {
+            quote! {
+                #nil_fn().map(Self)
+            }
+        };
+
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
             fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
-                #call
+                #decode_call
+            }
+
+            fn nil() -> core::option::Option<Self> {
+                #nil_call
             }
         }
     })
