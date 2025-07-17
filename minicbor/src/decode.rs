@@ -63,6 +63,10 @@ impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for alloc::boxed::Box<T> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         T::decode(d, ctx).map(alloc::boxed::Box::new)
     }
+
+    fn nil() -> Option<Self> {
+        T::nil().map(alloc::boxed::Box::new)
+    }
 }
 
 impl<'a, 'b: 'a, C> Decode<'b, C> for &'a str {
@@ -79,6 +83,10 @@ where
 {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         d.decode_with(ctx).map(alloc::borrow::Cow::Owned)
+    }
+
+    fn nil() -> Option<Self> {
+        T::Owned::nil().map(alloc::borrow::Cow::Owned)
     }
 }
 

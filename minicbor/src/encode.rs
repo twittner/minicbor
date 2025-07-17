@@ -58,6 +58,10 @@ impl<C, T: Encode<C> + ?Sized> Encode<C> for &T {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         (**self).encode(e, ctx)
     }
+
+    fn is_nil(&self) -> bool {
+        (**self).is_nil()
+    }
 }
 
 impl<C, T: CborLen<C> + ?Sized> CborLen<C> for &T {
@@ -69,6 +73,10 @@ impl<C, T: CborLen<C> + ?Sized> CborLen<C> for &T {
 impl<C, T: Encode<C> + ?Sized> Encode<C> for &mut T {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         (**self).encode(e, ctx)
+    }
+
+    fn is_nil(&self) -> bool {
+        (**self).is_nil()
     }
 }
 
@@ -82,6 +90,10 @@ impl<C, T: CborLen<C> + ?Sized> CborLen<C> for &mut T {
 impl<C, T: Encode<C> + ?Sized> Encode<C> for alloc::boxed::Box<T> {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         (**self).encode(e, ctx)
+    }
+
+    fn is_nil(&self) -> bool {
+        (**self).is_nil()
     }
 }
 
@@ -198,6 +210,10 @@ where
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         self.as_ref().encode(e, ctx)
+    }
+
+    fn is_nil(&self) -> bool {
+        self.as_ref().is_nil()
     }
 }
 
