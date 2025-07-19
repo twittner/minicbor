@@ -1,5 +1,9 @@
+use std::collections::HashSet;
+use std::ops::Deref;
+
 use crate::attrs::{Attributes, Idx, Kind, Level};
 use crate::attrs::idx;
+use crate::{collect_type_params, count_type_params, is_phantom_data, Mode};
 use proc_macro2::Span;
 use syn::{Ident, Type};
 use syn::spanned::Spanned;
@@ -97,6 +101,51 @@ impl Fields {
         all.sort_unstable_by_key(|(p, _)| *p);
         all.into_iter().map(|(_, i)| i).collect()
     }
+
+    /// Generate a blacklist of type parameters that should not have bounds attached.
+    ///
+    /// This includes:
+    ///
+    /// - Type parameters of fields with a custom encode or decode function.
+    /// - Fields that are skipped over.
+    /// - Fields with a `PhantomData` type.
+    pub(crate) fn blacklist<M>(&self, g: &syn::Generics, mode: M) -> Blacklist
+    where
+        M: Into<Option<Mode>>
+    {
+        let mode = mode.into();
+
+        // Start with custom encode/decode functions.
+        let mut blacklist = collect_type_params(g, self.fields().filter(|f| {
+            match mode {
+                Some(Mode::Encode) => f.attrs.codec().map(|c| c.is_encode()).unwrap_or(false),
+                Some(Mode::Decode) => f.attrs.codec().map(|c| c.is_decode()).unwrap_or(false),
+                None               => false
+            }
+        }));
+
+        // Extend the blacklist by type parameters only appearing in skipped fields.
+        let skipped = collect_type_params(g, self.skipped());
+        if !skipped.is_empty() {
+            let regular = collect_type_params(g, self.fields());
+            blacklist.extend(skipped.difference(&regular).cloned())
+        }
+
+        // And finally also by type parameters only appearing in `PhantomData`.
+        let phantoms = count_type_params(g, self.fields().chain(self.skipped()).filter(|f| {
+            is_phantom_data(&f.typ)
+        }));
+        if !phantoms.is_empty() {
+            let totals = count_type_params(g, self.fields().chain(self.skipped()));
+            for (t, n) in phantoms {
+                if n >= totals.get(&t).copied().unwrap_or(0) {
+                    blacklist.insert(t);
+                }
+            }
+        }
+
+        Blacklist(blacklist)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -139,5 +188,37 @@ impl<'a> FieldIter<'a> {
 
     pub fn positions(&self) -> impl Iterator<Item = usize> + use<'a> {
         self.clone().map(|f| f.pos)
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct Blacklist(HashSet<syn::Ident>);
+
+impl Blacklist {
+    pub(crate) fn merge<M>(&mut self, g: &syn::Generics, m: M, f: &Fields)
+    where
+        M: Into<Option<Mode>>
+    {
+        let b = f.blacklist(g, m);
+        for t in collect_type_params(g, f.fields()).difference(&b) {
+            self.0.remove(t);
+        }
+        for t in b.0 {
+            self.0.insert(t);
+        }
+    }
+}
+
+impl From<Blacklist> for HashSet<syn::Ident> {
+    fn from(b: Blacklist) -> Self {
+        b.0
+    }
+}
+
+impl Deref for Blacklist {
+    type Target = HashSet<syn::Ident>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

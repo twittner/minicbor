@@ -1,12 +1,12 @@
+use quote::{quote, ToTokens};
+use syn::spanned::Spanned;
+
 use crate::Mode;
-use crate::{add_bound_to_type_params, collect_type_params, is_option};
+use crate::{add_bound_to_type_params, is_option};
 use crate::{add_typeparam, gen_ctx_param};
 use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
-use crate::fields::{Field, Fields};
+use crate::fields::{Blacklist, Field, Fields};
 use crate::variants::Variants;
-use quote::{quote, ToTokens};
-use std::collections::HashSet;
-use syn::spanned::Spanned;
 
 /// Entry point to derive `minicbor::Encode` on structs and enums.
 pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -31,16 +31,11 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             unreachable!("`derive_from` matched against `syn::Data::Struct`")
         };
 
-    let name     = &inp.ident;
-    let attrs    = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let encoding = attrs.encoding().unwrap_or_default();
-    let fields   = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
-
-    // Collect type parameters which should not have an `Encode` bound added,
-    // i.e. from fields which have a custom encode function defined.
-    let blacklist = collect_type_params(&inp.generics, fields.fields().filter(|f| {
-        f.attrs.codec().map(|c| c.is_encode()).unwrap_or(false)
-    }));
+    let name      = &inp.ident;
+    let attrs     = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
+    let encoding  = attrs.encoding().unwrap_or_default();
+    let fields    = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
+    let blacklist = fields.blacklist(&inp.generics, Mode::Encode);
 
     {
         let bound  = gen_encode_bound()?;
@@ -96,17 +91,13 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
-    let mut blacklist = HashSet::new();
+    let mut blacklist = Blacklist::default();
     let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
 
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
-        // Collect type parameters which should not have an `Encode` bound added,
-        // i.e. from fields which have a custom encode function defined.
-        blacklist.extend(collect_type_params(&inp.generics, fields.fields().filter(|f| {
-            f.attrs.codec().map(|c| c.is_encode()).unwrap_or(false)
-        })));
+        blacklist.merge(&inp.generics, Mode::Encode, &fields);
         let con = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag = encode_tag(attrs);
@@ -628,4 +619,3 @@ fn encode_tag(a: &Attributes) -> proc_macro2::TokenStream {
         quote!()
     }
 }
-

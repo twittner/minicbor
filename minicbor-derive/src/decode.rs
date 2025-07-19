@@ -1,13 +1,14 @@
-use crate::Mode;
-use crate::{add_bound_to_type_params, collect_type_params, is_cow, is_option, is_str, is_byte_slice};
-use crate::{add_typeparam, gen_ctx_param, add_bound_to_matching_type_params};
-use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
-use crate::fields::{Field, Fields};
-use crate::variants::Variants;
-use crate::lifetimes::{gen_lifetime, lifetimes_to_constrain, add_lifetime};
 use quote::quote;
 use std::collections::HashSet;
 use syn::spanned::Spanned;
+
+use crate::{is_phantom_data, Mode};
+use crate::{add_bound_to_type_params, collect_type_params, is_cow, is_option, is_str, is_byte_slice};
+use crate::{add_typeparam, gen_ctx_param, add_bound_to_matching_type_params};
+use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
+use crate::fields::{Blacklist, Field, Fields};
+use crate::variants::Variants;
+use crate::lifetimes::{gen_lifetime, lifetimes_to_constrain, add_lifetime};
 
 /// Entry point to derive `minicbor::Decode` on structs and enums.
 pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -32,9 +33,10 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             unreachable!("`derive_from` matched against `syn::Data::Struct`")
         };
 
-    let name   = &inp.ident;
-    let attrs  = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let fields = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
+    let name      = &inp.ident;
+    let attrs     = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
+    let fields    = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
+    let blacklist = fields.blacklist(&inp.generics, Mode::Decode);
 
     let mut lifetime = gen_lifetime()?;
     for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, f.attrs.borrow(), &f.typ))) {
@@ -43,19 +45,12 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         }
     }
 
-    // Collect type parameters which should not have a `Decode` bound added,
-    // i.e. from fields which have a custom decode function defined.
-    let blacklist = collect_type_params(&inp.generics, fields.fields().filter(|f| {
-        f.attrs.codec().map(|c| c.is_decode()).unwrap_or(false)
-    }));
-
     // Collect type parameters which require a `Default` bound.
     let default_types =
         collect_type_params(&inp.generics, fields.fields().chain(fields.skipped()).filter(|f| {
-            f.attrs.default() || f.attrs.skip()
+            (f.attrs.default() || f.attrs.skip()) && !is_phantom_data(&f.typ)
         }))
         .into_iter()
-        .map(|t| t.ident)
         .collect();
 
     let bound  = gen_decode_bound()?;
@@ -144,7 +139,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
-    let mut blacklist = HashSet::new();
+    let mut blacklist = Blacklist::default();
     let mut defaults = HashSet::new();
     let mut field_attrs = Vec::new();
     let mut lifetime = gen_lifetime()?;
@@ -170,20 +165,13 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     lifetime.bounds.push(l.clone())
                 }
             }
-            // Collect type parameters which should not have an `Decode` bound added,
-            // i.e. from fields which have a custom decode function defined.
-            blacklist.extend(
-                collect_type_params(&inp.generics, fields.fields().filter(|f| {
-                    f.attrs.codec().map(|c| c.is_decode()).unwrap_or(false)
-                }))
-            );
+            blacklist.merge(&inp.generics, Mode::Decode, &fields);
             // Collect type parameters which require a `Default` bound.
             defaults.extend(
                 collect_type_params(&inp.generics, fields.fields().chain(fields.skipped()).filter(|f| {
-                    f.attrs.default() || f.attrs.skip()
+                    (f.attrs.default() || f.attrs.skip()) && !is_phantom_data(&f.typ)
                 }))
                 .into_iter()
-                .map(|t| t.ident)
             );
             let statements = gen_statements(&fields, encoding, flat)?;
             if let syn::Fields::Named(_) = var.fields {
