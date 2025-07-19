@@ -84,6 +84,24 @@ impl<E> Error<E> {
     pub fn is_custom(&self) -> bool {
         matches!(self.err, ErrorImpl::Custom(_))
     }
+
+    /// Extract the inner `Write` error if possible.
+    pub fn as_write(&self) -> Option<&E> {
+        if let ErrorImpl::Write(e) = &self.err {
+            Some(e)
+        } else {
+            None
+        }
+    }
+
+    /// Consume this error and return the inner `Write` error if possible.
+    pub fn into_write(self) -> Option<E> {
+        if let ErrorImpl::Write(e) = self.err {
+            Some(e)
+        } else {
+            None
+        }
+    }
 }
 
 /// Internal error representation.
