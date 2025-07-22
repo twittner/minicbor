@@ -608,11 +608,19 @@ impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::cell::Cell<T> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         d.decode_with(ctx).map(core::cell::Cell::new)
     }
+
+    fn nil() -> Option<Self> {
+        T::nil().map(core::cell::Cell::new)
+    }
 }
 
 impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::cell::RefCell<T> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         d.decode_with(ctx).map(core::cell::RefCell::new)
+    }
+
+    fn nil() -> Option<Self> {
+        T::nil().map(core::cell::RefCell::new)
     }
 }
 
@@ -769,4 +777,3 @@ impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::ops::Bound<T> {
         }
     }
 }
-

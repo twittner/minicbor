@@ -797,6 +797,10 @@ impl<C, T: Encode<C> + Copy> Encode<C> for core::cell::Cell<T> {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         self.get().encode(e, ctx)
     }
+
+    fn is_nil(&self) -> bool {
+        self.get().is_nil()
+    }
 }
 
 impl<C, T: CborLen<C> + Copy> CborLen<C> for core::cell::Cell<T> {
@@ -807,11 +811,11 @@ impl<C, T: CborLen<C> + Copy> CborLen<C> for core::cell::Cell<T> {
 
 impl<C, T: Encode<C>> Encode<C> for core::cell::RefCell<T> {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
-        if let Ok(v) = self.try_borrow() {
-            v.encode(e, ctx)
-        } else {
-            Err(Error::message("could not borrow ref cell value"))
-        }
+        self.borrow().encode(e, ctx)
+    }
+
+    fn is_nil(&self) -> bool {
+        self.borrow().is_nil()
     }
 }
 
