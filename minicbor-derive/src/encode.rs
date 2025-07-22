@@ -568,18 +568,31 @@ fn make_transparent_impl
     ) -> syn::Result<proc_macro2::TokenStream>
 {
     let default_encode_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::encode")?;
+    let default_is_nil_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::<Ctx>::is_nil")?;
 
     let encode_fn = field.attrs.codec()
         .filter(|cc| cc.is_encode())
         .and_then(CustomCodec::to_encode_path)
         .unwrap_or_else(|| default_encode_fn.clone());
 
-    let call =
+    let is_nil_fn = field.attrs.codec()
+        .and_then(|cc| cc.to_is_nil_path())
+        .unwrap_or_else(|| default_is_nil_fn.clone());
+
+    let encode_call =
         if field.is_name {
             let id = &field.ident;
             quote!(#encode_fn(&self.#id, __e777, __ctx777))
         } else {
             quote!(#encode_fn(&self.0, __e777, __ctx777))
+        };
+
+    let is_nil_call =
+        if field.is_name {
+            let id = &field.ident;
+            quote!(#is_nil_fn(&self.#id))
+        } else {
+            quote!(#is_nil_fn(&self.0))
         };
 
     Ok(quote! {
@@ -588,7 +601,11 @@ fn make_transparent_impl
             where
                 __W777: minicbor::encode::Write
             {
-                #call
+                #encode_call
+            }
+
+            fn is_nil(&self) -> bool {
+                #is_nil_call
             }
         }
     })
