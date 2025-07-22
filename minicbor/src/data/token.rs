@@ -72,24 +72,24 @@ pub enum Token<'b> {
 impl fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Token::Bool(b)     => write!(f, "{}", b),
-            Token::U8(n)       => write!(f, "{}", n),
-            Token::U16(n)      => write!(f, "{}", n),
-            Token::U32(n)      => write!(f, "{}", n),
-            Token::U64(n)      => write!(f, "{}", n),
-            Token::I8(n)       => write!(f, "{}", n),
-            Token::I16(n)      => write!(f, "{}", n),
-            Token::I32(n)      => write!(f, "{}", n),
-            Token::I64(n)      => write!(f, "{}", n),
-            Token::Int(n)      => write!(f, "{}", n),
-            Token::F16(n)      => write!(f, "{:e}", n),
-            Token::F32(n)      => write!(f, "{:e}", n),
-            Token::F64(n)      => write!(f, "{:e}", n),
-            Token::String(n)   => write!(f, "\"{}\"", n),
-            Token::Array(n)    => write!(f, "A[{}]", n),
-            Token::Map(n)      => write!(f, "M[{}]", n),
+            Token::Bool(b)     => write!(f, "{b}"),
+            Token::U8(n)       => write!(f, "{n}"),
+            Token::U16(n)      => write!(f, "{n}"),
+            Token::U32(n)      => write!(f, "{n}"),
+            Token::U64(n)      => write!(f, "{n}"),
+            Token::I8(n)       => write!(f, "{n}"),
+            Token::I16(n)      => write!(f, "{n}"),
+            Token::I32(n)      => write!(f, "{n}"),
+            Token::I64(n)      => write!(f, "{n}"),
+            Token::Int(n)      => write!(f, "{n}"),
+            Token::F16(n)      => write!(f, "{n:e}"),
+            Token::F32(n)      => write!(f, "{n:e}"),
+            Token::F64(n)      => write!(f, "{n:e}"),
+            Token::String(n)   => write!(f, "\"{n}\""),
+            Token::Array(n)    => write!(f, "A[{n}]"),
+            Token::Map(n)      => write!(f, "M[{n}]"),
             Token::Tag(t)      => write!(f, "T({})", u64::from(t)),
-            Token::Simple(n)   => write!(f, "simple({})", n),
+            Token::Simple(n)   => write!(f, "simple({n})"),
             Token::Break       => f.write_str("]"),
             Token::Null        => f.write_str("null"),
             Token::Undefined   => f.write_str("undefined"),
@@ -102,9 +102,9 @@ impl fmt::Display for Token<'_> {
                 let mut i = b.len();
                 for x in *b {
                     if i > 1 {
-                        write!(f, "{:02x} ", x)?
+                        write!(f, "{x:02x} ")?
                     } else {
-                        write!(f, "{:02x}", x)?
+                        write!(f, "{x:02x}")?
                     }
                     i -= 1;
                 }

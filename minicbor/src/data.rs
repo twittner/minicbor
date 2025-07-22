@@ -70,7 +70,7 @@ impl fmt::Display for Type {
             Type::MapIndef    => f.write_str("indefinite map"),
             Type::Tag         => f.write_str("tag"),
             Type::Break       => f.write_str("break"),
-            Type::Unknown(n)  => write!(f, "{:#x}", n)
+            Type::Unknown(n)  => write!(f, "{n:#x}")
         }
     }
 }

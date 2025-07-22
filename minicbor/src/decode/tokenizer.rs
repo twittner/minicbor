@@ -120,7 +120,7 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                         }
                         Some(Ok(t))  => t.fmt(f)?,
                         Some(Err(e)) => {
-                            write!(f, " !!! decoding error: {}", e)?;
+                            write!(f, " !!! decoding error: {e}")?;
                             return Ok(())
                         }
                         None => if required {
@@ -135,7 +135,7 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                         Some(Ok(Token::Break)) | None => continue,
                         Some(Ok(_))  => f.write_str(s)?,
                         Some(Err(e)) => {
-                            write!(f, " !!! decoding error: {}", e)?;
+                            write!(f, " !!! decoding error: {e}")?;
                             return Ok(())
                         }
                     }
@@ -272,4 +272,3 @@ impl Clone for Decoder<'_, '_> {
         }
     }
 }
-

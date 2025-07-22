@@ -20,7 +20,7 @@ fn main() {
                 match fs::read(&p) {
                     Ok(f)  => println!("{}", minicbor::display(&f)),
                     Err(e) => {
-                        eprintln!("Failed to read \"{}\": {}.", p, e);
+                        eprintln!("Failed to read \"{p}\": {e}.");
                         process::exit(2)
                     }
                 }
@@ -33,16 +33,16 @@ fn main() {
             match io::stdin().read_to_end(&mut v) {
                 Ok(_)  => println!("{}", minicbor::display(&v)),
                 Err(e) => {
-                    eprintln!("Failed to read from stdin: {}.", e);
+                    eprintln!("Failed to read from stdin: {e}.");
                     process::exit(3)
                 }
             }
         }
         Some("-h") | Some("--help") => {
-            println!("{}", SUMMARY)
+            println!("{SUMMARY}")
         }
         Some(unknown) => {
-            eprintln!("Unknown option: {}\n\n{}", unknown, SUMMARY);
+            eprintln!("Unknown option: {unknown}\n\n{SUMMARY}");
             process::exit(1)
         }
     }

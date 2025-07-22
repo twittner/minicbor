@@ -7,6 +7,11 @@
 
 # minicbor
 
+## `1.1.0`
+
+- Adds `encode::Error::{as_write, into_write}` to allow easier access to an error caused by
+  a `Write` implementation.
+
 ## `1.0.0`
 
 - Updated to 2024 edition.
