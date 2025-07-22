@@ -15,14 +15,16 @@
   `Decode` with implementations of `is_nil` and `nil`, wrapping the type in a `Box` or
   `Cell` or encoding it via reference would revert to the default implementation. This
   has been fixed and the following impls now override the defaults:
+
     + `&T`
     + `&mut T`
     + `Box<T>`
     + `Cow<'_, T>`
     + `Cell<T>`
     + `RefCell<T>`
-  With this fix, these types have a nil value if `T` has one. Prior versions would not
-  have one, so this is a breaking change that impacts code that relied on this.
+
+  With this fix, these types have a nil value if `T` has one whereas prior versions would
+  never have one.
 - The `Encode` implementation of `RefCell` no longer uses `try_borrow`, but `borrow`.
 
 ## `1.1.0`
