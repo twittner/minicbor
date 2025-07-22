@@ -64,8 +64,8 @@ mod generic {
         unimplemented!()
     }
 
-    pub(super) fn cbor_len<C, T: CborLen<C>>(x: &T, ctx: &mut C) -> usize {
-        1 + x.cbor_len(ctx)
+    pub(super) fn cbor_len<C, T>(_x: &T, _c: &mut C) -> usize {
+        unimplemented!()
     }
 }
 
@@ -162,4 +162,3 @@ struct W4<'a, T>(#[b(0)] BS2<'a, T>);
 #[derive(Encode, Decode, CborLen)]
 #[cbor(transparent)]
 struct W5<'a, T> { #[b(0)] inner: BS2<'a, T> }
-

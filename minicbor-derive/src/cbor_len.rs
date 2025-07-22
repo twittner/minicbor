@@ -1,9 +1,11 @@
 use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
 
+use crate::blacklist::Blacklist;
+use crate::{add_bound_to_type_params, collect_type_params, Mode};
 use crate::{add_typeparam, encode::is_nil, fields::Fields, gen_ctx_param, variants::Variants};
 use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
-use crate::fields::{Blacklist, Field};
+use crate::fields::Field;
 
 /// Entry point to derive `minicbor::CborLen` on structs and enums.
 pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -31,16 +33,20 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let name      = &inp.ident;
     let attrs     = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
     let fields    = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
-    let blacklist = fields.blacklist(&inp.generics, None);
+    let blacklist = Blacklist::new(Mode::Length, &fields, &inp.generics);
 
     let cbor_len_bound = gen_cbor_len_bound()?;
-    let encode_bound   = gen_encode_bound()?;
-    for p in inp.generics.type_params_mut() {
-        if !blacklist.contains(&p.ident) {
-            p.bounds.push(cbor_len_bound.clone());
-            p.bounds.push(encode_bound.clone())
-        }
-    }
+    let params         = inp.generics.type_params_mut();
+    add_bound_to_type_params(cbor_len_bound, params, &blacklist, fields.fields().attributes(), Mode::Length);
+
+    let mut blacklist = Blacklist::default();
+    blacklist.add(collect_type_params(&inp.generics, fields.fields().filter(|f| {
+        f.attrs.codec().map(|c| c.is_is_nil()).unwrap_or(false)
+    })));
+
+    let encode_bound = gen_encode_bound()?;
+    let params       = inp.generics.type_params_mut();
+    add_bound_to_type_params(encode_bound, params, &blacklist, fields.fields().attributes(), Mode::Length);
 
     let generics = add_typeparam(&inp.generics, gen_ctx_param()?, attrs.context_bound());
     let impl_generics = generics.split_for_impl().0;
@@ -86,11 +92,16 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
-    let mut blacklist = Blacklist::default();
+    let mut blacklist_len = Blacklist::default();
+    let mut blacklist_enc = Blacklist::default();
+    let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
-        blacklist.merge(&inp.generics, None, &fields);
+        blacklist_len.merge(Mode::Length, &fields, &inp.generics);
+        blacklist_enc.add(collect_type_params(&inp.generics, fields.fields().filter(|f| {
+            f.attrs.codec().map(|c| c.is_is_nil()).unwrap_or(false)
+        })));
         let con      = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag      = on_tag(attrs);
@@ -145,17 +156,18 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 }
             }
         };
+        field_attrs.extend(fields.fields().attributes().cloned());
         rows.push(row)
     }
 
     let cbor_len_bound = gen_cbor_len_bound()?;
+    let params         = inp.generics.type_params_mut();
+    add_bound_to_type_params(cbor_len_bound, params, &blacklist_len, &field_attrs, Mode::Length);
+
     let encode_bound   = gen_encode_bound()?;
-    for p in inp.generics.type_params_mut() {
-        if !blacklist.contains(&p.ident) {
-            p.bounds.push(cbor_len_bound.clone());
-            p.bounds.push(encode_bound.clone())
-        }
-    }
+    let params         = inp.generics.type_params_mut();
+    add_bound_to_type_params(encode_bound, params, &blacklist_enc, &field_attrs, Mode::Length);
+
     let generics = add_typeparam(&inp.generics, gen_ctx_param()?, enum_attrs.context_bound());
     let impl_generics = generics.split_for_impl().0;
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
@@ -317,8 +329,7 @@ fn make_transparent_impl
 
     Ok(quote! {
         impl #impl_generics minicbor::CborLen<Ctx> for #name #typ_generics #where_clause {
-            fn cbor_len(&self, __ctx777: &mut Ctx) -> usize
-            {
+            fn cbor_len(&self, __ctx777: &mut Ctx) -> usize {
                 #call
             }
         }
