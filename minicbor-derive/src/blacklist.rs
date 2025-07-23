@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::ops::Deref;
 
-use crate::{collect_type_params, count_type_params, is_phantom_data, Mode};
+use crate::{collect_type_params, is_phantom_data, Mode};
 use crate::{attrs::CustomCodec, fields::Fields};
 
 #[derive(Default)]
@@ -36,16 +36,14 @@ impl Blacklist {
         }
 
         // And finally also by type parameters only appearing in `PhantomData`.
-        let phantoms = count_type_params(g, fields.fields().chain(fields.skipped()).filter(|f| {
+        let phantoms = collect_type_params(g, fields.fields().chain(fields.skipped()).filter(|f| {
             is_phantom_data(&f.typ)
         }));
         if !phantoms.is_empty() {
-            let totals = count_type_params(g, fields.fields().chain(fields.skipped()));
-            for (t, n) in phantoms {
-                if n >= totals.get(&t).copied().unwrap_or(0) {
-                    blacklist.insert(t);
-                }
-            }
+            let non_phantom = collect_type_params(g, fields.fields().chain(fields.skipped()).filter(|f| {
+                !is_phantom_data(&f.typ)
+            }));
+            blacklist.extend(phantoms.difference(&non_phantom).cloned());
         }
 
         Self(blacklist)

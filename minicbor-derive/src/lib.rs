@@ -521,7 +521,7 @@ pub(crate) mod lifetimes;
 pub(crate) mod variants;
 pub(crate) mod blacklist;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 /// Derive the `minicbor::Decode` trait for a struct or enum.
 ///
@@ -627,8 +627,8 @@ fn is_byte_slice(ty: &syn::Type) -> bool {
     }
 }
 
-/// Traverse all field types and count all type parameters along the way.
-fn count_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashMap<syn::Ident, usize>
+/// Traverse all field types and collect all type parameters along the way.
+fn collect_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashSet<syn::Ident>
 where
     I: Iterator<Item = &'a fields::Field>
 {
@@ -636,7 +636,7 @@ where
 
     struct Collector {
         all: HashSet<syn::Ident>,
-        found: HashMap<syn::Ident, usize>
+        found: HashSet<syn::Ident>
     }
 
     impl<'a> Visit<'a> for Collector {
@@ -644,7 +644,7 @@ where
             if p.path.leading_colon.is_none() && p.path.segments.len() == 1 {
                 let id = &p.path.segments[0].ident;
                 if self.all.contains(id) {
-                    *self.found.entry(id.clone()).or_default() += 1
+                    self.found.insert(id.clone());
                 }
             }
             syn::visit::visit_type_path(self, p)
@@ -653,7 +653,7 @@ where
 
     let mut c = Collector {
         all: all.type_params().map(|tp| tp.ident.clone()).collect(),
-        found: HashMap::new()
+        found: HashSet::new()
     };
 
     for f in fields {
@@ -661,14 +661,6 @@ where
     }
 
     c.found
-}
-
-/// Traverse all field types and collect all type parameters along the way.
-fn collect_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashSet<syn::Ident>
-where
-    I: Iterator<Item = &'a fields::Field>
-{
-    count_type_params(all, fields).into_keys().collect()
 }
 
 fn add_bound_to_type_params<'a, I, A>
