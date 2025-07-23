@@ -75,6 +75,16 @@ impl CustomCodec {
         matches!(self, CustomCodec::Module(..))
     }
 
+    /// Is this a custom codec with `is_nil`?
+    pub fn is_is_nil(&self) -> bool {
+        match self {
+            CustomCodec::Encode(e)    => e.is_nil.is_some(),
+            CustomCodec::Both(e, _)   => e.is_nil.is_some(),
+            CustomCodec::Module(_, t) => *t,
+            CustomCodec::Decode(_)    => false
+        }
+    }
+
     /// Extract the encode function unless this `CustomCodec` does not declare one.
     pub fn to_encode_path(&self) -> Option<syn::ExprPath> {
         match self {
@@ -149,4 +159,3 @@ impl CustomCodec {
         }
     }
 }
-

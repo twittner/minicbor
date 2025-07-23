@@ -20,7 +20,10 @@ pub use idx::Idx;
 
 /// Recognised attributes.
 #[derive(Debug, Clone)]
-pub struct Attributes(Level, HashMap<Kind, Value>);
+pub struct Attributes {
+    level: Level,
+    attrs: HashMap<Kind, Value>
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Kind {
@@ -82,18 +85,21 @@ impl fmt::Display for Level {
 }
 
 impl Attributes {
-    pub fn new(l: Level) -> Self {
-        Attributes(l, HashMap::new())
+    fn new(l: Level) -> Self {
+        Self {
+            level: l,
+            attrs: HashMap::new()
+        }
     }
 
     pub fn try_from_iter<'a, I>(l: Level, attrs: I) -> syn::Result<Self>
     where
         I: IntoIterator<Item = &'a syn::Attribute>
     {
-        let mut this = Attributes::new(l);
-        for m in attrs.into_iter().map(|a| Attributes::try_from(l, a)) {
+        let mut this = Self::new(l);
+        for m in attrs.into_iter().map(|a| Self::try_from(l, a)) {
             let m = m?;
-            for (k, v) in m.1.into_iter() {
+            for (k, v) in m.attrs.into_iter() {
                 this.try_insert(k, v)?;
             }
         }
@@ -115,7 +121,7 @@ impl Attributes {
             }
         }
         if let Some(Value::Skip(s)) = this.get(Kind::Skip) {
-            if this.1.len() > 1 {
+            if this.attrs.len() > 1 {
                 return Err(syn::Error::new(*s, "`skip` does not allow other attributes"))
             }
         }
@@ -128,7 +134,7 @@ impl Attributes {
     }
 
     fn try_from(l: Level, a: &syn::Attribute) -> syn::Result<Self> {
-        let mut attrs = Attributes::new(l);
+        let mut attrs = Self::new(l);
 
         // #[n(...)]
         if a.path().is_ident("n") {
@@ -146,7 +152,7 @@ impl Attributes {
 
         // #[cbor(...)]
         if !a.path().is_ident("cbor") {
-            return Ok(Attributes::new(l))
+            return Ok(Self::new(l))
         }
 
         a.parse_nested_meta(|meta| {
@@ -197,11 +203,16 @@ impl Attributes {
                 let t: syn::TypeParam = s.parse()?;
                 let b = TypeParams::Decode(iter::once((t.ident.clone(), t)).collect());
                 attrs.try_insert(Kind::TypeParam, Value::TypeParam(b, meta.path.span()))?
+            } else if meta.path.is_ident("cbor_len_bound") {
+                let s: LitStr = meta.value()?.parse()?;
+                let t: syn::TypeParam = s.parse()?;
+                let b = TypeParams::Length(iter::once((t.ident.clone(), t)).collect());
+                attrs.try_insert(Kind::TypeParam, Value::TypeParam(b, meta.path.span()))?
             } else if meta.path.is_ident("bound") {
                 let s: LitStr = meta.value()?.parse()?;
                 let t: syn::TypeParam = s.parse()?;
                 let m = iter::once((t.ident.clone(), t)).collect::<HashMap<_, _>>();
-                let b = TypeParams::Both { encode: m.clone(), decode: m };
+                let b = TypeParams::All { encode: m.clone(), length: m.clone(), decode: m };
                 attrs.try_insert(Kind::TypeParam, Value::TypeParam(b, meta.path.span()))?
             } else if meta.path.is_ident("context_bound") {
                 let s: LitStr = meta.value()?.parse()?;
@@ -303,23 +314,23 @@ impl Attributes {
     }
 
     fn contains_key(&self, k: Kind) -> bool {
-        self.1.contains_key(&k)
+        self.attrs.contains_key(&k)
     }
 
     fn get(&self, k: Kind) -> Option<&Value> {
-        self.1.get(&k)
+        self.attrs.get(&k)
     }
 
     fn get_mut(&mut self, k: Kind) -> Option<&mut Value> {
-        self.1.get_mut(&k)
+        self.attrs.get_mut(&k)
     }
 
     fn remove(&mut self, k: Kind) -> Option<Value> {
-        self.1.remove(&k)
+        self.attrs.remove(&k)
     }
 
     fn try_insert(&mut self, key: Kind, mut val: Value) -> syn::Result<()> {
-        match self.0 {
+        match self.level {
             Level::Struct => match key {
                 | Kind::Encoding
                 | Kind::Transparent
@@ -339,7 +350,7 @@ impl Attributes {
                 | Kind::Flat
                 | Kind::Default
                 => {
-                    let msg = format!("attribute is not supported on {}-level", self.0);
+                    let msg = format!("attribute is not supported on {}-level", self.level);
                     return Err(syn::Error::new(val.span(), msg))
                 }
             }
@@ -362,7 +373,7 @@ impl Attributes {
                 | Kind::ContextBound
                 | Kind::Flat
                 => {
-                    let msg = format!("attribute is not supported on {}-level", self.0);
+                    let msg = format!("attribute is not supported on {}-level", self.level);
                     return Err(syn::Error::new(val.span(), msg))
                 }
             }
@@ -385,7 +396,7 @@ impl Attributes {
                 | Kind::Skip
                 | Kind::Default
                 => {
-                    let msg = format!("attribute is not supported on {}-level", self.0);
+                    let msg = format!("attribute is not supported on {}-level", self.level);
                     return Err(syn::Error::new(val.span(), msg))
                 }
             }
@@ -408,7 +419,7 @@ impl Attributes {
                 | Kind::Flat
                 | Kind::Default
                 => {
-                    let msg = format!("attribute is not supported on {}-level", self.0);
+                    let msg = format!("attribute is not supported on {}-level", self.level);
                     return Err(syn::Error::new(val.span(), msg))
                 }
             }
@@ -557,7 +568,7 @@ impl Attributes {
             }
             _ => {}
         }
-        self.1.insert(key, val);
+        self.attrs.insert(key, val);
         Ok(())
     }
 }
@@ -656,4 +667,3 @@ fn parse_i64_arg(a: &syn::Attribute) -> syn::Result<i64> {
 fn parse_int(n: &syn::LitInt) -> syn::Result<i64> {
     n.base10_parse().map_err(|_| syn::Error::new(n.span(), "expected `i64` value"))
 }
-

@@ -1,12 +1,13 @@
+use quote::{quote, ToTokens};
+use syn::spanned::Spanned;
+
+use crate::blacklist::Blacklist;
 use crate::Mode;
-use crate::{add_bound_to_type_params, collect_type_params, is_option};
+use crate::{add_bound_to_type_params, is_option};
 use crate::{add_typeparam, gen_ctx_param};
 use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
 use crate::fields::{Field, Fields};
 use crate::variants::Variants;
-use quote::{quote, ToTokens};
-use std::collections::HashSet;
-use syn::spanned::Spanned;
 
 /// Entry point to derive `minicbor::Encode` on structs and enums.
 pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -31,22 +32,15 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             unreachable!("`derive_from` matched against `syn::Data::Struct`")
         };
 
-    let name     = &inp.ident;
-    let attrs    = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let encoding = attrs.encoding().unwrap_or_default();
-    let fields   = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
+    let name      = &inp.ident;
+    let attrs     = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
+    let encoding  = attrs.encoding().unwrap_or_default();
+    let fields    = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
+    let blacklist = Blacklist::new(Mode::Encode, &fields, &inp.generics);
 
-    // Collect type parameters which should not have an `Encode` bound added,
-    // i.e. from fields which have a custom encode function defined.
-    let blacklist = collect_type_params(&inp.generics, fields.fields().filter(|f| {
-        f.attrs.codec().map(|c| c.is_encode()).unwrap_or(false)
-    }));
-
-    {
-        let bound  = gen_encode_bound()?;
-        let params = inp.generics.type_params_mut();
-        add_bound_to_type_params(bound, params, &blacklist, fields.fields().attributes(), Mode::Encode);
-    }
+    let bound  = gen_encode_bound()?;
+    let params = inp.generics.type_params_mut();
+    add_bound_to_type_params(bound, params, &blacklist, fields.fields().attributes(), Mode::Encode);
 
     let generics = add_typeparam(&inp.generics, gen_ctx_param()?, attrs.context_bound());
     let impl_generics = generics.split_for_impl().0;
@@ -96,17 +90,13 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
-    let mut blacklist = HashSet::new();
+    let mut blacklist = Blacklist::default();
     let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
 
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
-        // Collect type parameters which should not have an `Encode` bound added,
-        // i.e. from fields which have a custom encode function defined.
-        blacklist.extend(collect_type_params(&inp.generics, fields.fields().filter(|f| {
-            f.attrs.codec().map(|c| c.is_encode()).unwrap_or(false)
-        })));
+        blacklist.merge(Mode::Encode, &fields, &inp.generics);
         let con = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag = encode_tag(attrs);
@@ -577,18 +567,31 @@ fn make_transparent_impl
     ) -> syn::Result<proc_macro2::TokenStream>
 {
     let default_encode_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::encode")?;
+    let default_is_nil_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::<Ctx>::is_nil")?;
 
     let encode_fn = field.attrs.codec()
         .filter(|cc| cc.is_encode())
         .and_then(CustomCodec::to_encode_path)
         .unwrap_or_else(|| default_encode_fn.clone());
 
-    let call =
+    let is_nil_fn = field.attrs.codec()
+        .and_then(|cc| cc.to_is_nil_path())
+        .unwrap_or_else(|| default_is_nil_fn.clone());
+
+    let encode_call =
         if field.is_name {
             let id = &field.ident;
             quote!(#encode_fn(&self.#id, __e777, __ctx777))
         } else {
             quote!(#encode_fn(&self.0, __e777, __ctx777))
+        };
+
+    let is_nil_call =
+        if field.is_name {
+            let id = &field.ident;
+            quote!(#is_nil_fn(&self.#id))
+        } else {
+            quote!(#is_nil_fn(&self.0))
         };
 
     Ok(quote! {
@@ -597,7 +600,11 @@ fn make_transparent_impl
             where
                 __W777: minicbor::encode::Write
             {
-                #call
+                #encode_call
+            }
+
+            fn is_nil(&self) -> bool {
+                #is_nil_call
             }
         }
     })
@@ -628,4 +635,3 @@ fn encode_tag(a: &Attributes) -> proc_macro2::TokenStream {
         quote!()
     }
 }
-

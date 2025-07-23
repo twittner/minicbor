@@ -63,6 +63,10 @@ impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for alloc::boxed::Box<T> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         T::decode(d, ctx).map(alloc::boxed::Box::new)
     }
+
+    fn nil() -> Option<Self> {
+        T::nil().map(alloc::boxed::Box::new)
+    }
 }
 
 impl<'a, 'b: 'a, C> Decode<'b, C> for &'a str {
@@ -79,6 +83,10 @@ where
 {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         d.decode_with(ctx).map(alloc::borrow::Cow::Owned)
+    }
+
+    fn nil() -> Option<Self> {
+        T::Owned::nil().map(alloc::borrow::Cow::Owned)
     }
 }
 
@@ -600,11 +608,19 @@ impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::cell::Cell<T> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         d.decode_with(ctx).map(core::cell::Cell::new)
     }
+
+    fn nil() -> Option<Self> {
+        T::nil().map(core::cell::Cell::new)
+    }
 }
 
 impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::cell::RefCell<T> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         d.decode_with(ctx).map(core::cell::RefCell::new)
+    }
+
+    fn nil() -> Option<Self> {
+        T::nil().map(core::cell::RefCell::new)
     }
 }
 
@@ -761,4 +777,3 @@ impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::ops::Bound<T> {
         }
     }
 }
-

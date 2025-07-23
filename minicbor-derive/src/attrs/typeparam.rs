@@ -6,9 +6,11 @@ use std::mem;
 pub enum TypeParams {
     Encode(HashMap<syn::Ident, syn::TypeParam>),
     Decode(HashMap<syn::Ident, syn::TypeParam>),
-    Both {
+    Length(HashMap<syn::Ident, syn::TypeParam>),
+    All {
         encode: HashMap<syn::Ident, syn::TypeParam>,
-        decode: HashMap<syn::Ident, syn::TypeParam>
+        decode: HashMap<syn::Ident, syn::TypeParam>,
+        length: HashMap<syn::Ident, syn::TypeParam>,
     }
 }
 
@@ -21,29 +23,52 @@ impl TypeParams {
             (Self::Decode(d1), Self::Decode(d2)) => {
                 try_merge(s, d1, d2)?
             }
+            (Self::Length(l1), Self::Length(l2)) => {
+                try_merge(s, l1, l2)?
+            }
             (Self::Encode(e), Self::Decode(d)) => {
-                *self = Self::Both { encode: mem::take(e), decode: d }
+                *self = Self::All { encode: mem::take(e), decode: d, length: HashMap::new() }
+            }
+            (Self::Encode(e), Self::Length(l)) => {
+                *self = Self::All { encode: mem::take(e), decode: HashMap::new(), length: l }
             }
             (Self::Decode(d), Self::Encode(e)) => {
-                *self = Self::Both { encode: e, decode: mem::take(d) }
+                *self = Self::All { encode: e, decode: mem::take(d), length: HashMap::new() }
             }
-            (Self::Encode(e1), Self::Both { encode: e2, decode }) => {
+            (Self::Decode(d), Self::Length(l)) => {
+                *self = Self::All { encode: HashMap::new(), decode: mem::take(d), length: l }
+            }
+            (Self::Length(l), Self::Encode(e)) => {
+                *self = Self::All { encode: e, decode: HashMap::new(), length: mem::take(l) }
+            }
+            (Self::Length(l), Self::Decode(d)) => {
+                *self = Self::All { encode: HashMap::new(), decode: d, length: mem::take(l) }
+            }
+            (Self::Encode(e1), Self::All { encode: e2, decode, length }) => {
                 try_merge(s, e1, e2)?;
-                *self = Self::Both { encode: mem::take(e1), decode }
+                *self = Self::All { encode: mem::take(e1), decode, length }
             }
-            (Self::Decode(d1), Self::Both { encode, decode: d2 }) => {
+            (Self::Decode(d1), Self::All { encode, decode: d2, length }) => {
                 try_merge(s, d1, d2)?;
-                *self = Self::Both { encode, decode: mem::take(d1) }
+                *self = Self::All { encode, decode: mem::take(d1), length }
             }
-            (Self::Both { encode: e1, .. }, Self::Encode(e2)) => {
+            (Self::Length(l1), Self::All { encode, decode, length: l2 }) => {
+                try_merge(s, l1, l2)?;
+                *self = Self::All { encode, decode, length: mem::take(l1) }
+            }
+            (Self::All { encode: e1, .. }, Self::Encode(e2)) => {
                 try_merge(s, e1, e2)?
             }
-            (Self::Both { decode: d1, .. }, Self::Decode(d2)) => {
+            (Self::All { decode: d1, .. }, Self::Decode(d2)) => {
                 try_merge(s, d1, d2)?
             }
-            (Self::Both { encode: e1, decode: d1 }, Self::Both { encode: e2, decode: d2 }) => {
+            (Self::All { length: l1, .. }, Self::Length(l2)) => {
+                try_merge(s, l1, l2)?
+            }
+            (Self::All { encode: e1, decode: d1, length: l1 }, Self::All { encode: e2, decode: d2, length: l2 }) => {
                 try_merge(s, e1, e2)?;
-                try_merge(s, d1, d2)?
+                try_merge(s, d1, d2)?;
+                try_merge(s, l1, l2)?
             }
         }
         Ok(())
@@ -51,17 +76,25 @@ impl TypeParams {
 
     pub fn get_encode(&self, id: &syn::Ident) -> Option<&syn::TypeParam> {
         match self {
-            Self::Decode(_) => None,
+            Self::Decode(_) | Self::Length(_) => None,
             Self::Encode(e) => e.get(id),
-            Self::Both { encode, .. } => encode.get(id),
+            Self::All { encode, .. } => encode.get(id),
         }
     }
 
     pub fn get_decode(&self, id: &syn::Ident) -> Option<&syn::TypeParam> {
         match self {
-            Self::Encode(_) => None,
+            Self::Encode(_) | Self::Length(_) => None,
             Self::Decode(d) => d.get(id),
-            Self::Both { decode, .. } => decode.get(id)
+            Self::All { decode, .. } => decode.get(id)
+        }
+    }
+
+    pub fn get_length(&self, id: &syn::Ident) -> Option<&syn::TypeParam> {
+        match self {
+            Self::Encode(_) | Self::Decode(_) => None,
+            Self::Length(l) => l.get(id),
+            Self::All { length, .. } => length.get(id)
         }
     }
 }

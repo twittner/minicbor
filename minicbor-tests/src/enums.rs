@@ -60,8 +60,8 @@ mod generic {
         unimplemented!()
     }
 
-    pub(super) fn cbor_len<C, T: CborLen<C>>(x: &T, ctx: &mut C) -> usize {
-        x.cbor_len(ctx)
+    pub(super) fn cbor_len<C, T>(_x: &T, _c: &mut C) -> usize {
+        unimplemented!()
     }
 }
 
@@ -174,4 +174,3 @@ enum BE3<'a, T, U> {
     #[n(3)] D ( #[n(0)] T ),
     #[n(4)] E { #[n(0)] field: U }
 }
-

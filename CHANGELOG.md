@@ -7,6 +7,25 @@
 
 # minicbor
 
+## `2.0.0`
+
+- Depends on `minicbor-derive-0.18.0` (see below).
+- ⚠️ **Breaking** ⚠️ Several generic implementations of `Encode` and `Decode` did not override
+  the default `is_nil` and `nil` methods. As a result, if a type `T` implements `Encode` and
+  `Decode` with implementations of `is_nil` and `nil`, wrapping the type in a `Box` or
+  `Cell` or encoding it via reference would revert to the default implementation. This
+  has been fixed and the following impls now override the defaults:
+
+    + `&T`
+    + `&mut T`
+    + `Box<T>`
+    + `Cow<'_, T>`
+    + `Cell<T>`
+    + `RefCell<T>`
+
+  With this fix, these types have a nil value if `T` has one whereas prior versions would not.
+- The `Encode` implementation of `RefCell` no longer uses `try_borrow`, but `borrow`.
+
 ## `1.1.0`
 
 - Adds `encode::Error::{as_write, into_write}` to allow easier access to an error caused by
@@ -400,6 +419,22 @@
 
 # minicbor-derive
 
+## `0.18.0`
+
+- ⚠️ **Breaking** ⚠️ `#[cbor(transparent)]` implements `Decode::nil` and `Encode::is_nil` by
+  forwarding to the inner type (see issue [#32](https://github.com/twittner/minicbor/issues/32)
+  for details). Note that this may be a breaking change. If for example a type
+  `struct Foo(Option<u8>)` would derive `Encode` or `Decode` with `#[cbor(transparent)]`, it
+  would now use the `nil`/`is_nil` implementations of `Option`, meaning that a `Foo(None)` value
+  may not be encoded as a CBOR null value, whereas in previous versions it always would.
+- `#[cbor(skip)]` and `PhantomData` no longer require `Encode`, `Decode` or `CborLen` type
+  parameter bounds (see issue #[30](https://github.com/twittner/minicbor/issues/30) for details).
+- `#[cbor(cbor_len_bound)]` has been added to allow specifying type parameter bounds when
+  deriving `CborLen`.
+- Adding `#[cbor(cbor_len = "..."))]` no longer adds a bound for `CborLen` to type parameters
+  and if in addition `#[cbor(is_nil = "...")]` is given the bound to `Encode` is omitted as
+  well.
+
 ## `0.17.0`
 
 - Updated to 2024 edition.
@@ -558,6 +593,10 @@
 
 # minicbor-io
 
+## `0.23.0`
+
+- Require `minicbor-2.0.0`.
+
 ## `0.22.0`
 
 - Updated to 2024 edition.
@@ -700,6 +739,10 @@
 - Initial release which provides some I/O utilities.
 
 # minicbor-serde
+
+## `0.6.0`
+
+- Depends on `minicbor-2.0.0`.
 
 ## `0.5.0`
 
