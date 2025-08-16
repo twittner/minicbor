@@ -7,6 +7,11 @@
 
 # minicbor
 
+## `2.1.0`
+
+- Added `Encoder::str_len`, mirroring `Encoder::bytes_len` which was added in 0.26.1.
+- Depends on `minicbor-derive-0.18.1`.
+
 ## `2.0.0`
 
 - Depends on `minicbor-derive-0.18.0` (see below).
@@ -418,6 +423,11 @@
 - Added `Encode` and `Decode` impls for tuples (see merge request [1][mr1] by @koushiro).
 
 # minicbor-derive
+
+## `0.18.1`
+
+- Maintenance release, fixing an issue with blacklisting type parameter constraints, see
+  commit 0f7cc0d8468b7cfbc8fb12833db6d6b47d54713d for details.
 
 ## `0.18.0`
 

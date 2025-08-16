@@ -79,11 +79,11 @@ impl Fields {
         Ok(Fields { fields, skipped })
     }
 
-    pub fn fields(&self) -> FieldIter {
+    pub fn fields(&self) -> FieldIter<'_> {
         FieldIter(&self.fields, 0)
     }
 
-    pub fn skipped(&self) -> FieldIter {
+    pub fn skipped(&self) -> FieldIter<'_> {
         FieldIter(&self.skipped, 0)
     }
 

@@ -96,6 +96,12 @@ struct GS3<T, U> {
     #[n(1)] field2: U
 }
 
+#[derive(Encode, Decode, CborLen)]
+struct GS4<T> {
+    #[n(0)] #[cbor(with = "generic")] field1: Gen<T>,
+    #[n(1)] field2: T,
+}
+
 mod borrow {
     use super::*;
 

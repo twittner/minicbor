@@ -27,6 +27,20 @@ impl Blacklist {
                         .unwrap_or(false)
             }
         }));
+        if !blacklist.is_empty() {
+            let others = collect_type_params(g, fields.fields().filter(|f| {
+                match mode {
+                    Mode::Encode => f.attrs.codec().map(|c| !c.is_encode()).unwrap_or(true),
+                    Mode::Decode => f.attrs.codec().map(|c| !c.is_decode()).unwrap_or(true),
+                    Mode::Length => f.attrs.cbor_len().is_none()
+                        && f.attrs.codec()
+                            .map(|c| !matches!(c, CustomCodec::Module(..)))
+                            .unwrap_or(true)
+
+                }
+            }));
+            blacklist.retain(|ident| !others.contains(ident));
+        }
 
         // Extend the blacklist by type parameters only appearing in skipped fields.
         let skipped = collect_type_params(g, fields.skipped());

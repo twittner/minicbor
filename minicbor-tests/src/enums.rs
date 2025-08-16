@@ -102,6 +102,12 @@ enum GE3<T, U, Z> {
     #[n(4)] E { #[n(0)] field: Z }
 }
 
+#[derive(Encode, Decode, CborLen)]
+enum GE4<T> {
+    #[n(0)] A { #[n(0)] #[cbor(with = "generic")] field: Gen<T> },
+    #[n(1)] B ( #[n(1)] T )
+}
+
 mod borrow {
     use super::*;
 

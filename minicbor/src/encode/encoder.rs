@@ -229,6 +229,14 @@ impl<W: Write> Encoder<W> {
         self.type_len(TEXT, x.len() as u64)?.put(x.as_bytes())
     }
 
+    /// Begin encoding a string of `len` bytes.
+    ///
+    /// In contrast to [`Encoder::str`] which also encodes a string, this
+    /// method writes only the CBOR item head.
+    pub fn str_len(&mut self, len: u64) -> Result<&mut Self, Error<W::Error>> {
+        self.type_len(TEXT, len)
+    }
+
     /// Begin encoding an array with `len` elements.
     pub fn array(&mut self, len: u64) -> Result<&mut Self, Error<W::Error>> {
         self.type_len(ARRAY, len)
