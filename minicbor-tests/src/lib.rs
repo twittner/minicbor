@@ -1,9 +1,8 @@
-#![allow(clippy::needless_lifetimes)]
+#![allow(clippy::needless_lifetimes, unused)]
 
 mod bytes;
-mod structs;
 mod enums;
+mod structs;
 mod various;
 
 pub mod deriving;
-

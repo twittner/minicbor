@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
 
@@ -30,20 +32,16 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             unreachable!("`derive_from` matched against `syn::Data::Struct`")
         };
 
-    let name      = &inp.ident;
-    let attrs     = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let fields    = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
-    let blacklist = Blacklist::new(Mode::Length, &fields, &inp.generics);
+    let name   = &inp.ident;
+    let attrs  = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
+    let fields = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
 
+    let blacklist      = Blacklist::new(Mode::Length, &fields, &inp.generics);
     let cbor_len_bound = gen_cbor_len_bound()?;
     let params         = inp.generics.type_params_mut();
     add_bound_to_type_params(cbor_len_bound, params, &blacklist, fields.fields().attributes(), Mode::Length);
 
-    let mut blacklist = Blacklist::default();
-    blacklist.add(collect_type_params(&inp.generics, fields.fields().filter(|f| {
-        f.attrs.codec().map(|c| c.is_is_nil()).unwrap_or(false)
-    })));
-
+    let blacklist    = blacklist_is_nil_params(&inp.generics, &fields);
     let encode_bound = gen_encode_bound()?;
     let params       = inp.generics.type_params_mut();
     add_bound_to_type_params(encode_bound, params, &blacklist, fields.fields().attributes(), Mode::Length);
@@ -99,9 +97,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         blacklist_len.merge(Mode::Length, &fields, &inp.generics);
-        blacklist_enc.add(collect_type_params(&inp.generics, fields.fields().filter(|f| {
-            f.attrs.codec().map(|c| c.is_is_nil()).unwrap_or(false)
-        })));
+        blacklist_enc.add(HashSet::from(blacklist_is_nil_params(&inp.generics, &fields)));
         let con      = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag      = on_tag(attrs);
@@ -350,4 +346,19 @@ fn on_tag(a: &Attributes) -> proc_macro2::TokenStream {
     } else {
         quote!(0)
     }
+}
+
+fn blacklist_is_nil_params(generics: &syn::Generics, fields: &Fields) -> Blacklist {
+    let mut blacklist = Blacklist::default();
+    blacklist.add({
+        let mut with_is_nil = collect_type_params(generics, fields.fields().filter(|f| {
+            f.attrs.codec().map(|c| c.is_is_nil()).unwrap_or(false)
+        }));
+        let without_is_nil = collect_type_params(generics, fields.fields().filter(|f| {
+            f.attrs.codec().map(|c| !c.is_is_nil()).unwrap_or(true)
+        }));
+        with_is_nil.retain(|ident| !without_is_nil.contains(ident));
+        with_is_nil
+    });
+    blacklist
 }

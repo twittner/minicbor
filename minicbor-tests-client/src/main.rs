@@ -6,6 +6,7 @@ mod derive {
     use minicbor::{Encode, Decode};
 
     #[derive(Encode, Decode)]
+    #[allow(unused)]
     struct S<'a> {
         #[b(0)] a: &'a str,
         #[cfg(feature = "alloc")]
