@@ -7,7 +7,7 @@ use std::io;
 pub struct Reader<R> {
     reader: R,
     buffer: Vec<u8>,
-    max_len: usize
+    max_len: usize,
 }
 
 impl<R> Reader<R> {
@@ -18,7 +18,11 @@ impl<R> Reader<R> {
 
     /// Create a new reader with a max. buffer size of 512KiB.
     pub fn with_buffer(reader: R, buffer: Vec<u8>) -> Self {
-        Self { reader, buffer, max_len: 512 * 1024 }
+        Self {
+            reader,
+            buffer,
+            max_len: 512 * 1024,
+        }
     }
 
     /// Set the max. buffer size in bytes.
@@ -58,31 +62,30 @@ impl<R: io::Read> Reader<R> {
     }
 
     /// Like [`Reader::read`] but accepting a user provided decoding context.
-    pub fn read_with<'a, C, T: Decode<'a, C>>(&'a mut self, ctx: &mut C) -> Result<Option<T>, Error> {
+    pub fn read_with<'a, C, T: Decode<'a, C>>(
+        &'a mut self,
+        ctx: &mut C,
+    ) -> Result<Option<T>, Error> {
         let mut buf = [0; 4];
         let mut len = 0;
         while len < 4 {
-            match self.reader.read(&mut buf[len ..]) {
-                Ok(0) if len == 0 =>
-                    return Ok(None),
-                Ok(0) =>
-                    return Err(Error::Io(io::ErrorKind::UnexpectedEof.into())),
-                Ok(n) =>
-                    len += n,
-                Err(e) if e.kind() == io::ErrorKind::Interrupted =>
-                    continue,
-                Err(e) =>
-                    return Err(Error::Io(e))
+            match self.reader.read(&mut buf[len..]) {
+                Ok(0) if len == 0 => return Ok(None),
+                Ok(0) => return Err(Error::Io(io::ErrorKind::UnexpectedEof.into())),
+                Ok(n) => len += n,
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(Error::Io(e)),
             }
         }
         let len = u32::from_be_bytes(buf) as usize;
         if len > self.max_len {
-            return Err(Error::InvalidLen)
+            return Err(Error::InvalidLen);
         }
         self.buffer.clear();
         self.buffer.resize(len, 0u8);
         self.reader.read_exact(&mut self.buffer)?;
-        minicbor::decode_with(&self.buffer, ctx).map_err(Error::Decode).map(Some)
+        minicbor::decode_with(&self.buffer, ctx)
+            .map_err(Error::Decode)
+            .map(Some)
     }
 }
-

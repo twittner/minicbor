@@ -10,8 +10,8 @@ pub mod info;
 
 use crate::data::{Int, Tag, Tagged};
 
-pub use decoder::{Decoder, Probe};
 pub use decoder::{ArrayIter, ArrayIterWithCtx, BytesIter, MapIter, MapIterWithCtx, StrIter};
+pub use decoder::{Decoder, Probe};
 pub use error::Error;
 
 #[cfg(feature = "half")]
@@ -21,7 +21,10 @@ mod tokenizer;
 pub use tokenizer::Tokenizer;
 
 #[cfg(feature = "half")]
-#[deprecated(since = "0.23.0", note = "import `Token` from `minicbor::data` instead")]
+#[deprecated(
+    since = "0.23.0",
+    note = "import `Token` from `minicbor::data` instead"
+)]
 pub type Token<'b> = crate::data::Token<'b>;
 
 /// A type that can be decoded from CBOR.
@@ -79,7 +82,7 @@ impl<'a, 'b: 'a, C> Decode<'b, C> for &'a str {
 impl<'b, C, T> Decode<'b, C> for alloc::borrow::Cow<'_, T>
 where
     T: alloc::borrow::ToOwned + ?Sized,
-    T::Owned: Decode<'b, C>
+    T::Owned: Decode<'b, C>,
 {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         d.decode_with(ctx).map(alloc::borrow::Cow::Owned)
@@ -101,7 +104,8 @@ impl<'a, 'b: 'a, C> Decode<'b, C> for &'a core::ffi::CStr {
     fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         let p = d.position();
         let b = d.bytes()?;
-        core::ffi::CStr::from_bytes_with_nul(b).map_err(|_| Error::message("invalid c-string").at(p))
+        core::ffi::CStr::from_bytes_with_nul(b)
+            .map_err(|_| Error::message("invalid c-string").at(p))
     }
 }
 
@@ -124,7 +128,7 @@ impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for Option<T> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         if crate::data::Type::Null == d.datatype()? {
             d.skip()?;
-            return Ok(None)
+            return Ok(None);
         }
         T::decode(d, ctx).map(Some)
     }
@@ -137,18 +141,18 @@ impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for Option<T> {
 impl<'b, C, T, E> Decode<'b, C> for Result<T, E>
 where
     T: Decode<'b, C>,
-    E: Decode<'b, C>
+    E: Decode<'b, C>,
 {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(2) != d.array()? {
-            return Err(Error::message("expected enum (2-element array)").at(p))
+            return Err(Error::message("expected enum (2-element array)").at(p));
         }
         let p = d.position();
         match d.i64()? {
             0 => T::decode(d, ctx).map(Ok),
             1 => E::decode(d, ctx).map(Err),
-            n => Err(Error::unknown_variant(n).at(p))
+            n => Err(Error::unknown_variant(n).at(p)),
         }
     }
 }
@@ -156,7 +160,7 @@ where
 #[cfg(feature = "alloc")]
 impl<'b, C, T> Decode<'b, C> for alloc::collections::BinaryHeap<T>
 where
-    T: Decode<'b, C> + Ord
+    T: Decode<'b, C> + Ord,
 {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let iter: ArrayIterWithCtx<C, T> = d.array_iter_with(ctx)?;
@@ -172,7 +176,7 @@ where
 impl<'b, C, T, S> Decode<'b, C> for std::collections::HashSet<T, S>
 where
     T: Decode<'b, C> + Eq + std::hash::Hash,
-    S: std::hash::BuildHasher + std::default::Default
+    S: std::hash::BuildHasher + std::default::Default,
 {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let iter: ArrayIterWithCtx<C, T> = d.array_iter_with(ctx)?;
@@ -187,7 +191,7 @@ where
 #[cfg(feature = "alloc")]
 impl<'b, C, T> Decode<'b, C> for alloc::collections::BTreeSet<T>
 where
-    T: Decode<'b, C> + Ord
+    T: Decode<'b, C> + Ord,
 {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let iter: ArrayIterWithCtx<C, T> = d.array_iter_with(ctx)?;
@@ -204,7 +208,7 @@ impl<'b, C, K, V, S> Decode<'b, C> for std::collections::HashMap<K, V, S>
 where
     K: Decode<'b, C> + Eq + std::hash::Hash,
     V: Decode<'b, C>,
-    S: std::hash::BuildHasher + std::default::Default
+    S: std::hash::BuildHasher + std::default::Default,
 {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let mut m = std::collections::HashMap::default();
@@ -221,7 +225,7 @@ where
 impl<'b, C, K, V> Decode<'b, C> for alloc::collections::BTreeMap<K, V>
 where
     K: Decode<'b, C> + Eq + Ord,
-    V: Decode<'b, C>
+    V: Decode<'b, C>,
 {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let mut m = alloc::collections::BTreeMap::new();
@@ -238,7 +242,7 @@ impl<'b, C, T> Decode<'b, C> for core::marker::PhantomData<T> {
     fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(0) != d.array()? {
-            return Err(Error::message("expected phantom data, i.e. an empty array").at(p))
+            return Err(Error::message("expected phantom data, i.e. an empty array").at(p));
         }
         Ok(core::marker::PhantomData)
     }
@@ -248,7 +252,7 @@ impl<'b, C> Decode<'b, C> for () {
     fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(0) != d.array()? {
-            return Err(Error::message("expected unit, i.e. an empty array").at(p))
+            return Err(Error::message("expected unit, i.e. an empty array").at(p));
         }
         Ok(())
     }
@@ -320,9 +324,11 @@ impl<'b, C, const N: u64, T: Decode<'b, C>> Decode<'b, C> for Tagged<N, T> {
         let t = d.tag()?;
         if N != t.as_u64() {
             #[cfg(feature = "alloc")]
-            return Err(Error::tag_mismatch(t).with_message(alloc::format!("expected tag {N}")).at(p));
+            return Err(Error::tag_mismatch(t)
+                .with_message(alloc::format!("expected tag {N}"))
+                .at(p));
             #[cfg(not(feature = "alloc"))]
-            return Err(Error::tag_mismatch(t).at(p))
+            return Err(Error::tag_mismatch(t).at(p));
         }
         let v = d.decode_with(ctx)?;
         Ok(Tagged::new(v))
@@ -367,7 +373,11 @@ decode_nonzero! {
     core::num::NonZeroI64, "unexpected 0 when decoding a `NonZeroI64`"
 }
 
-#[cfg(any(target_pointer_width = "16", target_pointer_width = "32", target_pointer_width = "64"))]
+#[cfg(any(
+    target_pointer_width = "16",
+    target_pointer_width = "32",
+    target_pointer_width = "64"
+))]
 decode_nonzero! {
     core::num::NonZeroUsize,  "unexpected 0 when decoding a `NonZeroUsize`"
     core::num::NonZeroIsize,  "unexpected 0 when decoding a `NonZeroIsize`"
@@ -439,26 +449,25 @@ decode_sequential! {
     alloc::collections::LinkedList<T>, push_back
 }
 
-struct ArrayVec<T, const N: usize>{
+struct ArrayVec<T, const N: usize> {
     len: usize,
     buffer: [MaybeUninit<T>; N],
 }
 
-impl <T, const N: usize> ArrayVec<T, N> {
+impl<T, const N: usize> ArrayVec<T, N> {
     const ELEM: MaybeUninit<T> = MaybeUninit::uninit();
 
     fn new() -> Self {
         Self {
             len: 0,
-            buffer: [Self::ELEM; N]
+            buffer: [Self::ELEM; N],
         }
     }
 
     fn into_array(self) -> Result<[T; N], Self> {
         if self.len == N {
-            let array = unsafe {
-                (&self.buffer as *const [MaybeUninit<T>; N] as *const [T; N]).read()
-            };
+            let array =
+                unsafe { (&self.buffer as *const [MaybeUninit<T>; N] as *const [T; N]).read() };
 
             // We don't want `self`'s destructor to be called because that would drop all the
             // items in the array
@@ -481,7 +490,7 @@ impl <T, const N: usize> ArrayVec<T, N> {
     }
 }
 
-impl <T, const N: usize> core::ops::Drop for ArrayVec<T, N> {
+impl<T, const N: usize> core::ops::Drop for ArrayVec<T, N> {
     fn drop(&mut self) {
         unsafe {
             let s = core::slice::from_raw_parts_mut(self.buffer.as_mut_ptr() as *mut T, self.len);
@@ -650,13 +659,13 @@ impl<'b, C> Decode<'b, C> for std::net::IpAddr {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(2) != d.array()? {
-            return Err(Error::message("expected enum (2-element array)").at(p))
+            return Err(Error::message("expected enum (2-element array)").at(p));
         }
         let p = d.position();
         match d.i64()? {
             0 => Ok(std::net::Ipv4Addr::decode(d, ctx)?.into()),
             1 => Ok(std::net::Ipv6Addr::decode(d, ctx)?.into()),
-            n => Err(Error::unknown_variant(n).at(p))
+            n => Err(Error::unknown_variant(n).at(p)),
         }
     }
 }
@@ -682,13 +691,13 @@ impl<'b, C> Decode<'b, C> for std::net::SocketAddr {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(2) != d.array()? {
-            return Err(Error::message("expected enum (2-element array)").at(p))
+            return Err(Error::message("expected enum (2-element array)").at(p));
         }
         let p = d.position();
         match d.i64()? {
             0 => Ok(std::net::SocketAddrV4::decode(d, ctx)?.into()),
             1 => Ok(std::net::SocketAddrV6::decode(d, ctx)?.into()),
-            n => Err(Error::unknown_variant(n).at(p))
+            n => Err(Error::unknown_variant(n).at(p)),
         }
     }
 }
@@ -715,7 +724,7 @@ impl<'b, C> Decode<'b, C> for std::net::SocketAddrV6 {
     }
 }
 
-impl<'b, C, T: Decode<'b, C>> Decode<'b,C > for core::ops::Range<T> {
+impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::ops::Range<T> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         decode_fields! { d ctx |
             0 start => T ; "Range::start"
@@ -766,14 +775,14 @@ impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for core::ops::Bound<T> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(2) != d.array()? {
-            return Err(Error::message("expected enum (2-element array)").at(p))
+            return Err(Error::message("expected enum (2-element array)").at(p));
         }
         let p = d.position();
         match d.i64()? {
             0 => d.decode_with(ctx).map(core::ops::Bound::Included),
             1 => d.decode_with(ctx).map(core::ops::Bound::Excluded),
             2 => d.skip().map(|_| core::ops::Bound::Unbounded),
-            n => Err(Error::unknown_variant(n).at(p))
+            n => Err(Error::unknown_variant(n).at(p)),
         }
     }
 }

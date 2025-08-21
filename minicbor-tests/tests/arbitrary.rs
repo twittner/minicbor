@@ -2,7 +2,7 @@
 
 use arbitrary::{Arbitrary, Unstructured};
 use core::fmt::Debug;
-use minicbor::{Encode, Decode, CborLen, Decoder};
+use minicbor::{CborLen, Decode, Decoder, Encode};
 use minicbor_tests::deriving;
 
 const RUNS: usize = 100;
@@ -15,10 +15,10 @@ where
         + CborLen<()>
         + Encode<()>
         + Eq
-        + deriving::ResetSkipped
+        + deriving::ResetSkipped,
 {
-    for _ in 0 .. RUNS {
-        let seed  = rand::random::<[u8; 16]>();
+    for _ in 0..RUNS {
+        let seed = rand::random::<[u8; 16]>();
         let mut u = Unstructured::new(&seed[..]);
         let mut val1: T = u.arbitrary().unwrap();
 
@@ -28,7 +28,7 @@ where
 
         let mut dec = Decoder::new(&vec);
         let val2 = match dec.decode() {
-            Ok(v)  => v,
+            Ok(v) => v,
             Err(e) => {
                 panic!("decoding failed; error := {e}; input := {val1:?}")
             }
@@ -74,7 +74,6 @@ fn deriving_array_enums() {
     identity::<deriving::array::enums::Enum4RecRev>();
     identity::<deriving::array::enums::Enum8>();
     identity::<deriving::array::enums::Enum8Rec>();
-
 }
 
 #[test]
@@ -106,4 +105,3 @@ fn deriving_map_enums() {
     identity::<deriving::map::enums::Enum8>();
     identity::<deriving::map::enums::Enum8Rec>();
 }
-

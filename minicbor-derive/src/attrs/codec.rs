@@ -44,19 +44,19 @@ pub enum CustomCodec {
     /// the module contains functions `is_nil` and `nil` matching those
     /// declared with `is_nil` and `nil` when using `encode_with` and
     /// `decode_with`.
-    Module(syn::ExprPath, bool)
+    Module(syn::ExprPath, bool),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Encode {
     pub encode: syn::ExprPath,
-    pub is_nil: Option<syn::ExprPath>
+    pub is_nil: Option<syn::ExprPath>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Decode {
     pub decode: syn::ExprPath,
-    pub nil: Option<syn::ExprPath>
+    pub nil: Option<syn::ExprPath>,
 }
 
 impl CustomCodec {
@@ -78,19 +78,19 @@ impl CustomCodec {
     /// Is this a custom codec with `is_nil`?
     pub fn is_is_nil(&self) -> bool {
         match self {
-            CustomCodec::Encode(e)    => e.is_nil.is_some(),
-            CustomCodec::Both(e, _)   => e.is_nil.is_some(),
+            CustomCodec::Encode(e) => e.is_nil.is_some(),
+            CustomCodec::Both(e, _) => e.is_nil.is_some(),
             CustomCodec::Module(_, t) => *t,
-            CustomCodec::Decode(_)    => false
+            CustomCodec::Decode(_) => false,
         }
     }
 
     /// Extract the encode function unless this `CustomCodec` does not declare one.
     pub fn to_encode_path(&self) -> Option<syn::ExprPath> {
         match self {
-            CustomCodec::Encode(e)    => Some(e.encode.clone()),
-            CustomCodec::Both(e, _)   => Some(e.encode.clone()),
-            CustomCodec::Decode(_)    => None,
+            CustomCodec::Encode(e) => Some(e.encode.clone()),
+            CustomCodec::Both(e, _) => Some(e.encode.clone()),
+            CustomCodec::Decode(_) => None,
             CustomCodec::Module(p, _) => {
                 let mut p = p.clone();
                 let ident = syn::Ident::new("encode", proc_macro2::Span::call_site());
@@ -103,9 +103,9 @@ impl CustomCodec {
     /// Extract the decode function unless this `CustomCodec` does not declare one.
     pub fn to_decode_path(&self) -> Option<syn::ExprPath> {
         match self {
-            CustomCodec::Decode(d)    => Some(d.decode.clone()),
-            CustomCodec::Both(_, d)   => Some(d.decode.clone()),
-            CustomCodec::Encode(_)    => None,
+            CustomCodec::Decode(d) => Some(d.decode.clone()),
+            CustomCodec::Both(_, d) => Some(d.decode.clone()),
+            CustomCodec::Encode(_) => None,
             CustomCodec::Module(p, _) => {
                 let mut p = p.clone();
                 let ident = syn::Ident::new("decode", proc_macro2::Span::call_site());
@@ -118,8 +118,8 @@ impl CustomCodec {
     /// Extract the `is_nil` function if possible.
     pub fn to_is_nil_path(&self) -> Option<syn::ExprPath> {
         match self {
-            CustomCodec::Encode(e)       => e.is_nil.clone(),
-            CustomCodec::Both(e, _)      => e.is_nil.clone(),
+            CustomCodec::Encode(e) => e.is_nil.clone(),
+            CustomCodec::Both(e, _) => e.is_nil.clone(),
             CustomCodec::Module(p, true) => {
                 let mut p = p.clone();
                 let ident = syn::Ident::new("is_nil", proc_macro2::Span::call_site());
@@ -127,15 +127,15 @@ impl CustomCodec {
                 Some(p)
             }
             CustomCodec::Module(_, false) => None,
-            CustomCodec::Decode(_)        => None
+            CustomCodec::Decode(_) => None,
         }
     }
 
     /// Extract the `nil` function if possible.
     pub fn to_nil_path(&self) -> Option<syn::ExprPath> {
         match self {
-            CustomCodec::Decode(d)       => d.nil.clone(),
-            CustomCodec::Both(_, d)      => d.nil.clone(),
+            CustomCodec::Decode(d) => d.nil.clone(),
+            CustomCodec::Both(_, d) => d.nil.clone(),
             CustomCodec::Module(p, true) => {
                 let mut p = p.clone();
                 let ident = syn::Ident::new("nil", proc_macro2::Span::call_site());
@@ -143,7 +143,7 @@ impl CustomCodec {
                 Some(p)
             }
             CustomCodec::Module(_, false) => None,
-            CustomCodec::Encode(_)        => None
+            CustomCodec::Encode(_) => None,
         }
     }
 

@@ -44,8 +44,8 @@
 extern crate alloc;
 
 mod de;
-mod ser;
 pub mod error;
+mod ser;
 
 pub use de::{Deserializer, from_slice};
 pub use ser::Serializer;

@@ -2,7 +2,7 @@
 
 use minicbor::data::{Token, Type};
 use minicbor::decode::{self, Decode, Decoder, Tokenizer};
-use minicbor::encode::{self, Write, Encode, Encoder};
+use minicbor::encode::{self, Encode, Encoder, Write};
 use quickcheck::{Arbitrary, Gen};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -12,7 +12,7 @@ use std::iter::FromIterator;
 enum C {
     E(u32),
     A(Vec<C>),
-    M(BTreeMap<u32, C>)
+    M(BTreeMap<u32, C>),
 }
 
 impl Arbitrary for C {
@@ -21,17 +21,21 @@ impl Arbitrary for C {
         match g.choose(&[1, 2, 3]).unwrap() {
             1 => C::E(Arbitrary::arbitrary(&mut g)),
             2 => C::A(Arbitrary::arbitrary(&mut g)),
-            _ => C::M(Arbitrary::arbitrary(&mut g))
+            _ => C::M(Arbitrary::arbitrary(&mut g)),
         }
     }
 }
 
 impl<Ctx> Encode<Ctx> for C {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut Ctx) -> Result<(), encode::Error<W::Error>> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut Ctx,
+    ) -> Result<(), encode::Error<W::Error>> {
         match self {
-            C::E(n)  => e.u32(*n)?.ok(),
+            C::E(n) => e.u32(*n)?.ok(),
             C::A(xs) => e.encode_with(xs, ctx)?.ok(),
-            C::M(xs) => e.encode_with(xs, ctx)?.ok()
+            C::M(xs) => e.encode_with(xs, ctx)?.ok(),
         }
     }
 }
@@ -40,8 +44,8 @@ impl<'b, Ctx> Decode<'b, Ctx> for C {
     fn decode(d: &mut Decoder<'b>, ctx: &mut Ctx) -> Result<Self, decode::Error> {
         match d.datatype()? {
             Type::Array => d.decode_with(ctx).map(C::A),
-            Type::Map   => d.decode_with(ctx).map(C::M),
-            _           => d.decode_with(ctx).map(C::E)
+            Type::Map => d.decode_with(ctx).map(C::M),
+            _ => d.decode_with(ctx).map(C::E),
         }
     }
 }
@@ -76,7 +80,7 @@ impl fmt::Display for Rec<'_, '_> {
             match it.next() {
                 Some(Ok(Token::Array(n))) => {
                     f.write_str("[")?;
-                    for i in 0 .. n {
+                    for i in 0..n {
                         mk(it, f)?;
                         if i < n - 1 {
                             f.write_str(", ")?
@@ -86,7 +90,7 @@ impl fmt::Display for Rec<'_, '_> {
                 }
                 Some(Ok(Token::Map(n))) => {
                     f.write_str("{")?;
-                    for i in 0 .. n {
+                    for i in 0..n {
                         mk(it, f)?;
                         f.write_str(": ")?;
                         mk(it, f)?;
@@ -96,9 +100,9 @@ impl fmt::Display for Rec<'_, '_> {
                     }
                     f.write_str("}")
                 }
-                Some(Ok(t))  => t.fmt(f),
+                Some(Ok(t)) => t.fmt(f),
                 Some(Err(e)) => write!(f, "decoding error: {}", e),
-                None         => Ok(())
+                None => Ok(()),
             }
         }
         let mut this = self.0.clone();

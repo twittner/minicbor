@@ -1,7 +1,7 @@
 use minicbor::data::Type;
 use minicbor::decode::Decoder;
 use minicbor::encode::Encoder;
-use quickcheck::{quickcheck, TestResult};
+use quickcheck::{TestResult, quickcheck};
 
 #[test]
 fn trigger_length_overflow_str() {
@@ -481,14 +481,14 @@ fn check_type_of(i: i64) -> bool {
     minicbor::encode(i, b.as_mut()).unwrap();
     let mut d = Decoder::new(&b);
     match d.datatype().unwrap() {
-        Type::U8  => Some(i) == d.u8().ok().map(i64::from),
+        Type::U8 => Some(i) == d.u8().ok().map(i64::from),
         Type::U16 => Some(i) == d.u16().ok().map(i64::from),
         Type::U32 => Some(i) == d.u32().ok().map(i64::from),
         Type::U64 => Some(i) == d.u64().ok().and_then(|n| i64::try_from(n).ok()),
-        Type::I8  => Some(i) == d.i8().ok().map(i64::from),
+        Type::I8 => Some(i) == d.i8().ok().map(i64::from),
         Type::I16 => Some(i) == d.i16().ok().map(i64::from),
         Type::I32 => Some(i) == d.i32().ok().map(i64::from),
         Type::I64 => Some(i) == d.i64().ok(),
-        _         => false
+        _ => false,
     }
 }

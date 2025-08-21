@@ -21,7 +21,7 @@ impl Write for &mut [u8] {
 
     fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
         if self.len() < buf.len() {
-            return Err(EndOfSlice(()))
+            return Err(EndOfSlice(()));
         }
         let this = core::mem::take(self);
         let (prefix, suffix) = this.split_at_mut(buf.len());
@@ -45,7 +45,7 @@ impl Write for alloc::vec::Vec<u8> {
 #[derive(Debug)]
 pub struct Cursor<W> {
     wrt: W,
-    pos: usize
+    pos: usize,
 }
 
 impl<W> Cursor<W> {
@@ -83,8 +83,8 @@ impl Write for Cursor<&mut [u8]> {
     type Error = EndOfSlice;
 
     fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
-        let Some(slice) = self.wrt.get_mut(self.pos .. self.pos + buf.len()) else {
-            return Err(EndOfSlice(()))
+        let Some(slice) = self.wrt.get_mut(self.pos..self.pos + buf.len()) else {
+            return Err(EndOfSlice(()));
         };
         slice.copy_from_slice(buf);
         self.pos += buf.len();
@@ -96,8 +96,8 @@ impl<const N: usize> Write for Cursor<[u8; N]> {
     type Error = EndOfArray;
 
     fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
-        let Some(slice) = self.wrt.get_mut(self.pos .. self.pos + buf.len()) else {
-            return Err(EndOfArray(()))
+        let Some(slice) = self.wrt.get_mut(self.pos..self.pos + buf.len()) else {
+            return Err(EndOfArray(()));
         };
         slice.copy_from_slice(buf);
         self.pos += buf.len();
@@ -110,8 +110,8 @@ impl Write for Cursor<alloc::boxed::Box<[u8]>> {
     type Error = EndOfSlice;
 
     fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
-        let Some(slice) = self.wrt.get_mut(self.pos .. self.pos + buf.len()) else {
-            return Err(EndOfSlice(()))
+        let Some(slice) = self.wrt.get_mut(self.pos..self.pos + buf.len()) else {
+            return Err(EndOfSlice(()));
         };
         slice.copy_from_slice(buf);
         self.pos += buf.len();

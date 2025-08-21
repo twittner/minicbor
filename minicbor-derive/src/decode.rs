@@ -2,22 +2,24 @@ use quote::quote;
 use std::collections::HashSet;
 use syn::spanned::Spanned;
 
-use crate::blacklist::Blacklist;
-use crate::{is_phantom_data, Mode};
-use crate::{add_bound_to_type_params, collect_type_params, is_cow, is_option, is_str, is_byte_slice};
-use crate::{add_typeparam, gen_ctx_param, add_bound_to_matching_type_params};
 use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
+use crate::blacklist::Blacklist;
 use crate::fields::{Field, Fields};
+use crate::lifetimes::{add_lifetime, gen_lifetime, lifetimes_to_constrain};
 use crate::variants::Variants;
-use crate::lifetimes::{gen_lifetime, lifetimes_to_constrain, add_lifetime};
+use crate::{Mode, is_phantom_data};
+use crate::{add_bound_to_matching_type_params, add_typeparam, gen_ctx_param};
+use crate::{
+    add_bound_to_type_params, collect_type_params, is_byte_slice, is_cow, is_option, is_str,
+};
 
 /// Entry point to derive `minicbor::Decode` on structs and enums.
 pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let mut input = syn::parse_macro_input!(input as syn::DeriveInput);
     let result = match &input.data {
         syn::Data::Struct(_) => on_struct(&mut input),
-        syn::Data::Enum(_)   => on_enum(&mut input),
-        syn::Data::Union(u)  => {
+        syn::Data::Enum(_) => on_enum(&mut input),
+        syn::Data::Union(u) => {
             let msg = "deriving `minicbor::Decode` for a `union` is not supported";
             Err(syn::Error::new(u.union_token.span(), msg))
         }
@@ -27,38 +29,50 @@ pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
 /// Create a `Decode` impl for (tuple) structs.
 fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
-    let data =
-        if let syn::Data::Struct(data) = &inp.data {
-            data
-        } else {
-            unreachable!("`derive_from` matched against `syn::Data::Struct`")
-        };
+    let data = if let syn::Data::Struct(data) = &inp.data {
+        data
+    } else {
+        unreachable!("`derive_from` matched against `syn::Data::Struct`")
+    };
 
-    let name      = &inp.ident;
-    let attrs     = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let fields    = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
+    let name = &inp.ident;
+    let attrs = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
+    let fields = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
     let blacklist = Blacklist::new(Mode::Decode, &fields, &inp.generics);
 
     let mut lifetime = gen_lifetime()?;
-    for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, f.attrs.borrow(), &f.typ))) {
+    for l in lifetimes_to_constrain(
+        fields
+            .fields()
+            .map(|f| (&f.index, f.attrs.borrow(), &f.typ)),
+    ) {
         if !lifetime.bounds.iter().any(|b| *b == l) {
             lifetime.bounds.push(l.clone())
         }
     }
 
     // Collect type parameters which require a `Default` bound.
-    let default_types =
-        collect_type_params(&inp.generics, fields.fields().chain(fields.skipped()).filter(|f| {
-            (f.attrs.default() || f.attrs.skip()) && !is_phantom_data(&f.typ)
-        }))
-        .into_iter()
-        .collect();
+    let default_types = collect_type_params(
+        &inp.generics,
+        fields
+            .fields()
+            .chain(fields.skipped())
+            .filter(|f| (f.attrs.default() || f.attrs.skip()) && !is_phantom_data(&f.typ)),
+    )
+    .into_iter()
+    .collect();
 
-    let bound  = gen_decode_bound()?;
+    let bound = gen_decode_bound()?;
     let params = inp.generics.type_params_mut();
-    add_bound_to_type_params(bound, params, &blacklist, fields.fields().attributes(), Mode::Decode);
+    add_bound_to_type_params(
+        bound,
+        params,
+        &blacklist,
+        fields.fields().attributes(),
+        Mode::Decode,
+    );
 
-    let bound  = gen_default_bound()?;
+    let bound = gen_default_bound()?;
     let params = inp.generics.type_params_mut();
     add_bound_to_matching_type_params(bound, params, &default_types);
 
@@ -72,21 +86,21 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     if attrs.transparent() {
         if fields.fields().len() != 1 {
             let msg = "#[cbor(transparent)] requires a struct with one field";
-            return Err(syn::Error::new(inp.ident.span(), msg))
+            return Err(syn::Error::new(inp.ident.span(), msg));
         }
         let f = fields.fields().next().expect("struct has 1 field");
-        return make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause)
+        return make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause);
     }
 
     let statements = gen_statements(&fields, attrs.encoding().unwrap_or_default(), false)?;
 
     let result = if let syn::Fields::Named(_) = data.fields {
-        let defs      = defs(fields.fields());
-        let nils      = nils(fields.fields());
-        let indices   = fields.fields().indices();
-        let idents    = fields.fields().idents();
+        let defs = defs(fields.fields());
+        let nils = nils(fields.fields());
+        let indices = fields.fields().indices();
+        let idents = fields.fields().idents();
         let field_str = fields.fields().idents().map(|n| format!("{name}::{n}"));
-        let skipped   = fields.skipped().idents();
+        let skipped = fields.skipped().idents();
         quote! {
             Ok(#name {
                 #(#idents : if let Some(x) = #idents {
@@ -126,26 +140,30 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
 /// Create a `Decode` impl for enums.
 fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
-    let data =
-        if let syn::Data::Enum(data) = &inp.data {
-            data
-        } else {
-            unreachable!("`derive_from` matched against `syn::Data::Enum`")
-        };
+    let data = if let syn::Data::Enum(data) = &inp.data {
+        data
+    } else {
+        unreachable!("`derive_from` matched against `syn::Data::Enum`")
+    };
 
-    let name          = &inp.ident;
-    let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
+    let name = &inp.ident;
+    let enum_attrs = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
-    let index_only    = enum_attrs.index_only();
-    let flat          = enum_attrs.flat();
-    let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
+    let index_only = enum_attrs.index_only();
+    let flat = enum_attrs.flat();
+    let variants = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
     let mut blacklist = Blacklist::default();
     let mut defaults = HashSet::new();
     let mut field_attrs = Vec::new();
     let mut lifetime = gen_lifetime()?;
     let mut rows = Vec::new();
-    for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
+    for ((var, idx), attrs) in data
+        .variants
+        .iter()
+        .zip(variants.indices.iter())
+        .zip(&variants.attrs)
+    {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let con = &var.ident;
@@ -161,7 +179,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 })
             }
         } else {
-            for l in lifetimes_to_constrain(fields.fields().map(|f| (&f.index, f.attrs.borrow(), &f.typ))) {
+            for l in lifetimes_to_constrain(
+                fields
+                    .fields()
+                    .map(|f| (&f.index, f.attrs.borrow(), &f.typ)),
+            ) {
                 if !lifetime.bounds.iter().any(|b| *b == l) {
                     lifetime.bounds.push(l.clone())
                 }
@@ -169,19 +191,25 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             blacklist.merge(Mode::Decode, &fields, &inp.generics);
             // Collect type parameters which require a `Default` bound.
             defaults.extend(
-                collect_type_params(&inp.generics, fields.fields().chain(fields.skipped()).filter(|f| {
-                    (f.attrs.default() || f.attrs.skip()) && !is_phantom_data(&f.typ)
-                }))
-                .into_iter()
+                collect_type_params(
+                    &inp.generics,
+                    fields.fields().chain(fields.skipped()).filter(|f| {
+                        (f.attrs.default() || f.attrs.skip()) && !is_phantom_data(&f.typ)
+                    }),
+                )
+                .into_iter(),
             );
             let statements = gen_statements(&fields, encoding, flat)?;
             if let syn::Fields::Named(_) = var.fields {
-                let defs      = defs(fields.fields());
-                let nils      = nils(fields.fields());
-                let indices   = fields.fields().indices();
-                let idents    = fields.fields().idents();
-                let field_str = fields.fields().idents().map(|n| format!("{name}::{con}::{n}"));
-                let skipped   = fields.skipped().idents();
+                let defs = defs(fields.fields());
+                let nils = nils(fields.fields());
+                let indices = fields.fields().indices();
+                let idents = fields.fields().idents();
+                let field_str = fields
+                    .fields()
+                    .idents()
+                    .map(|n| format!("{name}::{con}::{n}"));
+                let skipped = fields.skipped().idents();
                 quote! {
                     #idx => {
                         #tag
@@ -216,11 +244,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         rows.push(row)
     }
 
-    let bound  = gen_decode_bound()?;
+    let bound = gen_decode_bound()?;
     let params = inp.generics.type_params_mut();
     add_bound_to_type_params(bound, params, &blacklist, &field_attrs, Mode::Decode);
 
-    let bound  = gen_default_bound()?;
+    let bound = gen_default_bound()?;
     let params = inp.generics.type_params_mut();
     add_bound_to_matching_type_params(bound, params, &defaults);
 
@@ -289,7 +317,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 // [1]: These variables will later be deconstructed in `on_enum` and
 // `on_struct` and their inner value will be used to initialise a field.
 // If not present, an error will be produced.
-fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Result<proc_macro2::TokenStream> {
+fn gen_statements(
+    fields: &Fields,
+    encoding: Encoding,
+    flat: bool,
+) -> syn::Result<proc_macro2::TokenStream> {
     let default_decode_fn: syn::ExprPath = syn::parse_str("minicbor::Decode::decode")?;
 
     let actions = fields.fields().map(|field| {
@@ -365,8 +397,8 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
         }
     });
 
-    let idents  = fields.fields().idents();
-    let types   = fields.fields().types();
+    let idents = fields.fields().idents();
+    let types = fields.fields().types();
     let indices = fields.fields().indices().collect::<Vec<_>>();
 
     Ok(match encoding {
@@ -421,82 +453,82 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
                 }
                 __d777.skip()?
             }
-        }
+        },
     })
 }
 
 /// Forward the decoding because of a `#[cbor(transparent)]` attribute.
-fn make_transparent_impl
-    ( name: &syn::Ident
-    , field: &Field
-    , impl_generics: syn::ImplGenerics
-    , typ_generics: syn::TypeGenerics
-    , where_clause: Option<&syn::WhereClause>
-    ) -> syn::Result<proc_macro2::TokenStream>
-{
+fn make_transparent_impl(
+    name: &syn::Ident,
+    field: &Field,
+    impl_generics: syn::ImplGenerics,
+    typ_generics: syn::TypeGenerics,
+    where_clause: Option<&syn::WhereClause>,
+) -> syn::Result<proc_macro2::TokenStream> {
     let default_decode_fn: syn::ExprPath = syn::parse_str("minicbor::Decode::decode")?;
     let default_nil_fn: syn::ExprPath = syn::parse_str("minicbor::Decode::<Ctx>::nil")?;
 
-    let decode_fn = field.attrs.codec()
+    let decode_fn = field
+        .attrs
+        .codec()
         .filter(|cc| cc.is_decode())
         .and_then(CustomCodec::to_decode_path)
         .unwrap_or_else(|| default_decode_fn.clone());
 
-    let nil_fn = field.attrs.codec()
+    let nil_fn = field
+        .attrs
+        .codec()
         .and_then(|cc| cc.to_nil_path())
         .unwrap_or_else(|| default_nil_fn.clone());
 
-    let decode_call =
-        if cfg!(any(feature = "alloc", feature = "std"))
-            && (field.attrs.borrow().is_some() || field.index.is_b())
-            && is_cow(&field.typ, |t| is_str(t) || is_byte_slice(t))
-        {
-            let cow =
-                if cfg!(feature = "std") {
-                    quote!(std::borrow::Cow::Borrowed(v))
-                } else {
-                    quote!(alloc::borrow::Cow::Borrowed(v))
-                };
-            if field.is_name {
-                let id = &field.ident;
-                quote! {
-                    Ok(#name {
-                        #id: match #decode_fn(__d777, __ctx777) {
-                            Ok(v)  => #cow,
-                            Err(e) => return Err(e)
-                        }
-                    })
-                }
-            } else {
-                quote! {
-                    Ok(#name(match #decode_fn(__d777, __ctx777) {
-                        Ok(v)  => #cow,
-                        Err(e) => return Err(e)
-                    }))
-                }
-            }
-        } else if field.is_name {
-            let id = &field.ident;
-            quote! {
-                Ok(#name { #id: #decode_fn(__d777, __ctx777)? })
-            }
+    let decode_call = if cfg!(any(feature = "alloc", feature = "std"))
+        && (field.attrs.borrow().is_some() || field.index.is_b())
+        && is_cow(&field.typ, |t| is_str(t) || is_byte_slice(t))
+    {
+        let cow = if cfg!(feature = "std") {
+            quote!(std::borrow::Cow::Borrowed(v))
         } else {
-            quote! {
-                Ok(#name(#decode_fn(__d777, __ctx777)?))
-            }
+            quote!(alloc::borrow::Cow::Borrowed(v))
         };
-
-    let nil_call =
         if field.is_name {
             let id = &field.ident;
             quote! {
-                #nil_fn().map(|v| Self { #id: v })
+                Ok(#name {
+                    #id: match #decode_fn(__d777, __ctx777) {
+                        Ok(v)  => #cow,
+                        Err(e) => return Err(e)
+                    }
+                })
             }
         } else {
             quote! {
-                #nil_fn().map(Self)
+                Ok(#name(match #decode_fn(__d777, __ctx777) {
+                    Ok(v)  => #cow,
+                    Err(e) => return Err(e)
+                }))
             }
-        };
+        }
+    } else if field.is_name {
+        let id = &field.ident;
+        quote! {
+            Ok(#name { #id: #decode_fn(__d777, __ctx777)? })
+        }
+    } else {
+        quote! {
+            Ok(#name(#decode_fn(__d777, __ctx777)?))
+        }
+    };
+
+    let nil_call = if field.is_name {
+        let id = &field.ident;
+        quote! {
+            #nil_fn().map(|v| Self { #id: v })
+        }
+    } else {
+        quote! {
+            #nil_fn().map(Self)
+        }
+    };
 
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
@@ -521,9 +553,10 @@ fn gen_default_bound() -> syn::Result<syn::TypeParamBound> {
 
 fn defs<'a, T>(fields: T) -> Vec<proc_macro2::TokenStream>
 where
-    T: IntoIterator<Item = &'a Field>
+    T: IntoIterator<Item = &'a Field>,
 {
-    fields.into_iter()
+    fields
+        .into_iter()
         .map(|f| {
             if f.attrs.default() {
                 quote!(Some(Default::default()))
@@ -536,7 +569,7 @@ where
 
 fn nils<'a, T>(fields: T) -> Vec<proc_macro2::TokenStream>
 where
-    T: IntoIterator<Item = &'a Field>
+    T: IntoIterator<Item = &'a Field>,
 {
     fields.into_iter().map(nil).collect()
 }
@@ -556,25 +589,23 @@ fn nil(f: &Field) -> proc_macro2::TokenStream {
     }
 }
 
-
 fn decode_tag(a: &Attributes) -> proc_macro2::TokenStream {
     if let Some(t) = a.tag() {
-        let err =
-            if cfg!(feature = "std") {
-                quote! {
-                    minicbor::decode::Error::tag_mismatch(__t777)
-                        .with_message(format!("expected tag {}", #t))
-                        .at(__p777)
-                }
-            } else if cfg!(feature = "alloc") {
-                quote! {
-                    minicbor::decode::Error::tag_mismatch(__t777)
-                        .with_message(alloc::format!("expected tag {}", #t))
-                        .at(__p777)
-                }
-            } else {
-                quote!(minicbor::decode::Error::tag_mismatch(__t777).at(__p777))
-            };
+        let err = if cfg!(feature = "std") {
+            quote! {
+                minicbor::decode::Error::tag_mismatch(__t777)
+                    .with_message(format!("expected tag {}", #t))
+                    .at(__p777)
+            }
+        } else if cfg!(feature = "alloc") {
+            quote! {
+                minicbor::decode::Error::tag_mismatch(__t777)
+                    .with_message(alloc::format!("expected tag {}", #t))
+                    .at(__p777)
+            }
+        } else {
+            quote!(minicbor::decode::Error::tag_mismatch(__t777).at(__p777))
+        };
         quote! {
             let __p777 = __d777.position();
             let __t777 = __d777.tag()?;

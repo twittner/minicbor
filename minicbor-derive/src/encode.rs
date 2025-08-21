@@ -1,21 +1,21 @@
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::spanned::Spanned;
 
-use crate::blacklist::Blacklist;
 use crate::Mode;
-use crate::{add_bound_to_type_params, is_option};
-use crate::{add_typeparam, gen_ctx_param};
 use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
+use crate::blacklist::Blacklist;
 use crate::fields::{Field, Fields};
 use crate::variants::Variants;
+use crate::{add_bound_to_type_params, is_option};
+use crate::{add_typeparam, gen_ctx_param};
 
 /// Entry point to derive `minicbor::Encode` on structs and enums.
 pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let mut input = syn::parse_macro_input!(input as syn::DeriveInput);
     let result = match &input.data {
         syn::Data::Struct(_) => on_struct(&mut input),
-        syn::Data::Enum(_)   => on_enum(&mut input),
-        syn::Data::Union(u)  => {
+        syn::Data::Enum(_) => on_enum(&mut input),
+        syn::Data::Union(u) => {
             let msg = "deriving `minicbor::Encode` for a `union` is not supported";
             Err(syn::Error::new(u.union_token.span(), msg))
         }
@@ -25,22 +25,27 @@ pub fn derive_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
 /// Create an `Encode` impl for (tuple) structs.
 fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
-    let data =
-        if let syn::Data::Struct(data) = &inp.data {
-            data
-        } else {
-            unreachable!("`derive_from` matched against `syn::Data::Struct`")
-        };
+    let data = if let syn::Data::Struct(data) = &inp.data {
+        data
+    } else {
+        unreachable!("`derive_from` matched against `syn::Data::Struct`")
+    };
 
-    let name      = &inp.ident;
-    let attrs     = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let encoding  = attrs.encoding().unwrap_or_default();
-    let fields    = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
+    let name = &inp.ident;
+    let attrs = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
+    let encoding = attrs.encoding().unwrap_or_default();
+    let fields = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
     let blacklist = Blacklist::new(Mode::Encode, &fields, &inp.generics);
 
-    let bound  = gen_encode_bound()?;
+    let bound = gen_encode_bound()?;
     let params = inp.generics.type_params_mut();
-    add_bound_to_type_params(bound, params, &blacklist, fields.fields().attributes(), Mode::Encode);
+    add_bound_to_type_params(
+        bound,
+        params,
+        &blacklist,
+        fields.fields().attributes(),
+        Mode::Encode,
+    );
 
     let generics = add_typeparam(&inp.generics, gen_ctx_param()?, attrs.context_bound());
     let impl_generics = generics.split_for_impl().0;
@@ -51,10 +56,10 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     if attrs.transparent() {
         if fields.fields().len() != 1 {
             let msg = "#[cbor(transparent)] requires a struct with one field";
-            return Err(syn::Error::new(inp.ident.span(), msg))
+            return Err(syn::Error::new(inp.ident.span(), msg));
         }
         let f = fields.fields().next().expect("struct has 1 field");
-        return make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause)
+        return make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause);
     }
 
     let tag = encode_tag(&attrs);
@@ -76,25 +81,29 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
 /// Create an `Encode` impl for enums.
 fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
-    let data =
-        if let syn::Data::Enum(data) = &inp.data {
-            data
-        } else {
-            unreachable!("`derive_from` matched against `syn::Data::Enum`")
-        };
+    let data = if let syn::Data::Enum(data) = &inp.data {
+        data
+    } else {
+        unreachable!("`derive_from` matched against `syn::Data::Enum`")
+    };
 
-    let name          = &inp.ident;
-    let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
+    let name = &inp.ident;
+    let enum_attrs = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
     let enum_encoding = enum_attrs.encoding().unwrap_or_default();
-    let index_only    = enum_attrs.index_only();
-    let flat          = enum_attrs.flat();
-    let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
+    let index_only = enum_attrs.index_only();
+    let flat = enum_attrs.flat();
+    let variants = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
     let mut blacklist = Blacklist::default();
     let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
 
-    for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
+    for ((var, idx), attrs) in data
+        .variants
+        .iter()
+        .zip(variants.indices.iter())
+        .zip(&variants.attrs)
+    {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         blacklist.merge(Mode::Encode, &fields, &inp.generics);
         let con = &var.ident;
@@ -132,10 +141,13 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         __e777.map(0)?;
                         Ok(())
                     }
-                }
-            }
+                },
+            },
             syn::Fields::Named(f) if index_only => {
-                return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
+                return Err(syn::Error::new(
+                    f.span(),
+                    "index_only enums must not have fields",
+                ));
             }
             syn::Fields::Named(_) if flat => {
                 let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
@@ -167,7 +179,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 }
             }
             syn::Fields::Unnamed(f) if index_only => {
-                return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
+                return Err(syn::Error::new(
+                    f.span(),
+                    "index_only enums must not have fields",
+                ));
             }
             syn::Fields::Unnamed(_) if flat => {
                 let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
@@ -205,7 +220,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     }
 
     {
-        let bound  = gen_encode_bound()?;
+        let bound = gen_encode_bound()?;
         let params = inp.generics.type_params_mut();
         add_bound_to_type_params(bound, params, &blacklist, &field_attrs, Mode::Encode);
     }
@@ -254,7 +269,12 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 /// depending on the encoding.
 ///
 /// NB: The `fields` parameter is assumed to be sorted by index.
-fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool) -> syn::Result<(proc_macro2::TokenStream, proc_macro2::TokenStream)> {
+fn encode_fields(
+    fields: &Fields,
+    has_self: bool,
+    encoding: Encoding,
+    flat: bool,
+) -> syn::Result<(proc_macro2::TokenStream, proc_macro2::TokenStream)> {
     let default_encode_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::encode")?;
 
     let mut tests = Vec::new();
@@ -266,35 +286,34 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
         Encoding::Array => {
             for field in fields.fields() {
                 if field.attrs.skip() {
-                    continue
+                    continue;
                 }
                 let is_nil = is_nil(&field.typ, field.attrs.codec());
                 assert!(field.index.val() >= 0);
                 let n = field.index.val() as u64;
                 let ident = &field.ident;
-                let expr =
-                    if has_self {
-                        if field.is_name {
-                            quote! {
-                                if !#is_nil(&self.#ident) {
-                                    __max_index777 = Some(#n)
-                                }
-                            }
-                        } else {
-                            let i = syn::Index::from(field.pos);
-                            quote! {
-                                if !#is_nil(&self.#i) {
-                                    __max_index777 = Some(#n)
-                                }
-                            }
-                        }
-                    } else {
+                let expr = if has_self {
+                    if field.is_name {
                         quote! {
-                            if !#is_nil(&#ident) {
+                            if !#is_nil(&self.#ident) {
                                 __max_index777 = Some(#n)
                             }
                         }
-                    };
+                    } else {
+                        let i = syn::Index::from(field.pos);
+                        quote! {
+                            if !#is_nil(&self.#i) {
+                                __max_index777 = Some(#n)
+                            }
+                        }
+                    }
+                } else {
+                    quote! {
+                        if !#is_nil(&#ident) {
+                            __max_index777 = Some(#n)
+                        }
+                    }
+                };
                 tests.push(expr)
             }
         }
@@ -305,33 +324,32 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
         Encoding::Map => {
             for field in fields.fields() {
                 if field.attrs.skip() {
-                    continue
+                    continue;
                 }
                 let is_nil = is_nil(&field.typ, field.attrs.codec());
                 let ident = &field.ident;
-                let expr =
-                    if has_self {
-                        if field.is_name {
-                            quote! {
-                                if #is_nil(&self.#ident) {
-                                    __max_fields777 -= 1
-                                }
-                            }
-                        } else {
-                            let i = syn::Index::from(field.pos);
-                            quote! {
-                                if #is_nil(&self.#i) {
-                                    __max_fields777 -= 1
-                                }
-                            }
-                        }
-                    } else {
+                let expr = if has_self {
+                    if field.is_name {
                         quote! {
-                            if #is_nil(&#ident) {
+                            if #is_nil(&self.#ident) {
                                 __max_fields777 -= 1
                             }
                         }
-                    };
+                    } else {
+                        let i = syn::Index::from(field.pos);
+                        quote! {
+                            if #is_nil(&self.#i) {
+                                __max_fields777 -= 1
+                            }
+                        }
+                    }
+                } else {
+                    quote! {
+                        if #is_nil(&#ident) {
+                            __max_fields777 -= 1
+                        }
+                    }
+                };
                 tests.push(expr);
             }
         }
@@ -349,19 +367,22 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
     match encoding {
         // Under map encoding each field is encoded with its index.
         // Only field values which are not nil are encoded.
-        Encoding::Map => for field in fields.fields() {
-            if field.attrs.skip() {
-                continue
-            }
-            let is_nil = is_nil(&field.typ, field.attrs.codec());
-            let encode_fn = field.attrs.codec().as_ref()
-                .and_then(|f| f.to_encode_path())
-                .unwrap_or_else(|| default_encode_fn.clone());
-            let tag   = encode_tag(&field.attrs);
-            let ident = &field.ident;
-            let idx   = &field.index;
-            let statement =
-                match (field.is_name, has_self) {
+        Encoding::Map => {
+            for field in fields.fields() {
+                if field.attrs.skip() {
+                    continue;
+                }
+                let is_nil = is_nil(&field.typ, field.attrs.codec());
+                let encode_fn = field
+                    .attrs
+                    .codec()
+                    .as_ref()
+                    .and_then(|f| f.to_encode_path())
+                    .unwrap_or_else(|| default_encode_fn.clone());
+                let tag = encode_tag(&field.attrs);
+                let ident = &field.ident;
+                let idx = &field.index;
+                let statement = match (field.is_name, has_self) {
                     // struct
                     (IS_NAME, HAS_SELF) => quote! {
                         if !#is_nil(&self.#ident) {
@@ -396,9 +417,10 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                             #tag
                             #encode_fn(#ident, __e777, __ctx777)?
                         }
-                    }
+                    },
                 };
-            statements.push(statement)
+                statements.push(statement)
+            }
         }
         // Under array encoding only field values are encoded and their
         // index is represented as the array position. Gaps between indexes
@@ -408,9 +430,12 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
             let mut k = 0;
             for field in fields.fields() {
                 if field.attrs.skip() {
-                    continue
+                    continue;
                 }
-                let encode_fn = field.attrs.codec().as_ref()
+                let encode_fn = field
+                    .attrs
+                    .codec()
+                    .as_ref()
                     .and_then(|f| f.to_encode_path())
                     .unwrap_or_else(|| default_encode_fn.clone());
                 let tag = encode_tag(&field.attrs);
@@ -423,90 +448,88 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     idx.val() - k - 1
                 };
                 let ident = &field.ident;
-                let statement =
-                    match (field.is_name, has_self, gaps > 0) {
-                        // struct
-                        (IS_NAME, HAS_SELF, HAS_GAPS) => quote! {
+                let statement = match (field.is_name, has_self, gaps > 0) {
+                    // struct
+                    (IS_NAME, HAS_SELF, HAS_GAPS) => quote! {
+                        if #idx <= __i777 {
+                            for _ in 0 .. #gaps {
+                                __e777.null()?;
+                            }
+                            #tag
+                            #encode_fn(&self.#ident, __e777, __ctx777)?
+                        }
+                    },
+                    (IS_NAME, HAS_SELF, NO_GAPS) => quote! {
+                        if #idx <= __i777 {
+                            #tag
+                            #encode_fn(&self.#ident, __e777, __ctx777)?
+                        }
+                    },
+                    // enum struct
+                    (IS_NAME, NO_SELF, HAS_GAPS) => quote! {
+                        if #idx <= __i777 {
+                            for _ in 0 .. #gaps {
+                                __e777.null()?;
+                            }
+                            #tag
+                            #encode_fn(#ident, __e777, __ctx777)?
+                        }
+                    },
+                    (IS_NAME, NO_SELF, NO_GAPS) => quote! {
+                        if #idx <= __i777 {
+                            #tag
+                            #encode_fn(#ident, __e777, __ctx777)?
+                        }
+                    },
+                    // tuple struct
+                    (NO_NAME, HAS_SELF, HAS_GAPS) => {
+                        let i = syn::Index::from(field.pos);
+                        quote! {
                             if #idx <= __i777 {
                                 for _ in 0 .. #gaps {
                                     __e777.null()?;
                                 }
                                 #tag
-                                #encode_fn(&self.#ident, __e777, __ctx777)?
-                            }
-                        },
-                        (IS_NAME, HAS_SELF, NO_GAPS) => quote! {
-                            if #idx <= __i777 {
-                                #tag
-                                #encode_fn(&self.#ident, __e777, __ctx777)?
-                            }
-                        },
-                        // enum struct
-                        (IS_NAME, NO_SELF, HAS_GAPS) => quote! {
-                            if #idx <= __i777 {
-                                for _ in 0 .. #gaps {
-                                    __e777.null()?;
-                                }
-                                #tag
-                                #encode_fn(#ident, __e777, __ctx777)?
-                            }
-                        },
-                        (IS_NAME, NO_SELF, NO_GAPS) => quote! {
-                            if #idx <= __i777 {
-                                #tag
-                                #encode_fn(#ident, __e777, __ctx777)?
-                            }
-                        },
-                        // tuple struct
-                        (NO_NAME, HAS_SELF, HAS_GAPS) => {
-                            let i = syn::Index::from(field.pos);
-                            quote! {
-                                if #idx <= __i777 {
-                                    for _ in 0 .. #gaps {
-                                        __e777.null()?;
-                                    }
-                                    #tag
-                                    #encode_fn(&self.#i, __e777, __ctx777)?
-                                }
+                                #encode_fn(&self.#i, __e777, __ctx777)?
                             }
                         }
-                        (NO_NAME, HAS_SELF, NO_GAPS) => {
-                            let i = syn::Index::from(field.pos);
-                            quote! {
-                                if #idx <= __i777 {
-                                    #tag
-                                    #encode_fn(&self.#i, __e777, __ctx777)?
-                                }
-                            }
-                         }
-                        // enum tuple
-                        (NO_NAME, NO_SELF, HAS_GAPS) => quote! {
-                            if #idx <= __i777 {
-                                for _ in 0 .. #gaps {
-                                    __e777.null()?;
-                                }
-                                #tag
-                                #encode_fn(#ident, __e777, __ctx777)?
-                            }
-                        },
-                        (NO_NAME, NO_SELF, NO_GAPS) => quote! {
+                    }
+                    (NO_NAME, HAS_SELF, NO_GAPS) => {
+                        let i = syn::Index::from(field.pos);
+                        quote! {
                             if #idx <= __i777 {
                                 #tag
-                                #encode_fn(#ident, __e777, __ctx777)?
+                                #encode_fn(&self.#i, __e777, __ctx777)?
                             }
                         }
-                    };
+                    }
+                    // enum tuple
+                    (NO_NAME, NO_SELF, HAS_GAPS) => quote! {
+                        if #idx <= __i777 {
+                            for _ in 0 .. #gaps {
+                                __e777.null()?;
+                            }
+                            #tag
+                            #encode_fn(#ident, __e777, __ctx777)?
+                        }
+                    },
+                    (NO_NAME, NO_SELF, NO_GAPS) => quote! {
+                        if #idx <= __i777 {
+                            #tag
+                            #encode_fn(#ident, __e777, __ctx777)?
+                        }
+                    },
+                };
                 statements.push(statement);
                 k = idx.val()
             }
         }
     }
 
-    let max_fields: u32 = fields.fields().len().try_into()
-        .map_err(|_| {
-            let msg = "more than 2^32 fields are not supported";
-            syn::Error::new(proc_macro2::Span::call_site(), msg)
-        })?;
+    let max_fields: u32 = fields.fields().len().try_into().map_err(|_| {
+        let msg = "more than 2^32 fields are not supported";
+        syn::Error::new(proc_macro2::Span::call_site(), msg)
+    })?;
 
     match encoding {
         Encoding::Array if flat => Ok((
@@ -521,7 +544,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                 }
 
                 Ok(())
-            }
+            },
         )),
         Encoding::Array => Ok((
             quote! {
@@ -538,7 +561,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                 }
 
                 Ok(())
-            }
+            },
         )),
         Encoding::Map => Ok((
             quote! {
@@ -552,47 +575,48 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                 #(#statements)*
 
                 Ok(())
-            }
+            },
         )),
     }
 }
 
 /// Forward the encoding because of a `#[cbor(transparent)]` attribute.
-fn make_transparent_impl
-    ( name: &syn::Ident
-    , field: &Field
-    , impl_generics: syn::ImplGenerics
-    , typ_generics: syn::TypeGenerics
-    , where_clause: Option<&syn::WhereClause>
-    ) -> syn::Result<proc_macro2::TokenStream>
-{
+fn make_transparent_impl(
+    name: &syn::Ident,
+    field: &Field,
+    impl_generics: syn::ImplGenerics,
+    typ_generics: syn::TypeGenerics,
+    where_clause: Option<&syn::WhereClause>,
+) -> syn::Result<proc_macro2::TokenStream> {
     let default_encode_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::encode")?;
     let default_is_nil_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::<Ctx>::is_nil")?;
 
-    let encode_fn = field.attrs.codec()
+    let encode_fn = field
+        .attrs
+        .codec()
         .filter(|cc| cc.is_encode())
         .and_then(CustomCodec::to_encode_path)
         .unwrap_or_else(|| default_encode_fn.clone());
 
-    let is_nil_fn = field.attrs.codec()
+    let is_nil_fn = field
+        .attrs
+        .codec()
         .and_then(|cc| cc.to_is_nil_path())
         .unwrap_or_else(|| default_is_nil_fn.clone());
 
-    let encode_call =
-        if field.is_name {
-            let id = &field.ident;
-            quote!(#encode_fn(&self.#id, __e777, __ctx777))
-        } else {
-            quote!(#encode_fn(&self.0, __e777, __ctx777))
-        };
+    let encode_call = if field.is_name {
+        let id = &field.ident;
+        quote!(#encode_fn(&self.#id, __e777, __ctx777))
+    } else {
+        quote!(#encode_fn(&self.0, __e777, __ctx777))
+    };
 
-    let is_nil_call =
-        if field.is_name {
-            let id = &field.ident;
-            quote!(#is_nil_fn(&self.#id))
-        } else {
-            quote!(#is_nil_fn(&self.0))
-        };
+    let is_nil_call = if field.is_name {
+        let id = &field.ident;
+        quote!(#is_nil_fn(&self.#id))
+    } else {
+        quote!(#is_nil_fn(&self.0))
+    };
 
     Ok(quote! {
         impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {

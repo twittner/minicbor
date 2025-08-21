@@ -23,8 +23,6 @@ pub use async_reader::AsyncReader;
 pub use async_writer::AsyncWriter;
 
 /// Ensure we can safely cast a `u32` to a `usize`.
-const __U32_FITS_INTO_USIZE: () =
-    if std::mem::size_of::<u32>() > std::mem::size_of::<usize>() {
-        panic!("This crate requires at least a 32-bit architecture.")
-    };
-
+const __U32_FITS_INTO_USIZE: () = if std::mem::size_of::<u32>() > std::mem::size_of::<usize>() {
+    panic!("This crate requires at least a 32-bit architecture.")
+};

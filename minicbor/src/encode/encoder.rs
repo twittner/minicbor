@@ -1,10 +1,12 @@
-use crate::{SIGNED, BYTES, TEXT, ARRAY, MAP, TAGGED, SIMPLE};
 use crate::data::{Int, Tag};
 use crate::encode::{Encode, Error, Write};
+use crate::{ARRAY, BYTES, MAP, SIGNED, SIMPLE, TAGGED, TEXT};
 
 /// A non-allocating CBOR encoder writing encoded bytes to the given [`Write`] sink.
 #[derive(Debug, Clone)]
-pub struct Encoder<W> { writer: W }
+pub struct Encoder<W> {
+    writer: W,
+}
 
 impl<W: Write> Encoder<W> {
     /// Construct an `Encoder` that writes to the given [`Write`] sink.
@@ -34,14 +36,18 @@ impl<W: Write> Encoder<W> {
     }
 
     /// Encode any type that implements [`Encode`].
-    pub fn encode_with<C, T: Encode<C>>(&mut self, x: T, ctx: &mut C) -> Result<&mut Self, Error<W::Error>> {
+    pub fn encode_with<C, T: Encode<C>>(
+        &mut self,
+        x: T,
+        ctx: &mut C,
+    ) -> Result<&mut Self, Error<W::Error>> {
         x.encode(self, ctx)?;
         Ok(self)
     }
 
     /// Encode a `u8` value.
     pub fn u8(&mut self, x: u8) -> Result<&mut Self, Error<W::Error>> {
-        if let 0 ..= 0x17 = x {
+        if let 0..=0x17 = x {
             self.put(&[x])
         } else {
             self.put(&[24, x])
@@ -51,80 +57,82 @@ impl<W: Write> Encoder<W> {
     /// Encode an `i8` value.
     pub fn i8(&mut self, x: i8) -> Result<&mut Self, Error<W::Error>> {
         if x >= 0 {
-            return self.u8(x as u8)
+            return self.u8(x as u8);
         }
         match (-1 - x) as u8 {
-            n @ 0 ..= 0x17 => self.put(&[SIGNED | n]),
-            n              => self.put(&[SIGNED | 24, n])
+            n @ 0..=0x17 => self.put(&[SIGNED | n]),
+            n => self.put(&[SIGNED | 24, n]),
         }
     }
 
     /// Encode a `u16` value.
     pub fn u16(&mut self, x: u16) -> Result<&mut Self, Error<W::Error>> {
         match x {
-            0    ..= 0x17 => self.put(&[x as u8]),
-            0x18 ..= 0xff => self.put(&[24, x as u8]),
-            _             => self.put(&[25])?.put(&x.to_be_bytes()[..])
+            0..=0x17 => self.put(&[x as u8]),
+            0x18..=0xff => self.put(&[24, x as u8]),
+            _ => self.put(&[25])?.put(&x.to_be_bytes()[..]),
         }
     }
 
     /// Encode an `i16` value.
     pub fn i16(&mut self, x: i16) -> Result<&mut Self, Error<W::Error>> {
         if x >= 0 {
-            return self.u16(x as u16)
+            return self.u16(x as u16);
         }
         match (-1 - x) as u16 {
-            n @ 0    ..= 0x17 => self.put(&[SIGNED | n as u8]),
-            n @ 0x18 ..= 0xff => self.put(&[SIGNED | 24, n as u8]),
-            n                 => self.put(&[SIGNED | 25])?.put(&n.to_be_bytes()[..])
+            n @ 0..=0x17 => self.put(&[SIGNED | n as u8]),
+            n @ 0x18..=0xff => self.put(&[SIGNED | 24, n as u8]),
+            n => self.put(&[SIGNED | 25])?.put(&n.to_be_bytes()[..]),
         }
     }
 
     /// Encode a `u32` value.
     pub fn u32(&mut self, x: u32) -> Result<&mut Self, Error<W::Error>> {
         match x {
-            0     ..= 0x17   => self.put(&[x as u8]),
-            0x18  ..= 0xff   => self.put(&[24, x as u8]),
-            0x100 ..= 0xffff => self.put(&[25])?.put(&(x as u16).to_be_bytes()[..]),
-            _                => self.put(&[26])?.put(&x.to_be_bytes()[..])
+            0..=0x17 => self.put(&[x as u8]),
+            0x18..=0xff => self.put(&[24, x as u8]),
+            0x100..=0xffff => self.put(&[25])?.put(&(x as u16).to_be_bytes()[..]),
+            _ => self.put(&[26])?.put(&x.to_be_bytes()[..]),
         }
     }
 
     /// Encode an `i32` value.
     pub fn i32(&mut self, x: i32) -> Result<&mut Self, Error<W::Error>> {
         if x >= 0 {
-            return self.u32(x as u32)
+            return self.u32(x as u32);
         }
         match (-1 - x) as u32 {
-            n @ 0     ..= 0x17   => self.put(&[SIGNED | n as u8]),
-            n @ 0x18  ..= 0xff   => self.put(&[SIGNED | 24, n as u8]),
-            n @ 0x100 ..= 0xffff => self.put(&[SIGNED | 25])?.put(&(n as u16).to_be_bytes()[..]),
-            n                    => self.put(&[SIGNED | 26])?.put(&n.to_be_bytes()[..])
+            n @ 0..=0x17 => self.put(&[SIGNED | n as u8]),
+            n @ 0x18..=0xff => self.put(&[SIGNED | 24, n as u8]),
+            n @ 0x100..=0xffff => self.put(&[SIGNED | 25])?.put(&(n as u16).to_be_bytes()[..]),
+            n => self.put(&[SIGNED | 26])?.put(&n.to_be_bytes()[..]),
         }
     }
 
     /// Encode a `u64` value.
     pub fn u64(&mut self, x: u64) -> Result<&mut Self, Error<W::Error>> {
         match x {
-            0        ..= 0x17        => self.put(&[x as u8]),
-            0x18     ..= 0xff        => self.put(&[24, x as u8]),
-            0x100    ..= 0xffff      => self.put(&[25])?.put(&(x as u16).to_be_bytes()[..]),
-            0x1_0000 ..= 0xffff_ffff => self.put(&[26])?.put(&(x as u32).to_be_bytes()[..]),
-            _                        => self.put(&[27])?.put(&x.to_be_bytes()[..])
+            0..=0x17 => self.put(&[x as u8]),
+            0x18..=0xff => self.put(&[24, x as u8]),
+            0x100..=0xffff => self.put(&[25])?.put(&(x as u16).to_be_bytes()[..]),
+            0x1_0000..=0xffff_ffff => self.put(&[26])?.put(&(x as u32).to_be_bytes()[..]),
+            _ => self.put(&[27])?.put(&x.to_be_bytes()[..]),
         }
     }
 
     /// Encode an `i64` value.
     pub fn i64(&mut self, x: i64) -> Result<&mut Self, Error<W::Error>> {
         if x >= 0 {
-            return self.u64(x as u64)
+            return self.u64(x as u64);
         }
         match (-1 - x) as u64 {
-            n @ 0        ..= 0x17        => self.put(&[SIGNED | n as u8]),
-            n @ 0x18     ..= 0xff        => self.put(&[SIGNED | 24, n as u8]),
-            n @ 0x100    ..= 0xffff      => self.put(&[SIGNED | 25])?.put(&(n as u16).to_be_bytes()[..]),
-            n @ 0x1_0000 ..= 0xffff_ffff => self.put(&[SIGNED | 26])?.put(&(n as u32).to_be_bytes()[..]),
-            n                            => self.put(&[SIGNED | 27])?.put(&n.to_be_bytes()[..])
+            n @ 0..=0x17 => self.put(&[SIGNED | n as u8]),
+            n @ 0x18..=0xff => self.put(&[SIGNED | 24, n as u8]),
+            n @ 0x100..=0xffff => self.put(&[SIGNED | 25])?.put(&(n as u16).to_be_bytes()[..]),
+            n @ 0x1_0000..=0xffff_ffff => {
+                self.put(&[SIGNED | 26])?.put(&(n as u32).to_be_bytes()[..])
+            }
+            n => self.put(&[SIGNED | 27])?.put(&n.to_be_bytes()[..]),
         }
     }
 
@@ -133,14 +141,16 @@ impl<W: Write> Encoder<W> {
     /// See [`Int`] for details regarding the value range of CBOR integers.
     pub fn int(&mut self, x: Int) -> Result<&mut Self, Error<W::Error>> {
         if !x.is_negative() {
-            return self.u64(x.value())
+            return self.u64(x.value());
         }
         match x.value() {
-            n @ 0        ..= 0x17        => self.put(&[SIGNED | n as u8]),
-            n @ 0x18     ..= 0xff        => self.put(&[SIGNED | 24, n as u8]),
-            n @ 0x100    ..= 0xffff      => self.put(&[SIGNED | 25])?.put(&(n as u16).to_be_bytes()[..]),
-            n @ 0x1_0000 ..= 0xffff_ffff => self.put(&[SIGNED | 26])?.put(&(n as u32).to_be_bytes()[..]),
-            n                            => self.put(&[SIGNED | 27])?.put(&n.to_be_bytes()[..])
+            n @ 0..=0x17 => self.put(&[SIGNED | n as u8]),
+            n @ 0x18..=0xff => self.put(&[SIGNED | 24, n as u8]),
+            n @ 0x100..=0xffff => self.put(&[SIGNED | 25])?.put(&(n as u16).to_be_bytes()[..]),
+            n @ 0x1_0000..=0xffff_ffff => {
+                self.put(&[SIGNED | 26])?.put(&(n as u32).to_be_bytes()[..])
+            }
+            n => self.put(&[SIGNED | 27])?.put(&n.to_be_bytes()[..]),
         }
     }
 
@@ -289,7 +299,7 @@ impl<W: Write> Encoder<W> {
     #[cfg(feature = "half")]
     pub fn tokens<'a, 'b: 'a, I>(&mut self, tokens: I) -> Result<(), Error<W::Error>>
     where
-        I: IntoIterator<Item = &'a crate::data::Token<'b>>
+        I: IntoIterator<Item = &'a crate::data::Token<'b>>,
     {
         for t in tokens {
             self.encode(t)?;
@@ -306,12 +316,11 @@ impl<W: Write> Encoder<W> {
     /// Write type and length information.
     fn type_len(&mut self, t: u8, x: u64) -> Result<&mut Self, Error<W::Error>> {
         match x {
-            0        ..= 0x17        => self.put(&[t | x as u8]),
-            0x18     ..= 0xff        => self.put(&[t | 24, x as u8]),
-            0x100    ..= 0xffff      => self.put(&[t | 25])?.put(&(x as u16).to_be_bytes()[..]),
-            0x1_0000 ..= 0xffff_ffff => self.put(&[t | 26])?.put(&(x as u32).to_be_bytes()),
-            _                        => self.put(&[t | 27])?.put(&x.to_be_bytes()[..])
+            0..=0x17 => self.put(&[t | x as u8]),
+            0x18..=0xff => self.put(&[t | 24, x as u8]),
+            0x100..=0xffff => self.put(&[t | 25])?.put(&(x as u16).to_be_bytes()[..]),
+            0x1_0000..=0xffff_ffff => self.put(&[t | 26])?.put(&(x as u32).to_be_bytes()),
+            _ => self.put(&[t | 27])?.put(&x.to_be_bytes()[..]),
         }
     }
 }
-

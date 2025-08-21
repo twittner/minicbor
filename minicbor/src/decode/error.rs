@@ -1,5 +1,5 @@
-use core::{fmt, str};
 use crate::data::{Tag, Type};
+use core::{fmt, str};
 
 #[cfg(feature = "alloc")]
 use alloc::string::ToString;
@@ -15,7 +15,7 @@ pub struct Error {
     #[cfg(not(feature = "alloc"))]
     msg: &'static str,
     #[cfg(feature = "alloc")]
-    msg: alloc::string::String
+    msg: alloc::string::String,
 }
 
 impl Error {
@@ -24,7 +24,7 @@ impl Error {
         Error {
             err: ErrorImpl::EndOfInput,
             pos: None,
-            msg: Default::default()
+            msg: Default::default(),
         }
     }
 
@@ -33,7 +33,7 @@ impl Error {
         Error {
             err: ErrorImpl::TypeMismatch(ty),
             pos: None,
-            msg: Default::default()
+            msg: Default::default(),
         }
     }
 
@@ -42,7 +42,7 @@ impl Error {
         Error {
             err: ErrorImpl::TagMismatch(tg),
             pos: None,
-            msg: Default::default()
+            msg: Default::default(),
         }
     }
 
@@ -56,7 +56,7 @@ impl Error {
         Error {
             err: ErrorImpl::Message,
             pos: None,
-            msg
+            msg,
         }
     }
 
@@ -70,7 +70,7 @@ impl Error {
         Error {
             err: ErrorImpl::Message,
             pos: None,
-            msg: msg.to_string()
+            msg: msg.to_string(),
         }
     }
 
@@ -82,7 +82,7 @@ impl Error {
         Error {
             err: ErrorImpl::Custom(Box::new(err)),
             pos: None,
-            msg: Default::default()
+            msg: Default::default(),
         }
     }
 
@@ -92,7 +92,7 @@ impl Error {
         Error {
             err: ErrorImpl::UnknownVariant(idx),
             pos: None,
-            msg: Default::default()
+            msg: Default::default(),
         }
     }
 
@@ -102,7 +102,7 @@ impl Error {
         Error {
             err: ErrorImpl::MissingValue(idx),
             pos: None,
-            msg: Default::default()
+            msg: Default::default(),
         }
     }
 
@@ -110,7 +110,7 @@ impl Error {
         Error {
             err: ErrorImpl::InvalidChar(item),
             pos: None,
-            msg: Default::default()
+            msg: Default::default(),
         }
     }
 
@@ -118,7 +118,7 @@ impl Error {
         Error {
             err: ErrorImpl::Utf8(err),
             pos: None,
-            msg: Default::default()
+            msg: Default::default(),
         }
     }
 
@@ -126,7 +126,7 @@ impl Error {
         Error {
             err: ErrorImpl::Overflow(item),
             pos: None,
-            msg: Default::default()
+            msg: Default::default(),
         }
     }
 
@@ -218,91 +218,88 @@ enum ErrorImpl {
     Message,
     /// Custom error.
     #[cfg(feature = "alloc")]
-    Custom(Box<dyn core::error::Error + Send + Sync>)
+    Custom(Box<dyn core::error::Error + Send + Sync>),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.err {
-            ErrorImpl::EndOfInput =>
-                match (self.msg.as_ref(), self.pos) {
-                    ("", None)    => write!(f, "end of input bytes"),
-                    ("", Some(p)) => write!(f, "end of input bytes at position {p}"),
-                    (m, None)     => write!(f, "end of input bytes: {m}"),
-                    (m, Some(p))  => write!(f, "end of input bytes at position {p}: {m}")
-                }
-            ErrorImpl::InvalidChar(n) =>
-                match (self.msg.as_ref(), self.pos) {
-                    ("", None)    => write!(f, "invalid char {n:#x?}"),
-                    ("", Some(p)) => write!(f, "invalid char {n:#x?} at position {p}"),
-                    (m, None)     => write!(f, "invalid char {n:#x?}: {m}"),
-                    (m, Some(p))  => write!(f, "invalid char {n:#x?} at position {p}: {m}")
-                }
+            ErrorImpl::EndOfInput => match (self.msg.as_ref(), self.pos) {
+                ("", None) => write!(f, "end of input bytes"),
+                ("", Some(p)) => write!(f, "end of input bytes at position {p}"),
+                (m, None) => write!(f, "end of input bytes: {m}"),
+                (m, Some(p)) => write!(f, "end of input bytes at position {p}: {m}"),
+            },
+            ErrorImpl::InvalidChar(n) => match (self.msg.as_ref(), self.pos) {
+                ("", None) => write!(f, "invalid char {n:#x?}"),
+                ("", Some(p)) => write!(f, "invalid char {n:#x?} at position {p}"),
+                (m, None) => write!(f, "invalid char {n:#x?}: {m}"),
+                (m, Some(p)) => write!(f, "invalid char {n:#x?} at position {p}: {m}"),
+            },
             #[cfg(not(feature = "std"))]
-            ErrorImpl::Utf8(e) =>
-                match (self.msg.as_ref(), self.pos) {
-                    ("", None)    => write!(f, "invalid utf-8: {e}"),
-                    ("", Some(p)) => write!(f, "invalid utf-8 at position {p}: {e}"),
-                    (m, None)     => write!(f, "invalid utf-8: {e}, {m}"),
-                    (m, Some(p))  => write!(f, "invalid utf-8 at position {p}: {e}, {m}")
-                }
+            ErrorImpl::Utf8(e) => match (self.msg.as_ref(), self.pos) {
+                ("", None) => write!(f, "invalid utf-8: {e}"),
+                ("", Some(p)) => write!(f, "invalid utf-8 at position {p}: {e}"),
+                (m, None) => write!(f, "invalid utf-8: {e}, {m}"),
+                (m, Some(p)) => write!(f, "invalid utf-8 at position {p}: {e}, {m}"),
+            },
             #[cfg(feature = "std")]
-            ErrorImpl::Utf8(_) =>
-                match (self.msg.as_ref(), self.pos) {
-                    ("", None)    => write!(f, "invalid utf-8"),
-                    ("", Some(p)) => write!(f, "invalid utf-8 at position {p}"),
-                    (m, None)     => write!(f, "invalid utf-8: {m}"),
-                    (m, Some(p))  => write!(f, "invalid utf-8 at position {p}: {m}")
-                }
-            ErrorImpl::Overflow(n) =>
-                match (self.msg.as_ref(), self.pos) {
-                    ("", None)    => write!(f, "{n} overflows target type"),
-                    ("", Some(p)) => write!(f, "{n} overflows target type at position {p}"),
-                    (m, None)     => write!(f, "{n} overflows target type: {m}"),
-                    (m, Some(p))  => write!(f, "{n} overflows target type at position {p}: {m}")
-                }
-            ErrorImpl::TypeMismatch(t) =>
-                match (self.msg.as_ref(), self.pos) {
-                    ("", None)    => write!(f, "unexpected type {t}"),
-                    ("", Some(p)) => write!(f, "unexpected type {t} at position {p}"),
-                    (m, None)     => write!(f, "unexpected type {t}: {m}"),
-                    (m, Some(p))  => write!(f, "unexpected type {t} at position {p}: {m}")
-                }
-            ErrorImpl::TagMismatch(t) =>
-                match (self.msg.as_ref(), self.pos) {
-                    ("", None)    => write!(f, "unexpected tag {t}"),
-                    ("", Some(p)) => write!(f, "unexpected tag {t} at position {p}"),
-                    (m, None)     => write!(f, "unexpected tag {t}: {m}"),
-                    (m, Some(p))  => write!(f, "unexpected tag {t} at position {p}: {m}")
-                }
-            ErrorImpl::UnknownVariant(n) =>
-                match (self.msg.as_ref(), self.pos) {
-                    ("", None)    => write!(f, "unknown enum variant {n}"),
-                    ("", Some(p)) => write!(f, "unknown enum variant {n} at position {p}"),
-                    (m, None)     => write!(f, "unknown enum variant {n}: {m}"),
-                    (m, Some(p))  => write!(f, "unknown enum variant {n} at position {p}: {m}")
-                }
-            ErrorImpl::MissingValue(n) =>
-                match (self.msg.as_ref(), self.pos) {
-                    ("", None)    => write!(f, "missing value at index {n}"),
-                    ("", Some(p)) => write!(f, "missing value at index {n} in map or array starting at position {p}"),
-                    (m, None)     => write!(f, "missing value at index {n} ({m})"),
-                    (m, Some(p))  => write!(f, "missing value at index {n} ({m}) in map or array starting at position {p}")
-                }
-            ErrorImpl::Message =>
+            ErrorImpl::Utf8(_) => match (self.msg.as_ref(), self.pos) {
+                ("", None) => write!(f, "invalid utf-8"),
+                ("", Some(p)) => write!(f, "invalid utf-8 at position {p}"),
+                (m, None) => write!(f, "invalid utf-8: {m}"),
+                (m, Some(p)) => write!(f, "invalid utf-8 at position {p}: {m}"),
+            },
+            ErrorImpl::Overflow(n) => match (self.msg.as_ref(), self.pos) {
+                ("", None) => write!(f, "{n} overflows target type"),
+                ("", Some(p)) => write!(f, "{n} overflows target type at position {p}"),
+                (m, None) => write!(f, "{n} overflows target type: {m}"),
+                (m, Some(p)) => write!(f, "{n} overflows target type at position {p}: {m}"),
+            },
+            ErrorImpl::TypeMismatch(t) => match (self.msg.as_ref(), self.pos) {
+                ("", None) => write!(f, "unexpected type {t}"),
+                ("", Some(p)) => write!(f, "unexpected type {t} at position {p}"),
+                (m, None) => write!(f, "unexpected type {t}: {m}"),
+                (m, Some(p)) => write!(f, "unexpected type {t} at position {p}: {m}"),
+            },
+            ErrorImpl::TagMismatch(t) => match (self.msg.as_ref(), self.pos) {
+                ("", None) => write!(f, "unexpected tag {t}"),
+                ("", Some(p)) => write!(f, "unexpected tag {t} at position {p}"),
+                (m, None) => write!(f, "unexpected tag {t}: {m}"),
+                (m, Some(p)) => write!(f, "unexpected tag {t} at position {p}: {m}"),
+            },
+            ErrorImpl::UnknownVariant(n) => match (self.msg.as_ref(), self.pos) {
+                ("", None) => write!(f, "unknown enum variant {n}"),
+                ("", Some(p)) => write!(f, "unknown enum variant {n} at position {p}"),
+                (m, None) => write!(f, "unknown enum variant {n}: {m}"),
+                (m, Some(p)) => write!(f, "unknown enum variant {n} at position {p}: {m}"),
+            },
+            ErrorImpl::MissingValue(n) => match (self.msg.as_ref(), self.pos) {
+                ("", None) => write!(f, "missing value at index {n}"),
+                ("", Some(p)) => write!(
+                    f,
+                    "missing value at index {n} in map or array starting at position {p}"
+                ),
+                (m, None) => write!(f, "missing value at index {n} ({m})"),
+                (m, Some(p)) => write!(
+                    f,
+                    "missing value at index {n} ({m}) in map or array starting at position {p}"
+                ),
+            },
+            ErrorImpl::Message => {
                 if let Some(p) = self.pos {
                     write!(f, "decode error at position {p}: {}", self.msg)
                 } else {
                     write!(f, "decode error: {}", self.msg)
                 }
+            }
             #[cfg(feature = "alloc")]
-            ErrorImpl::Custom(_) =>
-                match (self.msg.as_ref(), self.pos) {
-                    ("", None)    => write!(f, "decode error"),
-                    ("", Some(p)) => write!(f, "decode error at position {p}"),
-                    (m, None)     => write!(f, "decode error: {m}"),
-                    (m, Some(p))  => write!(f, "decode error at position {p}: {m}")
-                }
+            ErrorImpl::Custom(_) => match (self.msg.as_ref(), self.pos) {
+                ("", None) => write!(f, "decode error"),
+                ("", Some(p)) => write!(f, "decode error at position {p}"),
+                (m, None) => write!(f, "decode error: {m}"),
+                (m, Some(p)) => write!(f, "decode error at position {p}: {m}"),
+            },
         }
     }
 }
@@ -317,11 +314,10 @@ impl core::error::Error for Error {
             | ErrorImpl::TagMismatch(_)
             | ErrorImpl::UnknownVariant(_)
             | ErrorImpl::MissingValue(_)
-            | ErrorImpl::Message
-            => None,
-            ErrorImpl::Utf8(e)   => Some(e),
+            | ErrorImpl::Message => None,
+            ErrorImpl::Utf8(e) => Some(e),
             #[cfg(feature = "alloc")]
-            ErrorImpl::Custom(e) => Some(&**e)
+            ErrorImpl::Custom(e) => Some(&**e),
         }
     }
 }

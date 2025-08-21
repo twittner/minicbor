@@ -12,7 +12,7 @@ use crate::decode::Error;
 /// *Requires feature* `"half"`.
 #[derive(Debug, Clone)]
 pub struct Tokenizer<'a, 'b> {
-    decoder: Decoder<'a, 'b>
+    decoder: Decoder<'a, 'b>,
 }
 
 impl<'a, 'b> Iterator for Tokenizer<'a, 'b> {
@@ -22,27 +22,33 @@ impl<'a, 'b> Iterator for Tokenizer<'a, 'b> {
         match self.token() {
             Ok(t) => Some(Ok(t)),
             Err(e) if e.is_end_of_input() => None,
-            Err(e) => Some(Err(e))
+            Err(e) => Some(Err(e)),
         }
     }
 }
 
 impl<'b> From<crate::Decoder<'b>> for Tokenizer<'_, 'b> {
     fn from(d: crate::Decoder<'b>) -> Self {
-        Tokenizer { decoder: Decoder::Owned(d) }
+        Tokenizer {
+            decoder: Decoder::Owned(d),
+        }
     }
 }
 
 impl<'a, 'b> From<&'a mut crate::Decoder<'b>> for Tokenizer<'a, 'b> {
     fn from(d: &'a mut crate::Decoder<'b>) -> Self {
-        Tokenizer { decoder: Decoder::Borrowed(d) }
+        Tokenizer {
+            decoder: Decoder::Borrowed(d),
+        }
     }
 }
 
 impl<'a, 'b> Tokenizer<'a, 'b> {
     /// Create a new Tokenizer for the given input bytes.
-    pub fn new(bytes: &'b[u8]) -> Self {
-        Tokenizer { decoder: Decoder::Owned(crate::Decoder::new(bytes)) }
+    pub fn new(bytes: &'b [u8]) -> Self {
+        Tokenizer {
+            decoder: Decoder::Owned(crate::Decoder::new(bytes)),
+        }
     }
 
     /// Decode the next token.
@@ -73,10 +79,10 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
             B,               // indefinite bytes
             D,               // indefinite text
             S(&'static str), // display string
-            X(&'static str)  // display string (unless next token is BREAK)
+            X(&'static str), // display string (unless next token is BREAK)
         }
 
-        let mut iter  = self.clone().peekable();
+        let mut iter = self.clone().peekable();
         let mut stack = alloc::vec::Vec::new();
 
         while iter.peek().is_some() {
@@ -100,45 +106,51 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                             stack.push(E::M(None));
                             f.write_str("{_ ")?
                         }
-                        Some(Ok(Token::BeginBytes)) => if let Some(Ok(Token::Break)) = iter.peek() {
-                            iter.next();
-                            f.write_str("''_")?
-                        } else {
-                            stack.push(E::B);
-                            f.write_str("(_ ")?
+                        Some(Ok(Token::BeginBytes)) => {
+                            if let Some(Ok(Token::Break)) = iter.peek() {
+                                iter.next();
+                                f.write_str("''_")?
+                            } else {
+                                stack.push(E::B);
+                                f.write_str("(_ ")?
+                            }
                         }
-                        Some(Ok(Token::BeginString)) => if let Some(Ok(Token::Break)) = iter.peek() {
-                            iter.next();
-                            f.write_str("\"\"_")?
-                        } else {
-                            stack.push(E::D);
-                            f.write_str("(_ ")?
+                        Some(Ok(Token::BeginString)) => {
+                            if let Some(Ok(Token::Break)) = iter.peek() {
+                                iter.next();
+                                f.write_str("\"\"_")?
+                            } else {
+                                stack.push(E::D);
+                                f.write_str("(_ ")?
+                            }
                         }
                         Some(Ok(Token::Tag(t))) => {
                             stack.push(E::T);
                             write!(f, "{}(", u64::from(t))?
                         }
-                        Some(Ok(t))  => t.fmt(f)?,
+                        Some(Ok(t)) => t.fmt(f)?,
                         Some(Err(e)) => {
                             write!(f, " !!! decoding error: {e}")?;
-                            return Ok(())
+                            return Ok(());
                         }
-                        None => if required {
-                            f.write_str(" !!! decoding error: unexpected end of input")?;
-                            return Ok(())
-                        } else {
-                            continue
+                        None => {
+                            if required {
+                                f.write_str(" !!! decoding error: unexpected end of input")?;
+                                return Ok(());
+                            } else {
+                                continue;
+                            }
                         }
-                    }
+                    },
                     E::S(s) => f.write_str(s)?,
                     E::X(s) => match iter.peek() {
                         Some(Ok(Token::Break)) | None => continue,
-                        Some(Ok(_))  => f.write_str(s)?,
+                        Some(Ok(_)) => f.write_str(s)?,
                         Some(Err(e)) => {
                             write!(f, " !!! decoding error: {e}")?;
-                            return Ok(())
+                            return Ok(());
                         }
-                    }
+                    },
                     E::T => {
                         stack.push(E::S(")"));
                         stack.push(E::N(true))
@@ -156,7 +168,7 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                     E::A(None) => match iter.peek() {
                         None => {
                             f.write_str(" !!! indefinite array not closed")?;
-                            return Ok(())
+                            return Ok(());
                         }
                         Some(Ok(Token::Break)) => {
                             iter.next();
@@ -167,7 +179,7 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                             stack.push(E::X(", "));
                             stack.push(E::N(true))
                         }
-                    }
+                    },
                     E::M(Some(0)) => f.write_str("}")?,
                     E::M(Some(1)) => {
                         stack.push(E::M(Some(0)));
@@ -185,7 +197,7 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                     E::M(None) => match iter.peek() {
                         None => {
                             f.write_str(" !!! indefinite map not closed")?;
-                            return Ok(())
+                            return Ok(());
                         }
                         Some(Ok(Token::Break)) => {
                             iter.next();
@@ -198,11 +210,11 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                             stack.push(E::S(": "));
                             stack.push(E::N(true))
                         }
-                    }
+                    },
                     E::B => match iter.peek() {
                         None => {
                             f.write_str(" !!! indefinite byte string not closed")?;
-                            return Ok(())
+                            return Ok(());
                         }
                         Some(Ok(Token::Break)) => {
                             iter.next();
@@ -213,11 +225,11 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                             stack.push(E::X(", "));
                             stack.push(E::N(true))
                         }
-                    }
+                    },
                     E::D => match iter.peek() {
                         None => {
                             f.write_str(" !!! indefinite string not closed")?;
-                            return Ok(())
+                            return Ok(());
                         }
                         Some(Ok(Token::Break)) => {
                             iter.next();
@@ -228,7 +240,7 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
                             stack.push(E::X(", "));
                             stack.push(E::N(true))
                         }
-                    }
+                    },
                 }
             }
         }
@@ -241,7 +253,7 @@ impl core::fmt::Display for Tokenizer<'_, '_> {
 #[derive(Debug)]
 enum Decoder<'a, 'b> {
     Owned(crate::Decoder<'b>),
-    Borrowed(&'a mut crate::Decoder<'b>)
+    Borrowed(&'a mut crate::Decoder<'b>),
 }
 
 impl<'b> Deref for Decoder<'_, 'b> {
@@ -249,8 +261,8 @@ impl<'b> Deref for Decoder<'_, 'b> {
 
     fn deref(&self) -> &Self::Target {
         match self {
-            Self::Owned(d)    => d,
-            Self::Borrowed(d) => d
+            Self::Owned(d) => d,
+            Self::Borrowed(d) => d,
         }
     }
 }
@@ -258,8 +270,8 @@ impl<'b> Deref for Decoder<'_, 'b> {
 impl<'b> DerefMut for Decoder<'_, 'b> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         match self {
-            Self::Owned(d)    => d,
-            Self::Borrowed(d) => d
+            Self::Owned(d) => d,
+            Self::Borrowed(d) => d,
         }
     }
 }
@@ -267,8 +279,8 @@ impl<'b> DerefMut for Decoder<'_, 'b> {
 impl Clone for Decoder<'_, '_> {
     fn clone(&self) -> Self {
         match self {
-            Self::Owned(d)    => Self::Owned(d.clone()),
-            Self::Borrowed(d) => Self::Owned((*d).clone())
+            Self::Owned(d) => Self::Owned(d.clone()),
+            Self::Borrowed(d) => Self::Owned((*d).clone()),
         }
     }
 }

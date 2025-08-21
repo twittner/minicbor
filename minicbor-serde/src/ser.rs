@@ -20,7 +20,7 @@ pub fn to_vec<T: Serialize>(val: T) -> Result<Vec<u8>, EncodeError<core::convert
 #[derive(Debug, Clone)]
 pub struct Serializer<W> {
     encoder: Encoder<W>,
-    unit_as_null: bool
+    unit_as_null: bool,
 }
 
 impl<W: Write> Serializer<W> {
@@ -50,14 +50,14 @@ impl<W: Write> From<Encoder<W>> for Serializer<W> {
     fn from(e: Encoder<W>) -> Self {
         Self {
             encoder: e,
-            unit_as_null: false
+            unit_as_null: false,
         }
     }
 }
 
 impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W>
 where
-    <W as Write>::Error: core::error::Error + 'static
+    <W as Write>::Error: core::error::Error + 'static,
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
@@ -147,7 +147,7 @@ where
 
     fn serialize_some<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize + ?Sized
+        T: Serialize + ?Sized,
     {
         value.serialize(self)
     }
@@ -165,36 +165,35 @@ where
         self.serialize_unit()
     }
 
-    fn serialize_unit_variant
-        ( self
-        , _name: &'static str
-        , _index: u32
-        , variant: &'static str
-        ) -> Result<Self::Ok, Self::Error>
-    {
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _index: u32,
+        variant: &'static str,
+    ) -> Result<Self::Ok, Self::Error> {
         variant.serialize(self)
     }
 
-    fn serialize_newtype_struct<T>
-        ( self
-        , _name: &'static str
-        , value: &T
-        ) -> Result<Self::Ok, Self::Error>
+    fn serialize_newtype_struct<T>(
+        self,
+        _name: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize + ?Sized
+        T: Serialize + ?Sized,
     {
         value.serialize(self)
     }
 
-    fn serialize_newtype_variant<T>
-        ( self
-        , _name: &'static str
-        , _index: u32
-        , variant: &'static str
-        , value: &T
-        ) -> Result<Self::Ok, Self::Error>
+    fn serialize_newtype_variant<T>(
+        self,
+        _name: &'static str,
+        _index: u32,
+        variant: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize + ?Sized
+        T: Serialize + ?Sized,
     {
         self.encoder.map(1)?.str(variant)?;
         value.serialize(self)
@@ -206,31 +205,35 @@ where
         } else {
             self.encoder.begin_array()?;
         }
-        Ok(SeqSerializer { serializer: self, indefinite: len.is_none() })
+        Ok(SeqSerializer {
+            serializer: self,
+            indefinite: len.is_none(),
+        })
     }
 
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
         self.encoder.array(len as u64)?;
-        Ok(SeqSerializer { serializer: self, indefinite: false })
+        Ok(SeqSerializer {
+            serializer: self,
+            indefinite: false,
+        })
     }
 
-    fn serialize_tuple_struct
-        ( self
-        , _name: &'static str
-        , len: usize
-        ) -> Result<Self::SerializeTupleStruct, Self::Error>
-    {
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         self.serialize_tuple(len)
     }
 
-    fn serialize_tuple_variant
-        ( self
-        , _name: &'static str
-        , _index: u32
-        , variant: &'static str
-        , len: usize
-        ) -> Result<Self::SerializeTupleVariant, Self::Error>
-    {
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _index: u32,
+        variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         self.encoder.map(1)?.str(variant)?;
         self.serialize_tuple(len)
     }
@@ -241,34 +244,44 @@ where
         } else {
             self.encoder.begin_map()?;
         }
-        Ok(SeqSerializer { serializer: self, indefinite: len.is_none() })
+        Ok(SeqSerializer {
+            serializer: self,
+            indefinite: len.is_none(),
+        })
     }
 
-    fn serialize_struct
-        ( self
-        , _name: &'static str
-        , len: usize
-        ) -> Result<Self::SerializeStruct, Self::Error>
-    {
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
         self.encoder.map(len as u64)?;
-        Ok(SeqSerializer { serializer: self, indefinite: false })
+        Ok(SeqSerializer {
+            serializer: self,
+            indefinite: false,
+        })
     }
 
-    fn serialize_struct_variant
-        ( self
-        , name: &'static str
-        , _index: u32
-        , variant: &'static str
-        , len: usize
-        ) -> Result<Self::SerializeStructVariant, Self::Error>
-    {
+    fn serialize_struct_variant(
+        self,
+        name: &'static str,
+        _index: u32,
+        variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
         self.encoder.map(1)?.str(variant)?;
         self.serialize_struct(name, len)
     }
 
     #[cfg(not(feature = "alloc"))]
-    fn collect_str<T: core::fmt::Display + ?Sized>(self, _val: &T) -> Result<Self::Ok, Self::Error> {
-        Err(minicbor::encode::Error::message("collect_str requires features `alloc` or `std`").into())
+    fn collect_str<T: core::fmt::Display + ?Sized>(
+        self,
+        _val: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        Err(
+            minicbor::encode::Error::message("collect_str requires features `alloc` or `std`")
+                .into(),
+        )
     }
 
     fn is_human_readable(&self) -> bool {
@@ -278,12 +291,12 @@ where
 
 pub struct SeqSerializer<'a, W: 'a> {
     serializer: &'a mut Serializer<W>,
-    indefinite: bool
+    indefinite: bool,
 }
 
 impl<'a, W: Write> SerializeSeq for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: core::error::Error + 'static
+    <W as Write>::Error: core::error::Error + 'static,
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
@@ -302,7 +315,7 @@ where
 
 impl<'a, W: Write> SerializeTuple for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: core::error::Error + 'static
+    <W as Write>::Error: core::error::Error + 'static,
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
@@ -318,7 +331,7 @@ where
 
 impl<'a, W: Write> SerializeTupleStruct for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: core::error::Error + 'static
+    <W as Write>::Error: core::error::Error + 'static,
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
@@ -334,7 +347,7 @@ where
 
 impl<'a, W: Write> SerializeTupleVariant for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: core::error::Error + 'static
+    <W as Write>::Error: core::error::Error + 'static,
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
@@ -350,7 +363,7 @@ where
 
 impl<'a, W: Write> SerializeMap for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: core::error::Error + 'static
+    <W as Write>::Error: core::error::Error + 'static,
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
@@ -373,14 +386,14 @@ where
 
 impl<'a, W: Write> SerializeStruct for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: core::error::Error + 'static
+    <W as Write>::Error: core::error::Error + 'static,
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
 
     fn serialize_field<T>(&mut self, key: &'static str, val: &T) -> Result<(), Self::Error>
     where
-        T: Serialize + ?Sized
+        T: Serialize + ?Sized,
     {
         key.serialize(&mut *self.serializer)?;
         val.serialize(&mut *self.serializer)
@@ -393,14 +406,14 @@ where
 
 impl<'a, W: Write> SerializeStructVariant for SeqSerializer<'a, W>
 where
-    <W as Write>::Error: core::error::Error + 'static
+    <W as Write>::Error: core::error::Error + 'static,
 {
     type Ok = ();
     type Error = EncodeError<W::Error>;
 
     fn serialize_field<T>(&mut self, key: &'static str, val: &T) -> Result<(), Self::Error>
     where
-        T: Serialize + ?Sized
+        T: Serialize + ?Sized,
     {
         key.serialize(&mut *self.serializer)?;
         val.serialize(&mut *self.serializer)

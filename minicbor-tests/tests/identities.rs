@@ -1,8 +1,8 @@
 #![cfg(feature = "std")]
 
-use minicbor::{Encode, Encoder, CborLen, Decode, Decoder};
-use minicbor::data::{Int, Type, IanaTag};
+use minicbor::data::{IanaTag, Int, Type};
 use minicbor::encode;
+use minicbor::{CborLen, Decode, Decoder, Encode, Encoder};
 use quickcheck::quickcheck;
 use quickcheck::{Arbitrary, Gen};
 use std::collections::HashMap;
@@ -214,7 +214,7 @@ fn byte_slice() {
 fn byte_array() {
     use minicbor::bytes::ByteArray;
 
-    let arg = ByteArray::from([1,2,3,4,5,6,7,8]);
+    let arg = ByteArray::from([1, 2, 3, 4, 5, 6, 7, 8]);
     let vec = minicbor::to_vec(&arg).unwrap();
     assert_eq!(minicbor::len(&arg), vec.len());
     let mut dec = Decoder::new(&vec);
@@ -630,7 +630,7 @@ impl Arbitrary for Ia {
             TypedArrayF64L,
             TypedArrayF128L,
             MultiDimArrayR,
-            MultiDimArrayC
+            MultiDimArrayC,
         ];
         Self(*g.choose(TAGS).expect("some tag"))
     }

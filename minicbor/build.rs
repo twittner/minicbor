@@ -8,7 +8,7 @@ const ATOMIC32: &[&str] = &[
     "thumbv7em-none-eabi",
     "thumbv7m-none-eabi",
     "thumbv8m.base-none-eabi",
-    "thumbv8m.main-none-eabi"
+    "thumbv8m.main-none-eabi",
 ];
 
 /// Targets with max. atomic width = 64:
@@ -35,7 +35,7 @@ const ATOMIC64: &[&str] = &[
     "sparc64",
     "thumbv7neon-linux-androideabi",
     "thumbv7neon-unknown-linux-gnueabihf",
-    "wasm32"
+    "wasm32",
 ];
 
 fn main() {

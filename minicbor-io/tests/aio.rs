@@ -1,4 +1,4 @@
-use minicbor::{Encode, Decode};
+use minicbor::{Decode, Encode};
 use minicbor_io::{AsyncReader, AsyncWriter, Error};
 use quickcheck::{Arbitrary, Gen};
 use rand::Rng;
@@ -9,36 +9,54 @@ use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 #[derive(Clone, Debug, Encode, Decode, PartialEq, Eq)]
 struct Record {
-    #[n(0)] firstname: String,
-    #[n(1)] lastname: String,
-    #[n(2)] birthday: u32,
-    #[n(3)] addresses: Vec<Address>
+    #[n(0)]
+    firstname: String,
+    #[n(1)]
+    lastname: String,
+    #[n(2)]
+    birthday: u32,
+    #[n(3)]
+    addresses: Vec<Address>,
 }
 
 #[derive(Clone, Debug, Encode, Decode, PartialEq, Eq)]
 struct RecordView<'a> {
-    #[b(0)] firstname: &'a str,
-    #[b(1)] lastname: &'a str,
-    #[n(2)] birthday: u32,
-    #[b(3)] addresses: Vec<AddressView<'a>>
+    #[b(0)]
+    firstname: &'a str,
+    #[b(1)]
+    lastname: &'a str,
+    #[n(2)]
+    birthday: u32,
+    #[b(3)]
+    addresses: Vec<AddressView<'a>>,
 }
 
 #[derive(Clone, Debug, Encode, Decode, PartialEq, Eq)]
 struct Address {
-    #[n(0)] street: String,
-    #[n(1)] houseno: String,
-    #[n(2)] postcode: u32,
-    #[n(3)] city: String,
-    #[n(4)] country: String
+    #[n(0)]
+    street: String,
+    #[n(1)]
+    houseno: String,
+    #[n(2)]
+    postcode: u32,
+    #[n(3)]
+    city: String,
+    #[n(4)]
+    country: String,
 }
 
 #[derive(Clone, Debug, Encode, Decode, PartialEq, Eq)]
 struct AddressView<'a> {
-    #[b(0)] street: &'a str,
-    #[b(1)] houseno: &'a str,
-    #[n(2)] postcode: u32,
-    #[b(3)] city: &'a str,
-    #[b(4)] country: &'a str
+    #[b(0)]
+    street: &'a str,
+    #[b(1)]
+    houseno: &'a str,
+    #[n(2)]
+    postcode: u32,
+    #[b(3)]
+    city: &'a str,
+    #[b(4)]
+    country: &'a str,
 }
 
 impl Arbitrary for Record {
@@ -47,7 +65,7 @@ impl Arbitrary for Record {
             firstname: Arbitrary::arbitrary(g),
             lastname: Arbitrary::arbitrary(g),
             birthday: Arbitrary::arbitrary(g),
-            addresses: Arbitrary::arbitrary(g)
+            addresses: Arbitrary::arbitrary(g),
         }
     }
 }
@@ -59,7 +77,7 @@ impl Arbitrary for Address {
             houseno: Arbitrary::arbitrary(g),
             postcode: Arbitrary::arbitrary(g),
             city: Arbitrary::arbitrary(g),
-            country: Arbitrary::arbitrary(g)
+            country: Arbitrary::arbitrary(g),
         }
     }
 }
@@ -70,17 +88,17 @@ async fn read_write_identity() {
     let (addr, server) = server().await.unwrap();
     let join = tokio::spawn(echo::<Record>(server));
 
-    let mut g  = Gen::new(20);
-    let mut r  = rand::rng();
-    let rounds = r.random_range(10 .. 30);
+    let mut g = Gen::new(20);
+    let mut r = rand::rng();
+    let rounds = r.random_range(10..30);
 
-    for n in 0u8 .. rounds {
+    for n in 0u8..rounds {
         let mut client = TcpStream::connect(addr).await.unwrap();
         let (reader, writer) = client.split();
         let mut reader = AsyncReader::new(reader.compat());
         let mut writer = AsyncWriter::new(writer.compat_write());
 
-        for _ in 0u8 .. r.random_range(1 .. 50) {
+        for _ in 0u8..r.random_range(1..50) {
             let a = Record::arbitrary(&mut g);
             writer.write(Command::Value(&a)).await.unwrap();
             let b: RecordView<'_> = reader.read().await.unwrap().unwrap();
@@ -107,8 +125,10 @@ async fn read_write_identity() {
 
 #[derive(Debug, Encode, Decode)]
 enum Command<T> {
-    #[n(0)] Stop,
-    #[n(1)] Value(#[n(0)] T)
+    #[n(0)]
+    Stop,
+    #[n(1)]
+    Value(#[n(0)] T),
 }
 
 /// Bind a server to a random port.
@@ -122,7 +142,7 @@ async fn server() -> io::Result<(SocketAddr, TcpListener)> {
 /// `Command::Value`, send back the value.
 async fn echo<T>(l: TcpListener) -> Result<(), Error>
 where
-    T: Encode<()> + for<'a> Decode<'a, ()>
+    T: Encode<()> + for<'a> Decode<'a, ()>,
 {
     while let Ok((mut s, _)) = l.accept().await {
         let (r, w) = s.split();
@@ -132,7 +152,9 @@ where
             match r.read().await? {
                 None => break,
                 Some(Command::<T>::Stop) => return Ok(()),
-                Some(Command::<T>::Value(v)) => { w.write(v).await?; }
+                Some(Command::<T>::Value(v)) => {
+                    w.write(v).await?;
+                }
             }
         }
     }

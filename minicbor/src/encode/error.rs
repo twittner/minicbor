@@ -13,7 +13,7 @@ pub struct Error<E> {
     #[cfg(not(feature = "alloc"))]
     msg: &'static str,
     #[cfg(feature = "alloc")]
-    msg: alloc::string::String
+    msg: alloc::string::String,
 }
 
 impl<E> Error<E> {
@@ -24,7 +24,10 @@ impl<E> Error<E> {
     /// message.
     #[cfg(not(feature = "alloc"))]
     pub fn message(msg: &'static str) -> Self {
-        Error { err: ErrorImpl::Message, msg }
+        Error {
+            err: ErrorImpl::Message,
+            msg,
+        }
     }
 
     /// Construct an error with a generic message.
@@ -34,12 +37,18 @@ impl<E> Error<E> {
     /// message.
     #[cfg(feature = "alloc")]
     pub fn message<T: fmt::Display>(msg: T) -> Self {
-        Error { err: ErrorImpl::Message, msg: msg.to_string() }
+        Error {
+            err: ErrorImpl::Message,
+            msg: msg.to_string(),
+        }
     }
 
     /// A write error happened.
     pub fn write(e: E) -> Self {
-        Error { err: ErrorImpl::Write(e), msg: Default::default() }
+        Error {
+            err: ErrorImpl::Write(e),
+            msg: Default::default(),
+        }
     }
 
     /// A custom error.
@@ -47,7 +56,10 @@ impl<E> Error<E> {
     /// *Requires feature* `"alloc"`.
     #[cfg(feature = "alloc")]
     pub fn custom<T: core::error::Error + Send + Sync + 'static>(err: T) -> Self {
-        Error { err: ErrorImpl::Custom(Box::new(err)), msg: Default::default() }
+        Error {
+            err: ErrorImpl::Custom(Box::new(err)),
+            msg: Default::default(),
+        }
     }
 
     /// Add a message to this error value.
@@ -113,7 +125,7 @@ enum ErrorImpl<E> {
     Message,
     /// Custom error.
     #[cfg(feature = "alloc")]
-    Custom(Box<dyn core::error::Error + Send + Sync>)
+    Custom(Box<dyn core::error::Error + Send + Sync>),
 }
 
 impl<E: fmt::Display> fmt::Display for Error<E> {
@@ -121,26 +133,29 @@ impl<E: fmt::Display> fmt::Display for Error<E> {
         match &self.err {
             ErrorImpl::Message => write!(f, "{}", self.msg),
             #[cfg(not(feature = "std"))]
-            ErrorImpl::Write(e) =>
+            ErrorImpl::Write(e) => {
                 if self.msg.is_empty() {
                     write!(f, "write error: {e}")
                 } else {
                     write!(f, "write error: {e}, {}", self.msg)
                 }
+            }
             #[cfg(feature = "std")]
-            ErrorImpl::Write(_) =>
+            ErrorImpl::Write(_) => {
                 if self.msg.is_empty() {
                     write!(f, "write error")
                 } else {
                     write!(f, "write error: {}", self.msg)
                 }
+            }
             #[cfg(feature = "alloc")]
-            ErrorImpl::Custom(_) =>
+            ErrorImpl::Custom(_) => {
                 if self.msg.is_empty() {
                     write!(f, "encode error")
                 } else {
                     write!(f, "encode error: {}", self.msg)
                 }
+            }
         }
     }
 }
@@ -148,10 +163,10 @@ impl<E: fmt::Display> fmt::Display for Error<E> {
 impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match &self.err {
-            ErrorImpl::Message   => None,
-            ErrorImpl::Write(e)  => Some(e),
+            ErrorImpl::Message => None,
+            ErrorImpl::Write(e) => Some(e),
             #[cfg(feature = "alloc")]
-            ErrorImpl::Custom(e) => Some(&**e)
+            ErrorImpl::Custom(e) => Some(&**e),
         }
     }
 }

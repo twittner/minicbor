@@ -12,7 +12,7 @@ pub enum Error {
     /// An encoding error occured.
     Encode(minicbor::encode::Error<Infallible>),
     /// The length preceding the CBOR value is not valid.
-    InvalidLen
+    InvalidLen,
 }
 
 impl fmt::Display for Error {
@@ -21,7 +21,7 @@ impl fmt::Display for Error {
             Error::Io(e) => write!(f, "i/o error: {e}"),
             Error::Decode(e) => write!(f, "decode error: {e}"),
             Error::Encode(e) => write!(f, "encode error: {e}"),
-            Error::InvalidLen => f.write_str("invalid length")
+            Error::InvalidLen => f.write_str("invalid length"),
         }
     }
 }
@@ -32,7 +32,7 @@ impl core::error::Error for Error {
             Error::Io(e) => Some(e),
             Error::Decode(e) => Some(e),
             Error::Encode(e) => Some(e),
-            Error::InvalidLen => None
+            Error::InvalidLen => None,
         }
     }
 }

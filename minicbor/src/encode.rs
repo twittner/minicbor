@@ -146,8 +146,8 @@ impl<C, T: Encode<C>, E: Encode<C>> Encode<C> for Result<T, E> {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         e.array(2)?;
         match self {
-            Ok(v)  => e.u32(0)?.encode_with(v, ctx)?.ok(),
-            Err(v) => e.u32(1)?.encode_with(v, ctx)?.ok()
+            Ok(v) => e.u32(0)?.encode_with(v, ctx)?.ok(),
+            Err(v) => e.u32(1)?.encode_with(v, ctx)?.ok(),
         }
     }
 }
@@ -155,8 +155,8 @@ impl<C, T: Encode<C>, E: Encode<C>> Encode<C> for Result<T, E> {
 impl<C, T: CborLen<C>, E: CborLen<C>> CborLen<C> for Result<T, E> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         1 + match self {
-            Ok(x)  => 1 + x.cbor_len(ctx),
-            Err(e) => 1 + e.cbor_len(ctx)
+            Ok(x) => 1 + x.cbor_len(ctx),
+            Err(e) => 1 + e.cbor_len(ctx),
         }
     }
 }
@@ -206,7 +206,7 @@ impl<C> CborLen<C> for alloc::ffi::CString {
 #[cfg(feature = "alloc")]
 impl<C, T> Encode<C> for alloc::borrow::Cow<'_, T>
 where
-    T: Encode<C> + alloc::borrow::ToOwned + ?Sized
+    T: Encode<C> + alloc::borrow::ToOwned + ?Sized,
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         self.as_ref().encode(e, ctx)
@@ -220,7 +220,7 @@ where
 #[cfg(feature = "alloc")]
 impl<C, T> CborLen<C> for alloc::borrow::Cow<'_, T>
 where
-    T: CborLen<C> + alloc::borrow::ToOwned + ?Sized
+    T: CborLen<C> + alloc::borrow::ToOwned + ?Sized,
 {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         self.as_ref().cbor_len(ctx)
@@ -231,7 +231,7 @@ where
 impl<C, T, S> Encode<C> for std::collections::HashSet<T, S>
 where
     T: Encode<C>,
-    S: std::hash::BuildHasher
+    S: std::hash::BuildHasher,
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         e.array(self.len() as u64)?;
@@ -246,7 +246,7 @@ where
 impl<C, T, S> CborLen<C> for std::collections::HashSet<T, S>
 where
     T: CborLen<C>,
-    S: std::hash::BuildHasher
+    S: std::hash::BuildHasher,
 {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         self.len().cbor_len(ctx) + self.iter().map(|x| x.cbor_len(ctx)).sum::<usize>()
@@ -258,7 +258,7 @@ impl<C, K, V, S> Encode<C> for std::collections::HashMap<K, V, S>
 where
     K: Encode<C> + Eq + std::hash::Hash,
     V: Encode<C>,
-    S: std::hash::BuildHasher
+    S: std::hash::BuildHasher,
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         e.map(self.len() as u64)?;
@@ -275,12 +275,14 @@ impl<C, K, V, S> CborLen<C> for std::collections::HashMap<K, V, S>
 where
     K: CborLen<C>,
     V: CborLen<C>,
-    S: std::hash::BuildHasher
+    S: std::hash::BuildHasher,
 {
     fn cbor_len(&self, ctx: &mut C) -> usize {
-        self.len().cbor_len(ctx) + self.iter()
-            .map(|(k, v)| k.cbor_len(ctx) + v.cbor_len(ctx))
-            .sum::<usize>()
+        self.len().cbor_len(ctx)
+            + self
+                .iter()
+                .map(|(k, v)| k.cbor_len(ctx) + v.cbor_len(ctx))
+                .sum::<usize>()
     }
 }
 
@@ -288,7 +290,7 @@ where
 impl<C, K, V> Encode<C> for alloc::collections::BTreeMap<K, V>
 where
     K: Encode<C> + Eq + Ord,
-    V: Encode<C>
+    V: Encode<C>,
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         e.map(self.len() as u64)?;
@@ -307,9 +309,11 @@ where
     V: CborLen<C>,
 {
     fn cbor_len(&self, ctx: &mut C) -> usize {
-        self.len().cbor_len(ctx) + self.iter()
-            .map(|(k, v)| k.cbor_len(ctx) + v.cbor_len(ctx))
-            .sum::<usize>()
+        self.len().cbor_len(ctx)
+            + self
+                .iter()
+                .map(|(k, v)| k.cbor_len(ctx) + v.cbor_len(ctx))
+                .sum::<usize>()
     }
 }
 
@@ -510,16 +514,16 @@ impl<C> CborLen<C> for char {
 
 impl<C> CborLen<C> for u8 {
     fn cbor_len(&self, _: &mut C) -> usize {
-        if let 0 ..= 0x17 = self { 1 } else { 2 }
+        if let 0..=0x17 = self { 1 } else { 2 }
     }
 }
 
 impl<C> CborLen<C> for u16 {
     fn cbor_len(&self, _: &mut C) -> usize {
         match self {
-            0    ..= 0x17 => 1,
-            0x18 ..= 0xff => 2,
-            _             => 3
+            0..=0x17 => 1,
+            0x18..=0xff => 2,
+            _ => 3,
         }
     }
 }
@@ -527,10 +531,10 @@ impl<C> CborLen<C> for u16 {
 impl<C> CborLen<C> for u32 {
     fn cbor_len(&self, _: &mut C) -> usize {
         match self {
-            0     ..= 0x17   => 1,
-            0x18  ..= 0xff   => 2,
-            0x100 ..= 0xffff => 3,
-            _                => 5
+            0..=0x17 => 1,
+            0x18..=0xff => 2,
+            0x100..=0xffff => 3,
+            _ => 5,
         }
     }
 }
@@ -538,39 +542,55 @@ impl<C> CborLen<C> for u32 {
 impl<C> CborLen<C> for u64 {
     fn cbor_len(&self, _: &mut C) -> usize {
         match self {
-            0        ..= 0x17        => 1,
-            0x18     ..= 0xff        => 2,
-            0x100    ..= 0xffff      => 3,
-            0x1_0000 ..= 0xffff_ffff => 5,
-            _                        => 9
+            0..=0x17 => 1,
+            0x18..=0xff => 2,
+            0x100..=0xffff => 3,
+            0x1_0000..=0xffff_ffff => 5,
+            _ => 9,
         }
     }
 }
 
 impl<C> CborLen<C> for i8 {
     fn cbor_len(&self, ctx: &mut C) -> usize {
-        let x = if *self >= 0 { *self as u8 } else { (-1 - self) as u8 };
+        let x = if *self >= 0 {
+            *self as u8
+        } else {
+            (-1 - self) as u8
+        };
         x.cbor_len(ctx)
     }
 }
 
 impl<C> CborLen<C> for i16 {
     fn cbor_len(&self, ctx: &mut C) -> usize {
-        let x = if *self >= 0 { *self as u16 } else { (-1 - self) as u16 };
+        let x = if *self >= 0 {
+            *self as u16
+        } else {
+            (-1 - self) as u16
+        };
         x.cbor_len(ctx)
     }
 }
 
 impl<C> CborLen<C> for i32 {
     fn cbor_len(&self, ctx: &mut C) -> usize {
-        let x = if *self >= 0 { *self as u32 } else { (-1 - self) as u32 };
+        let x = if *self >= 0 {
+            *self as u32
+        } else {
+            (-1 - self) as u32
+        };
         x.cbor_len(ctx)
     }
 }
 
 impl<C> CborLen<C> for i64 {
     fn cbor_len(&self, ctx: &mut C) -> usize {
-        let x = if *self >= 0 { *self as u64 } else { (-1 - self) as u64 };
+        let x = if *self >= 0 {
+            *self as u64
+        } else {
+            (-1 - self) as u64
+        };
         x.cbor_len(ctx)
     }
 }
@@ -616,7 +636,11 @@ encode_nonzero! {
     core::num::NonZeroI64
 }
 
-#[cfg(any(target_pointer_width = "16", target_pointer_width = "32", target_pointer_width = "64"))]
+#[cfg(any(
+    target_pointer_width = "16",
+    target_pointer_width = "32",
+    target_pointer_width = "64"
+))]
 encode_nonzero! {
     core::num::NonZeroUsize
     core::num::NonZeroIsize
@@ -704,7 +728,7 @@ encode_sequential! {
     alloc::collections::BTreeSet<T>
 }
 
-impl <C, T: Encode<C>, const N: usize> Encode<C> for [T; N] {
+impl<C, T: Encode<C>, const N: usize> Encode<C> for [T; N] {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         e.array(N as u64)?;
         for x in self {
@@ -778,14 +802,14 @@ impl<C> CborLen<C> for core::time::Duration {
 impl<C> Encode<C> for std::time::SystemTime {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         match self.duration_since(std::time::UNIX_EPOCH) {
-            Ok(d)  => d.encode(e, ctx),
-            Err(e) => Err(Error::custom(e).with_message("when encoding system time"))
+            Ok(d) => d.encode(e, ctx),
+            Err(e) => Err(Error::custom(e).with_message("when encoding system time")),
         }
     }
 }
 
 #[cfg(feature = "std")]
-impl<C> CborLen<C> for std::time::SystemTime{
+impl<C> CborLen<C> for std::time::SystemTime {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         self.duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.cbor_len(ctx))
@@ -863,7 +887,7 @@ impl<C> Encode<C> for std::net::IpAddr {
         e.array(2)?;
         match self {
             std::net::IpAddr::V4(a) => e.u32(0)?.encode_with(a, ctx)?.ok(),
-            std::net::IpAddr::V6(a) => e.u32(1)?.encode_with(a, ctx)?.ok()
+            std::net::IpAddr::V6(a) => e.u32(1)?.encode_with(a, ctx)?.ok(),
         }
     }
 }
@@ -912,7 +936,7 @@ impl<C> Encode<C> for std::net::SocketAddr {
         e.array(2)?;
         match self {
             std::net::SocketAddr::V4(a) => e.u32(0)?.encode_with(a, ctx)?.ok(),
-            std::net::SocketAddr::V6(a) => e.u32(1)?.encode_with(a, ctx)?.ok()
+            std::net::SocketAddr::V6(a) => e.u32(1)?.encode_with(a, ctx)?.ok(),
         }
     }
 }
@@ -978,9 +1002,7 @@ impl<C, T: CborLen<C>> CborLen<C> for core::ops::Range<T> {
 
 impl<C, T: Encode<C>> Encode<C> for core::ops::RangeFrom<T> {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
-        e.array(1)?
-            .encode_with(&self.start, ctx)?
-            .ok()
+        e.array(1)?.encode_with(&self.start, ctx)?.ok()
     }
 }
 
@@ -992,9 +1014,7 @@ impl<C, T: CborLen<C>> CborLen<C> for core::ops::RangeFrom<T> {
 
 impl<C, T: Encode<C>> Encode<C> for core::ops::RangeTo<T> {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
-        e.array(1)?
-            .encode_with(&self.end, ctx)?
-            .ok()
+        e.array(1)?.encode_with(&self.end, ctx)?.ok()
     }
 }
 
@@ -1006,9 +1026,7 @@ impl<C, T: CborLen<C>> CborLen<C> for core::ops::RangeTo<T> {
 
 impl<C, T: Encode<C>> Encode<C> for core::ops::RangeToInclusive<T> {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
-        e.array(1)?
-            .encode_with(&self.end, ctx)?
-            .ok()
+        e.array(1)?.encode_with(&self.end, ctx)?.ok()
     }
 }
 
@@ -1039,7 +1057,7 @@ impl<C, T: Encode<C>> Encode<C> for core::ops::Bound<T> {
         match self {
             core::ops::Bound::Included(v) => e.u32(0)?.encode_with(v, ctx)?.ok(),
             core::ops::Bound::Excluded(v) => e.u32(1)?.encode_with(v, ctx)?.ok(),
-            core::ops::Bound::Unbounded   => e.u32(2)?.array(0)?.ok()
+            core::ops::Bound::Unbounded => e.u32(2)?.array(0)?.ok(),
         }
     }
 }
@@ -1049,7 +1067,7 @@ impl<C, T: CborLen<C>> CborLen<C> for core::ops::Bound<T> {
         1 + match self {
             core::ops::Bound::Included(v) => 1 + v.cbor_len(ctx),
             core::ops::Bound::Excluded(v) => 1 + v.cbor_len(ctx),
-            core::ops::Bound::Unbounded   => 2
+            core::ops::Bound::Unbounded => 2,
         }
     }
 }
@@ -1070,7 +1088,7 @@ impl<I> ArrayIter<I> {
 impl<C, I, T> Encode<C> for ArrayIter<I>
 where
     I: Iterator<Item = T> + Clone,
-    T: Encode<C>
+    T: Encode<C>,
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         let iter = self.0.clone();
@@ -1108,7 +1126,7 @@ impl<C, I, K, V> Encode<C> for MapIter<I>
 where
     I: Iterator<Item = (K, V)> + Clone,
     K: Encode<C>,
-    V: Encode<C>
+    V: Encode<C>,
 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         let iter = self.0.clone();

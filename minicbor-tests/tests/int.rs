@@ -1,8 +1,8 @@
 #![cfg(feature = "std")]
 
-use minicbor::{Encoder, Decoder};
 use minicbor::data::{Int, MAX_INT, MIN_INT};
-use quickcheck::{quickcheck, TestResult};
+use minicbor::{Decoder, Encoder};
+use quickcheck::{TestResult, quickcheck};
 
 fn identity<T: Into<Int>>(v: T) -> bool {
     let i = v.into();

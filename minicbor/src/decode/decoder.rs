@@ -1,15 +1,15 @@
 #![allow(clippy::unusual_byte_groupings)]
 
-use crate::{ARRAY, BREAK, BYTES, MAP, SIMPLE, TAGGED, TEXT, SIGNED, UNSIGNED};
 use crate::data::{Int, Tag, Type};
 use crate::decode::{Decode, Error};
+use crate::{ARRAY, BREAK, BYTES, MAP, SIGNED, SIMPLE, TAGGED, TEXT, UNSIGNED};
 use core::{marker, str};
 
 /// A non-allocating CBOR decoder.
 #[derive(Debug, Clone)]
 pub struct Decoder<'b> {
     buf: &'b [u8],
-    pos: usize
+    pos: usize,
 }
 
 impl<'b> Decoder<'b> {
@@ -51,7 +51,7 @@ impl<'b> Decoder<'b> {
     pub fn probe<'a>(&'a mut self) -> Probe<'a, 'b> {
         Probe {
             decoder: self.clone(),
-            _marker: marker::PhantomData
+            _marker: marker::PhantomData,
         }
     }
 
@@ -61,7 +61,9 @@ impl<'b> Decoder<'b> {
         match self.read()? {
             0xf4 => Ok(false),
             0xf5 => Ok(true),
-            b    => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected bool"))
+            b => Err(Error::type_mismatch(self.type_of(b)?)
+                .at(p)
+                .with_message("expected bool")),
         }
     }
 
@@ -69,12 +71,23 @@ impl<'b> Decoder<'b> {
     pub fn u8(&mut self) -> Result<u8, Error> {
         let p = self.pos;
         match self.read()? {
-            n @ 0 ..= 0x17 => Ok(n),
-            0x18           => self.read(),
-            0x19           => self.read_array().map(u16::from_be_bytes).and_then(|n| try_as(n, "when converting u16 to u8", p)),
-            0x1a           => self.read_array().map(u32::from_be_bytes).and_then(|n| try_as(n, "when converting u32 to u8", p)),
-            0x1b           => self.read_array().map(u64::from_be_bytes).and_then(|n| try_as(n, "when converting u64 to u8", p)),
-            b              => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected u8"))
+            n @ 0..=0x17 => Ok(n),
+            0x18 => self.read(),
+            0x19 => self
+                .read_array()
+                .map(u16::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u16 to u8", p)),
+            0x1a => self
+                .read_array()
+                .map(u32::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u32 to u8", p)),
+            0x1b => self
+                .read_array()
+                .map(u64::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u64 to u8", p)),
+            b => Err(Error::type_mismatch(self.type_of(b)?)
+                .at(p)
+                .with_message("expected u8")),
         }
     }
 
@@ -82,12 +95,20 @@ impl<'b> Decoder<'b> {
     pub fn u16(&mut self) -> Result<u16, Error> {
         let p = self.pos;
         match self.read()? {
-            n @ 0 ..= 0x17 => Ok(u16::from(n)),
-            0x18           => self.read().map(u16::from),
-            0x19           => self.read_array().map(u16::from_be_bytes),
-            0x1a           => self.read_array().map(u32::from_be_bytes).and_then(|n| try_as(n, "when converting u32 to u16", p)),
-            0x1b           => self.read_array().map(u64::from_be_bytes).and_then(|n| try_as(n, "when converting u64 to u16", p)),
-            b              => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected u16"))
+            n @ 0..=0x17 => Ok(u16::from(n)),
+            0x18 => self.read().map(u16::from),
+            0x19 => self.read_array().map(u16::from_be_bytes),
+            0x1a => self
+                .read_array()
+                .map(u32::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u32 to u16", p)),
+            0x1b => self
+                .read_array()
+                .map(u64::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u64 to u16", p)),
+            b => Err(Error::type_mismatch(self.type_of(b)?)
+                .at(p)
+                .with_message("expected u16")),
         }
     }
 
@@ -95,12 +116,17 @@ impl<'b> Decoder<'b> {
     pub fn u32(&mut self) -> Result<u32, Error> {
         let p = self.pos;
         match self.read()? {
-            n @ 0 ..= 0x17 => Ok(u32::from(n)),
-            0x18           => self.read().map(u32::from),
-            0x19           => self.read_array().map(u16::from_be_bytes).map(u32::from),
-            0x1a           => self.read_array().map(u32::from_be_bytes),
-            0x1b           => self.read_array().map(u64::from_be_bytes).and_then(|n| try_as(n, "when converting u64 to u32", p)),
-            b              => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected u32"))
+            n @ 0..=0x17 => Ok(u32::from(n)),
+            0x18 => self.read().map(u32::from),
+            0x19 => self.read_array().map(u16::from_be_bytes).map(u32::from),
+            0x1a => self.read_array().map(u32::from_be_bytes),
+            0x1b => self
+                .read_array()
+                .map(u64::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u64 to u32", p)),
+            b => Err(Error::type_mismatch(self.type_of(b)?)
+                .at(p)
+                .with_message("expected u32")),
         }
     }
 
@@ -115,17 +141,41 @@ impl<'b> Decoder<'b> {
     pub fn i8(&mut self) -> Result<i8, Error> {
         let p = self.pos;
         match self.read()? {
-            n @ 0x00 ..= 0x17 => Ok(n as i8),
-            0x18              => self.read().and_then(|n| try_as(n, "when converting u8 to i8", p)),
-            0x19              => self.read_array().map(u16::from_be_bytes).and_then(|n| try_as(n, "when converting u16 to i8", p)),
-            0x1a              => self.read_array().map(u32::from_be_bytes).and_then(|n| try_as(n, "when converting u32 to i8", p)),
-            0x1b              => self.read_array().map(u64::from_be_bytes).and_then(|n| try_as(n, "when converting u64 to i8", p)),
-            n @ 0x20 ..= 0x37 => Ok(-1 - (n - 0x20) as i8),
-            0x38              => self.read().and_then(|n| try_as(n, "when converting u8 to i8", p).map(|n: i8| -1 - n)),
-            0x39              => self.read_array().map(u16::from_be_bytes).and_then(|n| try_as(n, "when converting u16 to i8", p).map(|n: i8| -1 - n)),
-            0x3a              => self.read_array().map(u32::from_be_bytes).and_then(|n| try_as(n, "when converting u32 to i8", p).map(|n: i8| -1 - n)),
-            0x3b              => self.read_array().map(u64::from_be_bytes).and_then(|n| try_as(n, "when converting u64 to i8", p).map(|n: i8| -1 - n)),
-            b                 => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected i8"))
+            n @ 0x00..=0x17 => Ok(n as i8),
+            0x18 => self
+                .read()
+                .and_then(|n| try_as(n, "when converting u8 to i8", p)),
+            0x19 => self
+                .read_array()
+                .map(u16::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u16 to i8", p)),
+            0x1a => self
+                .read_array()
+                .map(u32::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u32 to i8", p)),
+            0x1b => self
+                .read_array()
+                .map(u64::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u64 to i8", p)),
+            n @ 0x20..=0x37 => Ok(-1 - (n - 0x20) as i8),
+            0x38 => self
+                .read()
+                .and_then(|n| try_as(n, "when converting u8 to i8", p).map(|n: i8| -1 - n)),
+            0x39 => self
+                .read_array()
+                .map(u16::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u16 to i8", p).map(|n: i8| -1 - n)),
+            0x3a => self
+                .read_array()
+                .map(u32::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u32 to i8", p).map(|n: i8| -1 - n)),
+            0x3b => self
+                .read_array()
+                .map(u64::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u64 to i8", p).map(|n: i8| -1 - n)),
+            b => Err(Error::type_mismatch(self.type_of(b)?)
+                .at(p)
+                .with_message("expected i8")),
         }
     }
 
@@ -133,17 +183,37 @@ impl<'b> Decoder<'b> {
     pub fn i16(&mut self) -> Result<i16, Error> {
         let p = self.pos;
         match self.read()? {
-            n @ 0x00 ..= 0x17 => Ok(i16::from(n)),
-            0x18              => self.read().map(i16::from),
-            0x19              => self.read_array().map(u16::from_be_bytes).and_then(|n| try_as(n, "when converting u16 to i16", p)),
-            0x1a              => self.read_array().map(u32::from_be_bytes).and_then(|n| try_as(n, "when converting u32 to i16", p)),
-            0x1b              => self.read_array().map(u64::from_be_bytes).and_then(|n| try_as(n, "when converting u64 to i16", p)),
-            n @ 0x20 ..= 0x37 => Ok(-1 - i16::from(n - 0x20)),
-            0x38              => self.read().map(|n| -1 - i16::from(n)),
-            0x39              => self.read_array().map(u16::from_be_bytes).and_then(|n| try_as(n, "when converting u16 to i16", p).map(|n: i16| -1 - n)),
-            0x3a              => self.read_array().map(u32::from_be_bytes).and_then(|n| try_as(n, "when converting u32 to i16", p).map(|n: i16| -1 - n)),
-            0x3b              => self.read_array().map(u64::from_be_bytes).and_then(|n| try_as(n, "when converting u64 to i16", p).map(|n: i16| -1 - n)),
-            b                 => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected i16"))
+            n @ 0x00..=0x17 => Ok(i16::from(n)),
+            0x18 => self.read().map(i16::from),
+            0x19 => self
+                .read_array()
+                .map(u16::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u16 to i16", p)),
+            0x1a => self
+                .read_array()
+                .map(u32::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u32 to i16", p)),
+            0x1b => self
+                .read_array()
+                .map(u64::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u64 to i16", p)),
+            n @ 0x20..=0x37 => Ok(-1 - i16::from(n - 0x20)),
+            0x38 => self.read().map(|n| -1 - i16::from(n)),
+            0x39 => self
+                .read_array()
+                .map(u16::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u16 to i16", p).map(|n: i16| -1 - n)),
+            0x3a => self
+                .read_array()
+                .map(u32::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u32 to i16", p).map(|n: i16| -1 - n)),
+            0x3b => self
+                .read_array()
+                .map(u64::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u64 to i16", p).map(|n: i16| -1 - n)),
+            b => Err(Error::type_mismatch(self.type_of(b)?)
+                .at(p)
+                .with_message("expected i16")),
         }
     }
 
@@ -151,17 +221,34 @@ impl<'b> Decoder<'b> {
     pub fn i32(&mut self) -> Result<i32, Error> {
         let p = self.pos;
         match self.read()? {
-            n @ 0x00 ..= 0x17 => Ok(i32::from(n)),
-            0x18              => self.read().map(i32::from),
-            0x19              => self.read_array().map(u16::from_be_bytes).map(i32::from),
-            0x1a              => self.read_array().map(u32::from_be_bytes).and_then(|n| try_as(n, "when converting u32 to i32", p)),
-            0x1b              => self.read_array().map(u64::from_be_bytes).and_then(|n| try_as(n, "when converting u64 to i32", p)),
-            n @ 0x20 ..= 0x37 => Ok(-1 - i32::from(n - 0x20)),
-            0x38              => self.read().map(|n| -1 - i32::from(n)),
-            0x39              => self.read_array().map(u16::from_be_bytes).map(|n| -1 - i32::from(n)),
-            0x3a              => self.read_array().map(u32::from_be_bytes).and_then(|n| try_as(n, "when converting u32 to i32", p).map(|n: i32| -1 - n)),
-            0x3b              => self.read_array().map(u64::from_be_bytes).and_then(|n| try_as(n, "when converting u64 to i32", p).map(|n: i32| -1 - n)),
-            b                 => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected i32"))
+            n @ 0x00..=0x17 => Ok(i32::from(n)),
+            0x18 => self.read().map(i32::from),
+            0x19 => self.read_array().map(u16::from_be_bytes).map(i32::from),
+            0x1a => self
+                .read_array()
+                .map(u32::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u32 to i32", p)),
+            0x1b => self
+                .read_array()
+                .map(u64::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u64 to i32", p)),
+            n @ 0x20..=0x37 => Ok(-1 - i32::from(n - 0x20)),
+            0x38 => self.read().map(|n| -1 - i32::from(n)),
+            0x39 => self
+                .read_array()
+                .map(u16::from_be_bytes)
+                .map(|n| -1 - i32::from(n)),
+            0x3a => self
+                .read_array()
+                .map(u32::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u32 to i32", p).map(|n: i32| -1 - n)),
+            0x3b => self
+                .read_array()
+                .map(u64::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u64 to i32", p).map(|n: i32| -1 - n)),
+            b => Err(Error::type_mismatch(self.type_of(b)?)
+                .at(p)
+                .with_message("expected i32")),
         }
     }
 
@@ -169,17 +256,31 @@ impl<'b> Decoder<'b> {
     pub fn i64(&mut self) -> Result<i64, Error> {
         let p = self.pos;
         match self.read()? {
-            n @ 0x00 ..= 0x17 => Ok(i64::from(n)),
-            0x18              => self.read().map(i64::from),
-            0x19              => self.read_array().map(u16::from_be_bytes).map(i64::from),
-            0x1a              => self.read_array().map(u32::from_be_bytes).map(i64::from),
-            0x1b              => self.read_array().map(u64::from_be_bytes).and_then(|n| try_as(n, "when converting u64 to i64", p)),
-            n @ 0x20 ..= 0x37 => Ok(-1 - i64::from(n - 0x20)),
-            0x38              => self.read().map(|n| -1 - i64::from(n)),
-            0x39              => self.read_array().map(u16::from_be_bytes).map(|n| -1 - i64::from(n)),
-            0x3a              => self.read_array().map(u32::from_be_bytes).map(|n| -1 - i64::from(n)),
-            0x3b              => self.read_array().map(u64::from_be_bytes).and_then(|n| try_as(n, "when converting u64 to i64", p).map(|n: i64| -1 - n)),
-            b                 => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected i64"))
+            n @ 0x00..=0x17 => Ok(i64::from(n)),
+            0x18 => self.read().map(i64::from),
+            0x19 => self.read_array().map(u16::from_be_bytes).map(i64::from),
+            0x1a => self.read_array().map(u32::from_be_bytes).map(i64::from),
+            0x1b => self
+                .read_array()
+                .map(u64::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u64 to i64", p)),
+            n @ 0x20..=0x37 => Ok(-1 - i64::from(n - 0x20)),
+            0x38 => self.read().map(|n| -1 - i64::from(n)),
+            0x39 => self
+                .read_array()
+                .map(u16::from_be_bytes)
+                .map(|n| -1 - i64::from(n)),
+            0x3a => self
+                .read_array()
+                .map(u32::from_be_bytes)
+                .map(|n| -1 - i64::from(n)),
+            0x3b => self
+                .read_array()
+                .map(u64::from_be_bytes)
+                .and_then(|n| try_as(n, "when converting u64 to i64", p).map(|n: i64| -1 - n)),
+            b => Err(Error::type_mismatch(self.type_of(b)?)
+                .at(p)
+                .with_message("expected i64")),
         }
     }
 
@@ -189,17 +290,19 @@ impl<'b> Decoder<'b> {
     pub fn int(&mut self) -> Result<Int, Error> {
         let p = self.pos;
         match self.read()? {
-            n @ 0x00 ..= 0x17 => Ok(Int::pos(n)),
-            0x18              => self.read().map(Int::pos),
-            0x19              => self.read_array().map(u16::from_be_bytes).map(Int::pos),
-            0x1a              => self.read_array().map(u32::from_be_bytes).map(Int::pos),
-            0x1b              => self.read_array().map(u64::from_be_bytes).map(Int::pos),
-            n @ 0x20 ..= 0x37 => Ok(Int::neg(n - 0x20)),
-            0x38              => self.read().map(Int::neg),
-            0x39              => self.read_array().map(u16::from_be_bytes).map(Int::neg),
-            0x3a              => self.read_array().map(u32::from_be_bytes).map(Int::neg),
-            0x3b              => self.read_array().map(u64::from_be_bytes).map(Int::neg),
-            b                 => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected int"))
+            n @ 0x00..=0x17 => Ok(Int::pos(n)),
+            0x18 => self.read().map(Int::pos),
+            0x19 => self.read_array().map(u16::from_be_bytes).map(Int::pos),
+            0x1a => self.read_array().map(u32::from_be_bytes).map(Int::pos),
+            0x1b => self.read_array().map(u64::from_be_bytes).map(Int::pos),
+            n @ 0x20..=0x37 => Ok(Int::neg(n - 0x20)),
+            0x38 => self.read().map(Int::neg),
+            0x39 => self.read_array().map(u16::from_be_bytes).map(Int::neg),
+            0x3a => self.read_array().map(u32::from_be_bytes).map(Int::neg),
+            0x3b => self.read_array().map(u64::from_be_bytes).map(Int::neg),
+            b => Err(Error::type_mismatch(self.type_of(b)?)
+                .at(p)
+                .with_message("expected int")),
         }
     }
 
@@ -211,7 +314,9 @@ impl<'b> Decoder<'b> {
         let p = self.pos;
         let b = self.read()?;
         if 0xf9 != b {
-            return Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected f16"))
+            return Err(Error::type_mismatch(self.type_of(b)?)
+                .at(p)
+                .with_message("expected f16"));
         }
         Ok(half::f16::from_bits(u16::from_be_bytes(self.read_array()?)).to_f32())
     }
@@ -226,7 +331,9 @@ impl<'b> Decoder<'b> {
                 self.read()?;
                 Ok(f32::from_be_bytes(self.read_array()?))
             }
-            b => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected f32"))
+            b => Err(Error::type_mismatch(self.type_of(b)?)
+                .at(p)
+                .with_message("expected f32")),
         }
     }
 
@@ -241,7 +348,9 @@ impl<'b> Decoder<'b> {
                 self.read()?;
                 Ok(f64::from_be_bytes(self.read_array()?))
             }
-            b => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected f64"))
+            b => Err(Error::type_mismatch(self.type_of(b)?)
+                .at(p)
+                .with_message("expected f64")),
         }
     }
 
@@ -262,7 +371,7 @@ impl<'b> Decoder<'b> {
         if BYTES != type_of(b) || info_of(b) == 31 {
             return Err(Error::type_mismatch(self.type_of(b)?)
                 .with_message("expected bytes (definite length)")
-                .at(p))
+                .at(p));
         }
         let n = u64_to_usize(self.unsigned(info_of(b), p)?, p)?;
         self.read_slice(n)
@@ -279,13 +388,19 @@ impl<'b> Decoder<'b> {
         if BYTES != type_of(b) {
             return Err(Error::type_mismatch(self.type_of(b)?)
                 .with_message("expected bytes")
-                .at(p))
+                .at(p));
         }
         match info_of(b) {
-            31 => Ok(BytesIter { decoder: self, state: State::Indef }),
-            n  => {
+            31 => Ok(BytesIter {
+                decoder: self,
+                state: State::Indef,
+            }),
+            n => {
                 let len = u64_to_usize(self.unsigned(n, p)?, p)?;
-                Ok(BytesIter { decoder: self, state: State::Def(len) })
+                Ok(BytesIter {
+                    decoder: self,
+                    state: State::Def(len),
+                })
             }
         }
     }
@@ -300,7 +415,7 @@ impl<'b> Decoder<'b> {
         if TEXT != type_of(b) || info_of(b) == 31 {
             return Err(Error::type_mismatch(self.type_of(b)?)
                 .with_message("expected text (definite length)")
-                .at(p))
+                .at(p));
         }
         let n = u64_to_usize(self.unsigned(info_of(b), p)?, p)?;
         let d = self.read_slice(n)?;
@@ -318,13 +433,21 @@ impl<'b> Decoder<'b> {
         if TEXT != type_of(b) {
             return Err(Error::type_mismatch(self.type_of(b)?)
                 .with_message("expected text")
-                .at(p))
+                .at(p));
         }
         match info_of(b) {
-            31 => Ok(StrIter { decoder: self, state: State::Indef, pos: p }),
-            n  => {
+            31 => Ok(StrIter {
+                decoder: self,
+                state: State::Indef,
+                pos: p,
+            }),
+            n => {
                 let len = u64_to_usize(self.unsigned(n, p)?, p)?;
-                Ok(StrIter { decoder: self, state: State::Def(len), pos: p })
+                Ok(StrIter {
+                    decoder: self,
+                    state: State::Def(len),
+                    pos: p,
+                })
             }
         }
     }
@@ -340,11 +463,11 @@ impl<'b> Decoder<'b> {
         if ARRAY != type_of(b) {
             return Err(Error::type_mismatch(self.type_of(b)?)
                 .with_message("expected array")
-                .at(p))
+                .at(p));
         }
         match info_of(b) {
             31 => Ok(None),
-            n  => Ok(Some(self.unsigned(n, p)?))
+            n => Ok(Some(self.unsigned(n, p)?)),
         }
     }
 
@@ -355,10 +478,14 @@ impl<'b> Decoder<'b> {
     /// homogenous arrays are supported by this method*.
     pub fn array_iter<T>(&mut self) -> Result<ArrayIter<'_, 'b, T>, Error>
     where
-        T: Decode<'b, ()>
+        T: Decode<'b, ()>,
     {
         let len = self.array()?;
-        Ok(ArrayIter { decoder: self, state: len.into(), _mark: marker::PhantomData })
+        Ok(ArrayIter {
+            decoder: self,
+            state: len.into(),
+            _mark: marker::PhantomData,
+        })
     }
 
     /// Iterate over all array elements.
@@ -366,12 +493,20 @@ impl<'b> Decoder<'b> {
     /// This supports indefinite and definite length arrays and uses the
     /// [`Decode`] trait to decode each element. Consequently *only
     /// homogenous arrays are supported by this method*.
-    pub fn array_iter_with<'a, C, T>(&'a mut self, ctx: &'a mut C) -> Result<ArrayIterWithCtx<'a, 'b, C, T>, Error>
+    pub fn array_iter_with<'a, C, T>(
+        &'a mut self,
+        ctx: &'a mut C,
+    ) -> Result<ArrayIterWithCtx<'a, 'b, C, T>, Error>
     where
-        T: Decode<'b, C>
+        T: Decode<'b, C>,
     {
         let len = self.array()?;
-        Ok(ArrayIterWithCtx { decoder: self, ctx, state: len.into(), _mark: marker::PhantomData })
+        Ok(ArrayIterWithCtx {
+            decoder: self,
+            ctx,
+            state: len.into(),
+            _mark: marker::PhantomData,
+        })
     }
 
     /// Begin decoding a map.
@@ -385,11 +520,11 @@ impl<'b> Decoder<'b> {
         if MAP != type_of(b) {
             return Err(Error::type_mismatch(self.type_of(b)?)
                 .with_message("expected map")
-                .at(p))
+                .at(p));
         }
         match info_of(b) {
             31 => Ok(None),
-            n  => Ok(Some(self.unsigned(n, p)?))
+            n => Ok(Some(self.unsigned(n, p)?)),
         }
     }
 
@@ -401,10 +536,14 @@ impl<'b> Decoder<'b> {
     pub fn map_iter<K, V>(&mut self) -> Result<MapIter<'_, 'b, K, V>, Error>
     where
         K: Decode<'b, ()>,
-        V: Decode<'b, ()>
+        V: Decode<'b, ()>,
     {
         let len = self.map()?;
-        Ok(MapIter { decoder: self, state: len.into(), _mark: marker::PhantomData })
+        Ok(MapIter {
+            decoder: self,
+            state: len.into(),
+            _mark: marker::PhantomData,
+        })
     }
 
     /// Iterate over all map entries.
@@ -412,13 +551,21 @@ impl<'b> Decoder<'b> {
     /// This supports indefinite and definite length maps and uses the
     /// [`Decode`] trait to decode each key and value. Consequently *only
     /// homogenous maps are supported by this method*.
-    pub fn map_iter_with<'a, C, K, V>(&'a mut self, ctx: &'a mut C) -> Result<MapIterWithCtx<'a, 'b, C, K, V>, Error>
+    pub fn map_iter_with<'a, C, K, V>(
+        &'a mut self,
+        ctx: &'a mut C,
+    ) -> Result<MapIterWithCtx<'a, 'b, C, K, V>, Error>
     where
         K: Decode<'b, C>,
-        V: Decode<'b, C>
+        V: Decode<'b, C>,
     {
         let len = self.map()?;
-        Ok(MapIterWithCtx { decoder: self, ctx, state: len.into(), _mark: marker::PhantomData })
+        Ok(MapIterWithCtx {
+            decoder: self,
+            ctx,
+            state: len.into(),
+            _mark: marker::PhantomData,
+        })
     }
 
     /// Decode a CBOR tag.
@@ -428,7 +575,7 @@ impl<'b> Decoder<'b> {
         if TAGGED != type_of(b) {
             return Err(Error::type_mismatch(self.type_of(b)?)
                 .with_message("expected tag")
-                .at(p))
+                .at(p));
         }
         self.unsigned(info_of(b), p).map(Tag::new)
     }
@@ -438,9 +585,9 @@ impl<'b> Decoder<'b> {
         let p = self.pos;
         match self.read()? {
             0xf6 => Ok(()),
-            n    => Err(Error::type_mismatch(self.type_of(n)?)
+            n => Err(Error::type_mismatch(self.type_of(n)?)
                 .with_message("expected null")
-                .at(p))
+                .at(p)),
         }
     }
 
@@ -449,9 +596,9 @@ impl<'b> Decoder<'b> {
         let p = self.pos;
         match self.read()? {
             0xf7 => Ok(()),
-            n    => Err(Error::type_mismatch(self.type_of(n)?)
+            n => Err(Error::type_mismatch(self.type_of(n)?)
                 .with_message("expected undefined")
-                .at(p))
+                .at(p)),
         }
     }
 
@@ -459,11 +606,11 @@ impl<'b> Decoder<'b> {
     pub fn simple(&mut self) -> Result<u8, Error> {
         let p = self.pos;
         match self.read()? {
-            n @ SIMPLE ..= 0xf3 => Ok(n - SIMPLE),
+            n @ SIMPLE..=0xf3 => Ok(n - SIMPLE),
             0xf8 => self.read(),
-            n    => Err(Error::type_mismatch(self.type_of(n)?)
+            n => Err(Error::type_mismatch(self.type_of(n)?)
                 .with_message("expected simple value")
-                .at(p))
+                .at(p)),
         }
     }
 
@@ -498,64 +645,78 @@ impl<'b> Decoder<'b> {
 
         while nrounds > 0 || irounds > 0 || !stack.is_empty() {
             match self.current()? {
-                UNSIGNED ..= 0x1b => { self.u64()?; }
-                SIGNED   ..= 0x3b => { self.int()?; }
-                BYTES    ..= 0x5f => { for v in self.bytes_iter()? { v?; } }
-                TEXT     ..= 0x7f => { for v in self.str_iter()? { v?; } }
-                ARRAY    ..= 0x9f =>
-                    match self.array()? {
-                        Some(0) => {}
-                        Some(n) =>
-                            if nrounds == 0 && irounds == 0 {
-                                stack.push(Some(n))
-                            } else {
-                                nrounds = nrounds.saturating_add(n)
-                            }
-                        None =>
-                            if nrounds == 0 && irounds == 0 {
-                                stack.push(None)
-                            } else if nrounds < 2 {
-                                irounds = irounds.saturating_add(1)
-                            } else {
-                                for _ in 0 .. irounds {
-                                    stack.push(None)
-                                }
-                                stack.push(Some(nrounds - 1));
-                                stack.push(None);
-                                nrounds = 0;
-                                irounds = 0
-                            }
+                UNSIGNED..=0x1b => {
+                    self.u64()?;
+                }
+                SIGNED..=0x3b => {
+                    self.int()?;
+                }
+                BYTES..=0x5f => {
+                    for v in self.bytes_iter()? {
+                        v?;
                     }
-                MAP ..= 0xbf =>
-                    match self.map()? {
-                        Some(0) => {}
-                        Some(n) =>
-                            if nrounds == 0 && irounds == 0 {
-                                stack.push(Some(n.saturating_mul(2)))
-                            } else {
-                                nrounds = nrounds.saturating_add(n.saturating_mul(2))
-                            }
-                        None =>
-                            if nrounds == 0 && irounds == 0 {
-                                stack.push(None)
-                            } else if nrounds < 2 {
-                                irounds = irounds.saturating_add(1)
-                            } else {
-                                for _ in 0 .. irounds {
-                                    stack.push(None)
-                                }
-                                stack.push(Some(nrounds - 1));
-                                stack.push(None);
-                                nrounds = 0;
-                                irounds = 0
-                            }
+                }
+                TEXT..=0x7f => {
+                    for v in self.str_iter()? {
+                        v?;
                     }
-                TAGGED ..= 0xdb => {
+                }
+                ARRAY..=0x9f => match self.array()? {
+                    Some(0) => {}
+                    Some(n) => {
+                        if nrounds == 0 && irounds == 0 {
+                            stack.push(Some(n))
+                        } else {
+                            nrounds = nrounds.saturating_add(n)
+                        }
+                    }
+                    None => {
+                        if nrounds == 0 && irounds == 0 {
+                            stack.push(None)
+                        } else if nrounds < 2 {
+                            irounds = irounds.saturating_add(1)
+                        } else {
+                            for _ in 0..irounds {
+                                stack.push(None)
+                            }
+                            stack.push(Some(nrounds - 1));
+                            stack.push(None);
+                            nrounds = 0;
+                            irounds = 0
+                        }
+                    }
+                },
+                MAP..=0xbf => match self.map()? {
+                    Some(0) => {}
+                    Some(n) => {
+                        if nrounds == 0 && irounds == 0 {
+                            stack.push(Some(n.saturating_mul(2)))
+                        } else {
+                            nrounds = nrounds.saturating_add(n.saturating_mul(2))
+                        }
+                    }
+                    None => {
+                        if nrounds == 0 && irounds == 0 {
+                            stack.push(None)
+                        } else if nrounds < 2 {
+                            irounds = irounds.saturating_add(1)
+                        } else {
+                            for _ in 0..irounds {
+                                stack.push(None)
+                            }
+                            stack.push(Some(nrounds - 1));
+                            stack.push(None);
+                            nrounds = 0;
+                            irounds = 0
+                        }
+                    }
+                },
+                TAGGED..=0xdb => {
                     let p = self.pos;
                     self.read().and_then(|n| self.unsigned(info_of(n), p))?;
-                    continue
+                    continue;
                 }
-                SIMPLE ..= 0xfb => {
+                SIMPLE..=0xfb => {
                     let p = self.pos;
                     self.read().and_then(|n| self.unsigned(info_of(n), p))?;
                 }
@@ -569,18 +730,20 @@ impl<'b> Decoder<'b> {
                         irounds = irounds.saturating_sub(1)
                     }
                 }
-                other => return Err(Error::type_mismatch(self.type_of(other)?)
-                    .at(self.pos)
-                    .with_message("unknown type"))
+                other => {
+                    return Err(Error::type_mismatch(self.type_of(other)?)
+                        .at(self.pos)
+                        .with_message("unknown type"));
+                }
             }
             if nrounds == 0 && irounds == 0 {
                 while let Some(Some(0)) = stack.last() {
-                     stack.pop();
+                    stack.pop();
                 }
                 match stack.last_mut() {
-                    Some(Some(n)) => { *n -= 1 }
-                    Some(None)    => {}
-                    None          => break
+                    Some(Some(n)) => *n -= 1,
+                    Some(None) => {}
+                    None => break,
                 }
             } else {
                 nrounds = nrounds.saturating_sub(1)
@@ -599,38 +762,51 @@ impl<'b> Decoder<'b> {
         let mut nrounds = 1u64; // number of iterations over array and map elements
         let mut irounds = 0u64; // number of indefinite iterations
 
-        let error_msg =
-            "arrays and maps of indefinite length inside of \
+        let error_msg = "arrays and maps of indefinite length inside of \
             regular arrays or maps require feature flag `alloc`";
 
         while nrounds > 0 || irounds > 0 {
             match self.current()? {
-                UNSIGNED ..= 0x1b => { self.u64()?; }
-                SIGNED   ..= 0x3b => { self.int()?; }
-                BYTES    ..= 0x5f => { for v in self.bytes_iter()? { v?; } }
-                TEXT     ..= 0x7f => { for v in self.str_iter()? { v?; } }
-                ARRAY    ..= 0x9f =>
+                UNSIGNED..=0x1b => {
+                    self.u64()?;
+                }
+                SIGNED..=0x3b => {
+                    self.int()?;
+                }
+                BYTES..=0x5f => {
+                    for v in self.bytes_iter()? {
+                        v?;
+                    }
+                }
+                TEXT..=0x7f => {
+                    for v in self.str_iter()? {
+                        v?;
+                    }
+                }
+                ARRAY..=0x9f => {
                     if let Some(n) = self.array()? {
                         nrounds = nrounds.saturating_add(n)
                     } else if nrounds < 2 {
                         irounds = irounds.saturating_add(1)
                     } else {
-                        return Err(Error::message(error_msg))
+                        return Err(Error::message(error_msg));
                     }
-                MAP ..= 0xbf =>
+                }
+                MAP..=0xbf => {
                     if let Some(n) = self.map()? {
                         nrounds = nrounds.saturating_add(n.saturating_mul(2))
                     } else if nrounds < 2 {
                         irounds = irounds.saturating_add(1)
                     } else {
-                        return Err(Error::message(error_msg))
+                        return Err(Error::message(error_msg));
                     }
-                TAGGED ..= 0xdb => {
+                }
+                TAGGED..=0xdb => {
                     let p = self.pos;
                     self.read().and_then(|n| self.unsigned(info_of(n), p))?;
-                    continue
+                    continue;
                 }
-                SIMPLE ..= 0xfb => {
+                SIMPLE..=0xfb => {
                     let p = self.pos;
                     self.read().and_then(|n| self.unsigned(info_of(n), p))?;
                 }
@@ -638,9 +814,11 @@ impl<'b> Decoder<'b> {
                     self.read()?;
                     irounds = irounds.saturating_sub(1)
                 }
-                other => return Err(Error::type_mismatch(self.type_of(other)?)
-                    .at(self.pos)
-                    .with_message("not supported"))
+                other => {
+                    return Err(Error::type_mismatch(self.type_of(other)?)
+                        .at(self.pos)
+                        .with_message("not supported"));
+                }
             }
             nrounds = nrounds.saturating_sub(1)
         }
@@ -651,21 +829,21 @@ impl<'b> Decoder<'b> {
     /// Decode a `u64` value beginning with `b`.
     pub(crate) fn unsigned(&mut self, b: u8, p: usize) -> Result<u64, Error> {
         match b {
-            n @ 0 ..= 0x17 => Ok(u64::from(n)),
+            n @ 0..=0x17 => Ok(u64::from(n)),
             0x18 => self.read().map(u64::from),
             0x19 => self.read_array().map(u16::from_be_bytes).map(u64::from),
             0x1a => self.read_array().map(u32::from_be_bytes).map(u64::from),
             0x1b => self.read_array().map(u64::from_be_bytes),
-            _    => Err(Error::type_mismatch(self.type_of(b)?)
+            _ => Err(Error::type_mismatch(self.type_of(b)?)
                 .with_message("expected u64")
-                .at(p))
+                .at(p)),
         }
     }
 
     /// Get the byte at the current position.
     fn current(&self) -> Result<u8, Error> {
         if let Some(b) = self.buf.get(self.pos) {
-            return Ok(*b)
+            return Ok(*b);
         }
         Err(Error::end_of_input())
     }
@@ -674,23 +852,28 @@ impl<'b> Decoder<'b> {
     fn read(&mut self) -> Result<u8, Error> {
         if let Some(b) = self.buf.get(self.pos) {
             self.pos += 1;
-            return Ok(*b)
+            return Ok(*b);
         }
         Err(Error::end_of_input())
     }
 
     /// Peek to the next byte.
     fn peek(&self) -> Result<u8, Error> {
-        self.pos.checked_add(1)
+        self.pos
+            .checked_add(1)
             .and_then(|i| self.buf.get(i).copied())
             .ok_or_else(Error::end_of_input)
     }
 
     /// Consume and return *n* bytes starting at the current position.
     fn read_slice(&mut self, n: usize) -> Result<&'b [u8], Error> {
-        if let Some(b) = self.pos.checked_add(n).and_then(|end| self.buf.get(self.pos .. end)) {
+        if let Some(b) = self
+            .pos
+            .checked_add(n)
+            .and_then(|end| self.buf.get(self.pos..end))
+        {
             self.pos += n;
-            return Ok(b)
+            return Ok(b);
         }
         Err(Error::end_of_input())
     }
@@ -707,33 +890,57 @@ impl<'b> Decoder<'b> {
     /// Map the given byte to a [`Type`].
     fn type_of(&self, n: u8) -> Result<Type, Error> {
         Ok(match n {
-            0x00 ..= 0x18        => Type::U8,
-            0x19                 => Type::U16,
-            0x1a                 => Type::U32,
-            0x1b                 => Type::U64,
-            0x20 ..= 0x37        => Type::I8,
-            0x38                 => if self.peek()? < 0x80 { Type::I8  } else { Type::I16 }
-            0x39                 => if self.peek()? < 0x80 { Type::I16 } else { Type::I32 }
-            0x3a                 => if self.peek()? < 0x80 { Type::I32 } else { Type::I64 }
-            0x3b                 => if self.peek()? < 0x80 { Type::I64 } else { Type::Int }
-            0x40 ..= 0x5b        => Type::Bytes,
-            0x5f                 => Type::BytesIndef,
-            0x60 ..= 0x7b        => Type::String,
-            0x7f                 => Type::StringIndef,
-            0x80 ..= 0x9b        => Type::Array,
-            0x9f                 => Type::ArrayIndef,
-            0xa0 ..= 0xbb        => Type::Map,
-            0xbf                 => Type::MapIndef,
-            0xc0 ..= 0xdb        => Type::Tag,
-            0xe0 ..= 0xf3 | 0xf8 => Type::Simple,
-            0xf4 | 0xf5          => Type::Bool,
-            0xf6                 => Type::Null,
-            0xf7                 => Type::Undefined,
-            0xf9                 => Type::F16,
-            0xfa                 => Type::F32,
-            0xfb                 => Type::F64,
-            0xff                 => Type::Break,
-            n                    => Type::Unknown(n)
+            0x00..=0x18 => Type::U8,
+            0x19 => Type::U16,
+            0x1a => Type::U32,
+            0x1b => Type::U64,
+            0x20..=0x37 => Type::I8,
+            0x38 => {
+                if self.peek()? < 0x80 {
+                    Type::I8
+                } else {
+                    Type::I16
+                }
+            }
+            0x39 => {
+                if self.peek()? < 0x80 {
+                    Type::I16
+                } else {
+                    Type::I32
+                }
+            }
+            0x3a => {
+                if self.peek()? < 0x80 {
+                    Type::I32
+                } else {
+                    Type::I64
+                }
+            }
+            0x3b => {
+                if self.peek()? < 0x80 {
+                    Type::I64
+                } else {
+                    Type::Int
+                }
+            }
+            0x40..=0x5b => Type::Bytes,
+            0x5f => Type::BytesIndef,
+            0x60..=0x7b => Type::String,
+            0x7f => Type::StringIndef,
+            0x80..=0x9b => Type::Array,
+            0x9f => Type::ArrayIndef,
+            0xa0..=0xbb => Type::Map,
+            0xbf => Type::MapIndef,
+            0xc0..=0xdb => Type::Tag,
+            0xe0..=0xf3 | 0xf8 => Type::Simple,
+            0xf4 | 0xf5 => Type::Bool,
+            0xf6 => Type::Null,
+            0xf7 => Type::Undefined,
+            0xf9 => Type::F16,
+            0xfa => Type::F32,
+            0xfb => Type::F64,
+            0xff => Type::Break,
+            n => Type::Unknown(n),
         })
     }
 }
@@ -744,7 +951,7 @@ impl<'b> Decoder<'b> {
 #[derive(Debug)]
 pub struct BytesIter<'a, 'b> {
     decoder: &'a mut Decoder<'b>,
-    state: State<usize>
+    state: State<usize>,
 }
 
 impl<'a, 'b> Iterator for BytesIter<'a, 'b> {
@@ -757,10 +964,10 @@ impl<'a, 'b> Iterator for BytesIter<'a, 'b> {
                     self.state = State::End;
                     self.decoder.read().map(|_| None).transpose()
                 }
-                Ok(_)  => Some(self.decoder.bytes()),
-                Err(e) => Some(Err(e))
-            }
-            State::End    => None,
+                Ok(_) => Some(self.decoder.bytes()),
+                Err(e) => Some(Err(e)),
+            },
+            State::End => None,
             State::Def(n) => {
                 self.state = State::End;
                 Some(self.decoder.read_slice(n))
@@ -771,8 +978,8 @@ impl<'a, 'b> Iterator for BytesIter<'a, 'b> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         match self.state {
             State::Def(_) => (1, Some(1)),
-            State::End    => (0, Some(0)),
-            State::Indef  => (0, None)
+            State::End => (0, Some(0)),
+            State::Indef => (0, None),
         }
     }
 }
@@ -784,7 +991,7 @@ impl<'a, 'b> Iterator for BytesIter<'a, 'b> {
 pub struct StrIter<'a, 'b> {
     decoder: &'a mut Decoder<'b>,
     state: State<usize>,
-    pos: usize
+    pos: usize,
 }
 
 impl<'a, 'b> Iterator for StrIter<'a, 'b> {
@@ -797,15 +1004,17 @@ impl<'a, 'b> Iterator for StrIter<'a, 'b> {
                     self.state = State::End;
                     self.decoder.read().map(|_| None).transpose()
                 }
-                Ok(_)  => Some(self.decoder.str()),
-                Err(e) => Some(Err(e))
-            }
-            State::End    => None,
+                Ok(_) => Some(self.decoder.str()),
+                Err(e) => Some(Err(e)),
+            },
+            State::End => None,
             State::Def(n) => {
                 self.state = State::End;
-                Some(self.decoder.read_slice(n).and_then(|d| {
-                    str::from_utf8(d).map_err(|e| Error::utf8(e).at(self.pos))
-                }))
+                Some(
+                    self.decoder
+                        .read_slice(n)
+                        .and_then(|d| str::from_utf8(d).map_err(|e| Error::utf8(e).at(self.pos))),
+                )
             }
         }
     }
@@ -813,8 +1022,8 @@ impl<'a, 'b> Iterator for StrIter<'a, 'b> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         match self.state {
             State::Def(_) => (1, Some(1)),
-            State::End    => (0, Some(0)),
-            State::Indef  => (0, None)
+            State::End => (0, Some(0)),
+            State::Indef => (0, None),
         }
     }
 }
@@ -826,7 +1035,7 @@ impl<'a, 'b> Iterator for StrIter<'a, 'b> {
 pub struct ArrayIter<'a, 'b, T> {
     decoder: &'a mut Decoder<'b>,
     state: State<u64>,
-    _mark: marker::PhantomData<fn(T)>
+    _mark: marker::PhantomData<fn(T)>,
 }
 
 impl<'a, 'b, T: Decode<'b, ()>> Iterator for ArrayIter<'a, 'b, T> {
@@ -839,9 +1048,9 @@ impl<'a, 'b, T: Decode<'b, ()>> Iterator for ArrayIter<'a, 'b, T> {
                     self.state = State::End;
                     self.decoder.read().map(|_| None).transpose()
                 }
-                Ok(_)  => Some(T::decode(self.decoder, &mut ())),
-                Err(e) => Some(Err(e))
-            }
+                Ok(_) => Some(T::decode(self.decoder, &mut ())),
+                Err(e) => Some(Err(e)),
+            },
             State::Def(0) | State::End => None,
             State::Def(n) => {
                 self.state = State::Def(n - 1);
@@ -863,7 +1072,7 @@ pub struct ArrayIterWithCtx<'a, 'b, C, T> {
     decoder: &'a mut Decoder<'b>,
     ctx: &'a mut C,
     state: State<u64>,
-    _mark: marker::PhantomData<fn(T)>
+    _mark: marker::PhantomData<fn(T)>,
 }
 
 impl<'a, 'b, C, T: Decode<'b, C>> Iterator for ArrayIterWithCtx<'a, 'b, C, T> {
@@ -876,9 +1085,9 @@ impl<'a, 'b, C, T: Decode<'b, C>> Iterator for ArrayIterWithCtx<'a, 'b, C, T> {
                     self.state = State::End;
                     self.decoder.read().map(|_| None).transpose()
                 }
-                Ok(_)  => Some(T::decode(self.decoder, self.ctx)),
-                Err(e) => Some(Err(e))
-            }
+                Ok(_) => Some(T::decode(self.decoder, self.ctx)),
+                Err(e) => Some(Err(e)),
+            },
             State::Def(0) | State::End => None,
             State::Def(n) => {
                 self.state = State::Def(n - 1);
@@ -899,13 +1108,13 @@ impl<'a, 'b, C, T: Decode<'b, C>> Iterator for ArrayIterWithCtx<'a, 'b, C, T> {
 pub struct MapIter<'a, 'b, K, V> {
     decoder: &'a mut Decoder<'b>,
     state: State<u64>,
-    _mark: marker::PhantomData<fn(K, V)>
+    _mark: marker::PhantomData<fn(K, V)>,
 }
 
 impl<'a, 'b, K, V> Iterator for MapIter<'a, 'b, K, V>
 where
     K: Decode<'b, ()>,
-    V: Decode<'b, ()>
+    V: Decode<'b, ()>,
 {
     type Item = Result<(K, V), Error>;
 
@@ -913,7 +1122,7 @@ where
         fn pair<'b, K, V>(d: &mut Decoder<'b>) -> Result<(K, V), Error>
         where
             K: Decode<'b, ()>,
-            V: Decode<'b, ()>
+            V: Decode<'b, ()>,
         {
             Ok((K::decode(d, &mut ())?, V::decode(d, &mut ())?))
         }
@@ -923,9 +1132,9 @@ where
                     self.state = State::End;
                     self.decoder.read().map(|_| None).transpose()
                 }
-                Ok(_)  => Some(pair(self.decoder)),
-                Err(e) => Some(Err(e))
-            }
+                Ok(_) => Some(pair(self.decoder)),
+                Err(e) => Some(Err(e)),
+            },
             State::Def(0) | State::End => None,
             State::Def(n) => {
                 self.state = State::Def(n - 1);
@@ -947,13 +1156,13 @@ pub struct MapIterWithCtx<'a, 'b, C, K, V> {
     decoder: &'a mut Decoder<'b>,
     ctx: &'a mut C,
     state: State<u64>,
-    _mark: marker::PhantomData<fn(K, V)>
+    _mark: marker::PhantomData<fn(K, V)>,
 }
 
 impl<'a, 'b, C, K, V> Iterator for MapIterWithCtx<'a, 'b, C, K, V>
 where
     K: Decode<'b, C>,
-    V: Decode<'b, C>
+    V: Decode<'b, C>,
 {
     type Item = Result<(K, V), Error>;
 
@@ -961,7 +1170,7 @@ where
         fn pair<'b, C, K, V>(d: &mut Decoder<'b>, ctx: &mut C) -> Result<(K, V), Error>
         where
             K: Decode<'b, C>,
-            V: Decode<'b, C>
+            V: Decode<'b, C>,
         {
             Ok((K::decode(d, ctx)?, V::decode(d, ctx)?))
         }
@@ -971,9 +1180,9 @@ where
                     self.state = State::End;
                     self.decoder.read().map(|_| None).transpose()
                 }
-                Ok(_)  => Some(pair(self.decoder, self.ctx)),
-                Err(e) => Some(Err(e))
-            }
+                Ok(_) => Some(pair(self.decoder, self.ctx)),
+                Err(e) => Some(Err(e)),
+            },
             State::Def(0) | State::End => None,
             State::Def(n) => {
                 self.state = State::Def(n - 1);
@@ -995,7 +1204,7 @@ enum State<T> {
     /// End of iteration.
     End,
     /// Indefinite length.
-    Indef
+    Indef,
 }
 
 impl<T> From<Option<T>> for State<T> {
@@ -1010,17 +1219,16 @@ impl<T> From<Option<T>> for State<T> {
 
 impl<T> State<T>
 where
-    usize: TryFrom<T>
+    usize: TryFrom<T>,
 {
     fn into_size_hint(self) -> (usize, Option<usize>) {
         match self {
-            Self::Def(n) =>
-                usize::try_from(n)
-                    .ok()
-                    .map(|n| (n, Some(n)))
-                    .unwrap_or_default(),
-            Self::End   => (0, Some(0)),
-            Self::Indef => (0, None)
+            Self::Def(n) => usize::try_from(n)
+                .ok()
+                .map(|n| (n, Some(n)))
+                .unwrap_or_default(),
+            Self::End => (0, Some(0)),
+            Self::Indef => (0, None),
         }
     }
 }
@@ -1039,7 +1247,7 @@ where
 #[derive(Debug)]
 pub struct Probe<'a, 'b> {
     decoder: Decoder<'b>,
-    _marker: marker::PhantomData<&'a mut ()>
+    _marker: marker::PhantomData<&'a mut ()>,
 }
 
 impl<'b> core::ops::Deref for Probe<'_, 'b> {
@@ -1067,12 +1275,17 @@ pub(crate) fn info_of(b: u8) -> u8 {
 }
 
 fn u64_to_usize(n: u64, pos: usize) -> Result<usize, Error> {
-    n.try_into().map_err(|_| Error::overflow(n).at(pos).with_message("when converting u64 to usize"))
+    n.try_into().map_err(|_| {
+        Error::overflow(n)
+            .at(pos)
+            .with_message("when converting u64 to usize")
+    })
 }
 
 fn try_as<A, B>(val: A, msg: &'static str, pos: usize) -> Result<B, Error>
 where
-    A: TryInto<B> + Into<u64> + Copy
+    A: TryInto<B> + Into<u64> + Copy,
 {
-    val.try_into().map_err(|_| Error::overflow(val.into()).at(pos).with_message(msg))
+    val.try_into()
+        .map_err(|_| Error::overflow(val.into()).at(pos).with_message(msg))
 }

@@ -12,7 +12,7 @@ pub struct AsyncWriter<W> {
     writer: W,
     buffer: Vec<u8>,
     max_len: usize,
-    state: State
+    state: State,
 }
 
 /// Write state.
@@ -21,7 +21,7 @@ enum State {
     /// Nothing is written at the moment.
     None,
     /// Writing buffer from offset.
-    WriteFrom(usize)
+    WriteFrom(usize),
 }
 
 impl<W> AsyncWriter<W> {
@@ -32,7 +32,12 @@ impl<W> AsyncWriter<W> {
 
     /// Create a new writer with a max. buffer size of 512KiB.
     pub fn with_buffer(writer: W, buffer: Vec<u8>) -> Self {
-        Self { writer, buffer, max_len: 512 * 1024, state: State::None }
+        Self {
+            writer,
+            buffer,
+            max_len: 512 * 1024,
+            state: State::None,
+        }
     }
 
     /// Set the max. buffer size in bytes.
@@ -78,14 +83,18 @@ impl<W: AsyncWrite + Unpin> AsyncWriter<W> {
     }
 
     /// Like [`AsyncWriter::write`] but accepting a user provided encoding context.
-    pub async fn write_with<C, T: Encode<C>>(&mut self, val: T, ctx: &mut C) -> Result<usize, Error> {
+    pub async fn write_with<C, T: Encode<C>>(
+        &mut self,
+        val: T,
+        ctx: &mut C,
+    ) -> Result<usize, Error> {
         self.buffer.resize(4, 0u8);
         minicbor::encode_with(val, &mut self.buffer, ctx)?;
         if self.buffer.len() - 4 > self.max_len {
-            return Err(Error::InvalidLen)
+            return Err(Error::InvalidLen);
         }
         let prefix = (self.buffer.len() as u32 - 4).to_be_bytes();
-        self.buffer[.. 4].copy_from_slice(&prefix);
+        self.buffer[..4].copy_from_slice(&prefix);
         self.state = State::WriteFrom(0);
 
         self.sync().await?;
@@ -101,17 +110,15 @@ impl<W: AsyncWrite + Unpin> AsyncWriter<W> {
     pub async fn sync(&mut self) -> Result<(), Error> {
         loop {
             match self.state {
-                State::None => {
-                    return Ok(())
-                }
+                State::None => return Ok(()),
                 State::WriteFrom(o) if o >= self.buffer.len() => {
                     self.state = State::None;
-                    return Ok(())
+                    return Ok(());
                 }
                 State::WriteFrom(ref mut o) => {
-                    let n = self.writer.write(&self.buffer[*o ..]).await?;
+                    let n = self.writer.write(&self.buffer[*o..]).await?;
                     if n == 0 {
-                        return Err(Error::Io(io::ErrorKind::WriteZero.into()))
+                        return Err(Error::Io(io::ErrorKind::WriteZero.into()));
                     }
                     *o += n
                 }

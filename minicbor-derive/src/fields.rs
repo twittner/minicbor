@@ -1,13 +1,13 @@
-use crate::attrs::{Attributes, Idx, Kind, Level};
 use crate::attrs::idx;
+use crate::attrs::{Attributes, Idx, Kind, Level};
 use proc_macro2::Span;
-use syn::{Ident, Type};
 use syn::spanned::Spanned;
+use syn::{Ident, Type};
 
 #[derive(Debug, Clone)]
 pub struct Fields {
     fields: Vec<Field>,
-    skipped: Vec<Field>
+    skipped: Vec<Field>,
 }
 
 #[derive(Debug, Clone)]
@@ -25,18 +25,21 @@ pub struct Field {
     /// field attributes
     pub attrs: Attributes,
     /// the original syn field
-    pub orig: syn::Field
+    pub orig: syn::Field,
 }
 
 impl Fields {
     pub fn try_from<'a, I>(span: Span, iter: I, parents: &[&Attributes]) -> syn::Result<Self>
     where
-        I: IntoIterator<Item = &'a syn::Field>
+        I: IntoIterator<Item = &'a syn::Field>,
     {
-        let mut fields  = Vec::new();
+        let mut fields = Vec::new();
         let mut skipped = Vec::new();
 
-        let encoding = parents.iter().find_map(|p| p.encoding()).unwrap_or_default();
+        let encoding = parents
+            .iter()
+            .find_map(|p| p.encoding())
+            .unwrap_or_default();
 
         for (pos, f) in iter.into_iter().enumerate() {
             let attrs = Attributes::try_from_iter(Level::Field, &f.attrs)?;
@@ -49,22 +52,41 @@ impl Fields {
             } else if parents.last().map(|p| p.transparent()).unwrap_or(false) {
                 Idx::N(i64::MAX)
             } else {
-                let s = f.ident.as_ref().map(|i| i.span()).unwrap_or_else(|| f.ty.span());
-                return Err(syn::Error::new(s, "missing `#[n(...)]` or `#[b(...)]` attribute"))
+                let s = f
+                    .ident
+                    .as_ref()
+                    .map(|i| i.span())
+                    .unwrap_or_else(|| f.ty.span());
+                return Err(syn::Error::new(
+                    s,
+                    "missing `#[n(...)]` or `#[b(...)]` attribute",
+                ));
             };
             if index.val().is_negative() && encoding.is_array() {
-                let s = attrs.span(Kind::Index)
+                let s = attrs
+                    .span(Kind::Index)
                     .or_else(|| f.ident.as_ref().map(|i| i.span()))
                     .unwrap_or_else(|| f.ty.span());
-                return Err(syn::Error::new(s, "array encoding does not support fields with negative indices"))
+                return Err(syn::Error::new(
+                    s,
+                    "array encoding does not support fields with negative indices",
+                ));
             }
             let (ident, is_name) = match &f.ident {
                 Some(n) => (n.clone(), true),
-                None    => (quote::format_ident!("_{}", pos), false)
+                None => (quote::format_ident!("_{}", pos), false),
             };
-            let typ  = f.ty.clone();
+            let typ = f.ty.clone();
             let skip = attrs.skip();
-            let fld  = Field { pos, index, ident, is_name, typ, attrs, orig: f.clone() };
+            let fld = Field {
+                pos,
+                index,
+                ident,
+                is_name,
+                typ,
+                attrs,
+                orig: f.clone(),
+            };
 
             if skip {
                 skipped.push(fld)
@@ -91,8 +113,14 @@ impl Fields {
     ///
     /// To be used when matching identifiers by position, e.g. in tuples.
     pub fn match_idents(&self) -> Vec<syn::Ident> {
-        let idents  = self.fields().positions().zip(self.fields().idents().cloned());
-        let skipped = self.skipped().positions().zip(self.skipped().idents().map(|_| quote::format_ident!("_")));
+        let idents = self
+            .fields()
+            .positions()
+            .zip(self.fields().idents().cloned());
+        let skipped = self
+            .skipped()
+            .positions()
+            .zip(self.skipped().idents().map(|_| quote::format_ident!("_")));
         let mut all = idents.chain(skipped).collect::<Vec<_>>();
         all.sort_unstable_by_key(|(p, _)| *p);
         all.into_iter().map(|(_, i)| i).collect()
@@ -108,7 +136,7 @@ impl<'a> Iterator for FieldIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(x) = self.0.get(self.1) {
             self.1 += 1;
-            return Some(x)
+            return Some(x);
         }
         None
     }

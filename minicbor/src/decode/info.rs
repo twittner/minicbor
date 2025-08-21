@@ -1,7 +1,10 @@
 //! Introspection utilities.
 
-use crate::{BYTES, TEXT, ARRAY, MAP, SIMPLE, TAGGED, SIGNED, UNSIGNED, Decoder, data::Type};
-use super::{decoder::{info_of, type_of}, Error};
+use super::{
+    Error,
+    decoder::{info_of, type_of},
+};
+use crate::{ARRAY, BYTES, Decoder, MAP, SIGNED, SIMPLE, TAGGED, TEXT, UNSIGNED, data::Type};
 
 /// Information about a CBOR item size.
 ///
@@ -26,23 +29,23 @@ pub enum Size {
     /// The item is an array or map with the given number of items.
     Items(u64),
     /// The item is an indefinite value.
-    Indef
+    Indef,
 }
 
 impl Size {
     /// Given the first byte, derive the length of the item head.
     pub fn head(fst: u8) -> Result<usize, Error> {
         match info_of(fst) {
-            0 ..= 0x17 => Ok(1),
+            0..=0x17 => Ok(1),
             0x18 => Ok(2),
             0x19 => Ok(3),
             0x1a => Ok(5),
             0x1b => Ok(9),
             0x1f => match type_of(fst) {
                 BYTES | TEXT | ARRAY | MAP | SIMPLE => Ok(1),
-                _ => Err(Error::message("invalid data item head"))
-            }
-            _ => Err(Error::message("invalid data item head"))
+                _ => Err(Error::message("invalid data item head")),
+            },
+            _ => Err(Error::message("invalid data item head")),
         }
     }
 
@@ -54,24 +57,26 @@ impl Size {
             BYTES | TEXT => match info_of(fst) {
                 0x1f => Ok(Self::Indef),
                 info => {
-                    let mut d = Decoder::new(&head[1 ..]);
+                    let mut d = Decoder::new(&head[1..]);
                     let p = d.position();
                     let n = d.unsigned(info, p)?;
                     Ok(Self::Bytes(n))
                 }
-            }
+            },
             ARRAY | MAP => match info_of(fst) {
                 0x1f => Ok(Self::Indef),
                 info => {
-                    let mut d = Decoder::new(&head[1 ..]);
+                    let mut d = Decoder::new(&head[1..]);
                     let p = d.position();
                     let n = d.unsigned(info, p)?;
                     Ok(Self::Items(n))
                 }
-            }
+            },
             n => {
                 let t = Type::Unknown(n);
-                Err(Error::type_mismatch(t).at(0).with_message("unknown cbor type"))
+                Err(Error::type_mismatch(t)
+                    .at(0)
+                    .with_message("unknown cbor type"))
             }
         }
     }

@@ -8,7 +8,7 @@ pub enum Idx {
     /// A regular, non-borrowing index.
     N(i64),
     /// An index which indicates that the value borrows from the decoding input.
-    B(i64)
+    B(i64),
 }
 
 impl ToTokens for Idx {
@@ -27,7 +27,7 @@ impl Idx {
     pub fn val(self) -> i64 {
         match self {
             Idx::N(i) => i,
-            Idx::B(i) => i
+            Idx::B(i) => i,
         }
     }
 
@@ -40,7 +40,7 @@ impl Idx {
 /// Check that there are no duplicate `Idx` values in `iter`.
 pub fn check_uniq<I>(s: Span, iter: I) -> syn::Result<()>
 where
-    I: IntoIterator<Item = Idx>
+    I: IntoIterator<Item = Idx>,
 {
     let mut set = HashSet::new();
     let mut ctr = 0;
@@ -49,8 +49,7 @@ where
         ctr += 1;
     }
     if ctr != set.len() {
-        return Err(syn::Error::new(s, "duplicate index numbers"))
+        return Err(syn::Error::new(s, "duplicate index numbers"));
     }
     Ok(())
 }
-

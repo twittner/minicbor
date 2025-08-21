@@ -15,14 +15,17 @@
 //! `#[cbor(with = "minicbor::bytes")]` annotation.
 
 use crate::decode::{self, Decode, Decoder};
-use crate::encode::{self, Encode, Encoder, Write, CborLen};
+use crate::encode::{self, CborLen, Encode, Encoder, Write};
 use core::ops::{Deref, DerefMut};
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 #[cfg(all(feature = "alloc", feature = "derive"))]
-use alloc::{boxed::Box, borrow::{Cow, ToOwned}};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    boxed::Box,
+};
 
 /// Newtype for `[u8]`.
 ///
@@ -34,17 +37,13 @@ pub struct ByteSlice([u8]);
 
 impl<'a> From<&'a [u8]> for &'a ByteSlice {
     fn from(xs: &'a [u8]) -> Self {
-        unsafe {
-            &*(xs as *const [u8] as *const ByteSlice)
-        }
+        unsafe { &*(xs as *const [u8] as *const ByteSlice) }
     }
 }
 
 impl<'a> From<&'a mut [u8]> for &'a mut ByteSlice {
     fn from(xs: &'a mut [u8]) -> Self {
-        unsafe {
-            &mut *(xs as *mut [u8] as *mut ByteSlice)
-        }
+        unsafe { &mut *(xs as *mut [u8] as *mut ByteSlice) }
     }
 }
 
@@ -81,7 +80,11 @@ impl<'a, 'b: 'a, C> Decode<'b, C> for &'a ByteSlice {
 }
 
 impl<C> Encode<C> for ByteSlice {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         e.bytes(self)?.ok()
     }
 }
@@ -190,7 +193,7 @@ impl<const N: usize> AsMut<[u8; N]> for ByteArray<N> {
 
 impl<'b, C, const N: usize> Decode<'b, C> for ByteArray<N> {
     fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, decode::Error> {
-        let pos   = d.position();
+        let pos = d.position();
         let slice = d.bytes()?;
         let array = <[u8; N]>::try_from(slice).map_err(|_| {
             decode::Error::message("byte slice length does not match expected array length").at(pos)
@@ -200,7 +203,11 @@ impl<'b, C, const N: usize> Decode<'b, C> for ByteArray<N> {
 }
 
 impl<C, const N: usize> Encode<C> for ByteArray<N> {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         e.bytes(&self.0[..])?.ok()
     }
 }
@@ -258,7 +265,11 @@ impl<C> Decode<'_, C> for ByteVec {
 
 #[cfg(feature = "alloc")]
 impl<C> Encode<C> for ByteVec {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         e.bytes(self)?.ok()
     }
 }
@@ -276,7 +287,11 @@ impl<C> CborLen<C> for ByteVec {
 /// Like [`Encode`] but specific for encoding of byte slices.
 #[cfg(feature = "derive")]
 pub trait EncodeBytes<C> {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>>;
+    fn encode_bytes<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), encode::Error<W::Error>>;
 
     fn is_nil(&self) -> bool {
         false
@@ -301,14 +316,22 @@ pub trait CborLenBytes<C> {
 
 #[cfg(feature = "derive")]
 impl<'a, C, T: EncodeBytes<C> + ?Sized> EncodeBytes<C> for &'a T {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode_bytes<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         (**self).encode_bytes(e, ctx)
     }
 }
 
 #[cfg(feature = "derive")]
 impl<C> EncodeBytes<C> for [u8] {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode_bytes<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         e.bytes(self)?.ok()
     }
 }
@@ -337,7 +360,11 @@ impl<C> CborLenBytes<C> for [u8] {
 
 #[cfg(feature = "derive")]
 impl<C, const N: usize> EncodeBytes<C> for [u8; N] {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode_bytes<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         e.bytes(&self[..])?.ok()
     }
 }
@@ -358,7 +385,11 @@ impl<C, const N: usize> CborLenBytes<C> for [u8; N] {
 
 #[cfg(all(feature = "alloc", feature = "derive"))]
 impl<C> EncodeBytes<C> for Vec<u8> {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode_bytes<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         e.bytes(self.as_slice())?.ok()
     }
 }
@@ -380,7 +411,11 @@ impl<C> CborLenBytes<C> for Vec<u8> {
 
 #[cfg(all(feature = "alloc", feature = "derive"))]
 impl<C> EncodeBytes<C> for Box<[u8]> {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode_bytes<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         e.bytes(self)?.ok()
     }
 }
@@ -402,7 +437,11 @@ impl<C> CborLenBytes<C> for Box<[u8]> {
 
 #[cfg(feature = "derive")]
 impl<C> EncodeBytes<C> for ByteSlice {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode_bytes<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         Self::encode(self, e, ctx)
     }
 }
@@ -423,7 +462,11 @@ impl<C> CborLenBytes<C> for ByteSlice {
 
 #[cfg(feature = "derive")]
 impl<C, const N: usize> EncodeBytes<C> for ByteArray<N> {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode_bytes<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         Self::encode(self, e, ctx)
     }
 }
@@ -444,7 +487,11 @@ impl<C, const N: usize> CborLenBytes<C> for ByteArray<N> {
 
 #[cfg(all(feature = "alloc", feature = "derive"))]
 impl<C> EncodeBytes<C> for ByteVec {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode_bytes<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         Self::encode(self, e, ctx)
     }
 }
@@ -465,7 +512,11 @@ impl<C> CborLenBytes<C> for ByteVec {
 
 #[cfg(feature = "derive")]
 impl<C, T: EncodeBytes<C>> EncodeBytes<C> for Option<T> {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode_bytes<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         if let Some(x) = self {
             x.encode_bytes(e, ctx)
         } else {
@@ -483,7 +534,7 @@ impl<'b, C, T: DecodeBytes<'b, C>> DecodeBytes<'b, C> for Option<T> {
     fn decode_bytes(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, decode::Error> {
         if crate::data::Type::Null == d.datatype()? {
             d.skip()?;
-            return Ok(None)
+            return Ok(None);
         }
         T::decode_bytes(d, ctx).map(Some)
     }
@@ -506,7 +557,11 @@ impl<C, T: CborLenBytes<C>> CborLenBytes<C> for Option<T> {
 
 #[cfg(all(feature = "alloc", feature = "derive"))]
 impl<C> EncodeBytes<C> for Cow<'_, [u8]> {
-    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode_bytes<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         self.as_ref().encode_bytes(e, ctx)
     }
 }
@@ -533,7 +588,7 @@ impl<C> CborLenBytes<C> for Cow<'_, [u8]> {
 #[cfg(feature = "derive")]
 pub fn decode<'b, C, T>(d: &mut Decoder<'b>, ctx: &mut C) -> Result<T, decode::Error>
 where
-    T: DecodeBytes<'b, C>
+    T: DecodeBytes<'b, C>,
 {
     T::decode_bytes(d, ctx)
 }
@@ -541,7 +596,7 @@ where
 #[cfg(feature = "derive")]
 pub fn nil<'b, C, T>() -> Option<T>
 where
-    T: DecodeBytes<'b, C>
+    T: DecodeBytes<'b, C>,
 {
     T::nil()
 }
@@ -551,10 +606,14 @@ where
 /// For use in `#[cbor(with = "minicbor::bytes")]` or `#[cbor(encode_with =
 /// "minicbor::bytes::encode")]`.
 #[cfg(feature = "derive")]
-pub fn encode<C, T, W>(xs: &T, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>>
+pub fn encode<C, T, W>(
+    xs: &T,
+    e: &mut Encoder<W>,
+    ctx: &mut C,
+) -> Result<(), encode::Error<W::Error>>
 where
     T: EncodeBytes<C>,
-    W: Write
+    W: Write,
 {
     T::encode_bytes(xs, e, ctx)
 }
@@ -562,7 +621,7 @@ where
 #[cfg(feature = "derive")]
 pub fn is_nil<C, T>(xs: &T) -> bool
 where
-    T: EncodeBytes<C>
+    T: EncodeBytes<C>,
 {
     T::is_nil(xs)
 }
@@ -570,7 +629,7 @@ where
 #[cfg(feature = "derive")]
 pub fn cbor_len<C, T>(xs: T, ctx: &mut C) -> usize
 where
-    T: CborLenBytes<C>
+    T: CborLenBytes<C>,
 {
     xs.cbor_len(ctx)
 }

@@ -3,7 +3,7 @@
 pub enum Encoding {
     #[default]
     Array,
-    Map
+    Map,
 }
 
 impl Encoding {

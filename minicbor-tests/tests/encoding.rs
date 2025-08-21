@@ -1,6 +1,6 @@
 #![cfg(feature = "std")]
 
-use minicbor::{Encode, Decode, CborLen};
+use minicbor::{CborLen, Decode, Encode};
 
 const NULL: u8 = 0xf6;
 
@@ -9,48 +9,75 @@ fn encode_as_array() {
     #[derive(Debug, Encode, Decode, PartialEq, Eq)]
     #[cbor(array)]
     struct T {
-        #[n(0)] a: Option<u8>,
-        #[n(2)] b: Option<u8>,
-        #[n(5)] c: Option<u8>
+        #[n(0)]
+        a: Option<u8>,
+        #[n(2)]
+        b: Option<u8>,
+        #[n(5)]
+        c: Option<u8>,
     }
 
     // empty value => empty array
-    let v = T { a: None, b: None, c: None };
+    let v = T {
+        a: None,
+        b: None,
+        c: None,
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0x80][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // empty suffix is not encoded
-    let v = T { a: Some(1), b: None, c: None };
+    let v = T {
+        a: Some(1),
+        b: None,
+        c: None,
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0x81, 1][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are filled with nulls
-    let v = T { a: Some(1), b: Some(2), c: None };
+    let v = T {
+        a: Some(1),
+        b: Some(2),
+        c: None,
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0x83, 1, NULL, 2][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // more gaps to fill
-    let v = T { a: Some(1), b: Some(2), c: Some(3) };
+    let v = T {
+        a: Some(1),
+        b: Some(2),
+        c: Some(3),
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0x86, 1, NULL, 2, NULL, NULL, 3][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // and even more
-    let v = T { a: Some(1), b: None, c: Some(3) };
+    let v = T {
+        a: Some(1),
+        b: None,
+        c: Some(3),
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0x86, 1, NULL, NULL, NULL, NULL, 3][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // empty prefix is filled with nulls too
-    let v = T { a: None, b: None, c: Some(3) };
+    let v = T {
+        a: None,
+        b: None,
+        c: Some(3),
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0x86, NULL, NULL, NULL, NULL, NULL, 3][..], &bytes[..]);
@@ -62,50 +89,91 @@ fn encode_as_map() {
     #[derive(Debug, Encode, Decode, PartialEq, Eq)]
     #[cbor(map)]
     struct T {
-        #[n(0)] a: Option<u8>,
-        #[n(2)] b: Option<u8>,
-        #[n(5)] c: Option<u8>,
-        #[n(-1)] d: Option<u8>,
-        #[n(-100)] e: Option<u8>
+        #[n(0)]
+        a: Option<u8>,
+        #[n(2)]
+        b: Option<u8>,
+        #[n(5)]
+        c: Option<u8>,
+        #[n(-1)]
+        d: Option<u8>,
+        #[n(-100)]
+        e: Option<u8>,
     }
 
     // empty value => empty map
-    let v = T { a: None, b: None, c: None, d: None, e: None };
+    let v = T {
+        a: None,
+        b: None,
+        c: None,
+        d: None,
+        e: None,
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa0][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // empty suffix is not encoded
-    let v = T { a: Some(1), b: None, c: None, d: None, e: None };
+    let v = T {
+        a: Some(1),
+        b: None,
+        c: None,
+        d: None,
+        e: None,
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa1, 0, 1][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
-    let v = T { a: Some(1), b: Some(2), c: None, d: None, e: None };
+    let v = T {
+        a: Some(1),
+        b: Some(2),
+        c: None,
+        d: None,
+        e: None,
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa2, 0, 1, 2, 2][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
-    let v = T { a: Some(1), b: Some(2), c: Some(3), d: Some(4), e: Some(5) };
+    let v = T {
+        a: Some(1),
+        b: Some(2),
+        c: Some(3),
+        d: Some(4),
+        e: Some(5),
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa5, 0, 1, 2, 2, 5, 3, 32, 4, 56, 99, 5][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
-    let v = T { a: Some(1), b: None, c: Some(3), d: Some(4), e: Some(5) };
+    let v = T {
+        a: Some(1),
+        b: None,
+        c: Some(3),
+        d: Some(4),
+        e: Some(5),
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa4, 0, 1, 5, 3, 32, 4, 56, 99, 5][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
     // gaps are not encoded
-    let v = T { a: None, b: None, c: Some(3), d: Some(4), e: Some(5) };
+    let v = T {
+        a: None,
+        b: None,
+        c: Some(3),
+        d: Some(4),
+        e: Some(5),
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa3, 5, 3, 32, 4, 56, 99, 5][..], &bytes[..]);
@@ -117,16 +185,28 @@ fn mixed_encoding_1() {
     #[derive(Debug, Encode, Decode, PartialEq, Eq)]
     #[cbor(array)]
     struct T {
-        #[n(0)] a: u8,
-        #[n(1)] e: E
+        #[n(0)]
+        a: u8,
+        #[n(1)]
+        e: E,
     }
 
     #[derive(Debug, Encode, Decode, PartialEq, Eq)]
     #[cbor(map)]
     enum E {
-        #[n(0)] A,
-        #[n(1)] B { #[n(0)] x: u8 },
-        #[n(2)] #[cbor(array)] C { #[n(0)] z: u8 }
+        #[n(0)]
+        A,
+        #[n(1)]
+        B {
+            #[n(0)]
+            x: u8,
+        },
+        #[n(2)]
+        #[cbor(array)]
+        C {
+            #[n(0)]
+            z: u8,
+        },
     }
 
     let v = T { a: 1, e: E::A };
@@ -135,13 +215,19 @@ fn mixed_encoding_1() {
     assert_eq!(&[0x82, 1, 0x82, 0, 0xa0][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
-    let v = T { a: 1, e: E::B { x: 2 } };
+    let v = T {
+        a: 1,
+        e: E::B { x: 2 },
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0x82, 1, 0x82, 1, 0xa1, 0, 2][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
-    let v = T { a: 1, e: E::C { z: 2 } };
+    let v = T {
+        a: 1,
+        e: E::C { z: 2 },
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0x82, 1, 0x82, 2, 0x81, 2][..], &bytes[..]);
@@ -153,16 +239,28 @@ fn mixed_encoding_2() {
     #[derive(Debug, Encode, Decode, PartialEq, Eq)]
     #[cbor(map)]
     struct T {
-        #[n(0)] a: u8,
-        #[n(1)] e: E
+        #[n(0)]
+        a: u8,
+        #[n(1)]
+        e: E,
     }
 
     #[derive(Debug, Encode, Decode, PartialEq, Eq)]
     #[cbor(array)]
     enum E {
-        #[n(0)] A,
-        #[n(1)] B { #[n(0)] x: u8 },
-        #[n(2)] #[cbor(map)] C { #[n(0)] z: u8 }
+        #[n(0)]
+        A,
+        #[n(1)]
+        B {
+            #[n(0)]
+            x: u8,
+        },
+        #[n(2)]
+        #[cbor(map)]
+        C {
+            #[n(0)]
+            z: u8,
+        },
     }
 
     let v = T { a: 1, e: E::A };
@@ -171,13 +269,19 @@ fn mixed_encoding_2() {
     assert_eq!(&[0xa2, 0, 1, 1, 0x82, 0, 0x80][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
-    let v = T { a: 1, e: E::B { x: 2 } };
+    let v = T {
+        a: 1,
+        e: E::B { x: 2 },
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa2, 0, 1, 1, 0x82, 1, 0x81, 2][..], &bytes[..]);
     assert_eq!(v, minicbor::decode(&bytes).unwrap());
 
-    let v = T { a: 1, e: E::C { z: 2 } };
+    let v = T {
+        a: 1,
+        e: E::C { z: 2 },
+    };
 
     let bytes = minicbor::to_vec(&v).unwrap();
     assert_eq!(&[0xa2, 0, 1, 1, 0x82, 2, 0xa1, 0, 2][..], &bytes[..]);
@@ -189,8 +293,10 @@ fn index_only_enum() {
     #[derive(Debug, Encode, Decode, PartialEq, Eq)]
     #[cbor(index_only)]
     enum E {
-        #[n(0)] A,
-        #[n(1)] B
+        #[n(0)]
+        A,
+        #[n(1)]
+        B,
     }
 
     let bytes = minicbor::to_vec(&E::A).unwrap();
@@ -202,11 +308,16 @@ fn index_only_enum() {
     assert_eq!(E::B, minicbor::decode(&bytes).unwrap());
 
     let mut e = minicbor::Encoder::new(Vec::new());
-    e.array(4).unwrap()
-        .encode(E::A).unwrap()
-        .encode(E::B).unwrap()
-        .encode(32u8).unwrap()
-        .encode("foo").unwrap();
+    e.array(4)
+        .unwrap()
+        .encode(E::A)
+        .unwrap()
+        .encode(E::B)
+        .unwrap()
+        .encode(32u8)
+        .unwrap()
+        .encode("foo")
+        .unwrap();
 
     let mut d = minicbor::Decoder::new(e.writer());
     assert_eq!(Some(4), d.array().unwrap());
@@ -227,8 +338,10 @@ fn index_only_enum() {
 fn regular_enum() {
     #[derive(Debug, Encode, Decode, PartialEq, Eq)]
     enum E {
-        #[n(0)] A,
-        #[n(1)] B
+        #[n(0)]
+        A,
+        #[n(1)]
+        B,
     }
 
     let bytes = minicbor::to_vec(&E::A).unwrap();
@@ -240,11 +353,16 @@ fn regular_enum() {
     assert_eq!(E::B, minicbor::decode(&bytes).unwrap());
 
     let mut e = minicbor::Encoder::new(Vec::new());
-    e.array(4).unwrap()
-        .encode(E::A).unwrap()
-        .encode(E::B).unwrap()
-        .encode(32u8).unwrap()
-        .encode("foo").unwrap();
+    e.array(4)
+        .unwrap()
+        .encode(E::A)
+        .unwrap()
+        .encode(E::B)
+        .unwrap()
+        .encode(32u8)
+        .unwrap()
+        .encode("foo")
+        .unwrap();
 
     let mut d = minicbor::Decoder::new(e.writer());
     assert_eq!(Some(4), d.array().unwrap());
@@ -266,20 +384,28 @@ fn flat_enum() {
     #[derive(Debug, Encode, Decode, PartialEq, Eq)]
     #[cbor(map)]
     struct S {
-        #[n(0)] x: bool,
-        #[n(1)] y: bool
+        #[n(0)]
+        x: bool,
+        #[n(1)]
+        y: bool,
     }
 
     #[derive(Debug, Encode, Decode, PartialEq, Eq)]
     #[cbor(flat)]
     enum E {
-        #[n(0)] A,
-        #[n(1)] B,
-        #[n(2)] C {
-            #[n(0)] x: bool,
-            #[n(1)] y: bool
+        #[n(0)]
+        A,
+        #[n(1)]
+        B,
+        #[n(2)]
+        C {
+            #[n(0)]
+            x: bool,
+            #[n(1)]
+            y: bool,
         },
-        #[n(3)] D(#[n(0)] S)
+        #[n(3)]
+        D(#[n(0)] S),
     }
 
     let bytes = minicbor::to_vec(E::A).unwrap();
@@ -292,18 +418,29 @@ fn flat_enum() {
 
     let bytes = minicbor::to_vec(E::C { x: true, y: false }).unwrap();
     assert_eq!(&[0x83, 2, 0xF5, 0xF4][..], &bytes[..]);
-    assert_eq!(E::C { x: true, y: false }, minicbor::decode(&bytes).unwrap());
+    assert_eq!(
+        E::C { x: true, y: false },
+        minicbor::decode(&bytes).unwrap()
+    );
 
     let bytes = minicbor::to_vec(E::D(S { x: true, y: false })).unwrap();
     assert_eq!(&[0x82, 3, 0xA2, 0, 0xF5, 1, 0xF4][..], &bytes[..]);
-    assert_eq!(E::D(S { x: true, y: false }), minicbor::decode(&bytes).unwrap());
+    assert_eq!(
+        E::D(S { x: true, y: false }),
+        minicbor::decode(&bytes).unwrap()
+    );
 
     let mut e = minicbor::Encoder::new(Vec::new());
-    e.array(4).unwrap()
-        .encode(E::A).unwrap()
-        .encode(E::B).unwrap()
-        .encode(32u8).unwrap()
-        .encode("foo").unwrap();
+    e.array(4)
+        .unwrap()
+        .encode(E::A)
+        .unwrap()
+        .encode(E::B)
+        .unwrap()
+        .encode(32u8)
+        .unwrap()
+        .encode("foo")
+        .unwrap();
 
     let mut d = minicbor::Decoder::new(e.writer());
     assert_eq!(Some(4), d.array().unwrap());
@@ -325,8 +462,10 @@ fn encode_as_cbor_bytes() {
     #[derive(Debug, Encode, Decode, PartialEq, Eq, CborLen)]
     #[cbor(map)]
     struct T {
-        #[n(0)] a: u8,
-        #[n(1)] b: u8,
+        #[n(0)]
+        a: u8,
+        #[n(1)]
+        b: u8,
     }
 
     let value = T { a: 1, b: 2 };

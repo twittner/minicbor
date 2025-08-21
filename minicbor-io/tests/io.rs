@@ -37,12 +37,12 @@ fn cursor_write_impl(mut buf: Vec<u8>, data: Vec<u8>) -> bool {
     if data.len() > c.get_ref().len() {
         if let Err(e) = c.write_all(&data) {
             let _: write::EndOfSlice = e;
-            return true
+            return true;
         } else {
-            return false
+            return false;
         }
     } else {
         assert!(c.write_all(&data).is_ok());
-        data == c.get_ref()[.. c.position()]
+        data == c.get_ref()[..c.position()]
     }
 }

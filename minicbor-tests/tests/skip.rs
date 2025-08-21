@@ -4,10 +4,10 @@ extern crate alloc;
 
 use alloc::collections::btree_map::BTreeMap;
 use alloc::vec::Vec;
-use minicbor::{Decode, Decoder, Encode, Encoder};
 use minicbor::data::{IanaTag, Tag, Type};
 use minicbor::decode;
 use minicbor::encode::{self, Write};
+use minicbor::{Decode, Decoder, Encode, Encoder};
 use quickcheck::{Arbitrary, Gen};
 
 /// A simplified CBOR data model.
@@ -32,7 +32,7 @@ enum Cbor {
     /// An indefinite length CBOR string.
     StringIndef(Vec<String>),
     /// An indefinite length CBOR byte string.
-    BytesIndef(Vec<Vec<u8>>)
+    BytesIndef(Vec<Vec<u8>>),
 }
 
 quickcheck::quickcheck! {
@@ -83,7 +83,11 @@ impl encode::Write for Buf {
 // Trait impls ///////////////////////////////////////////////////////////////////////////////////
 
 impl<C> Encode<C> for Cbor {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         match self {
             Cbor::Int(i) => e.u8(*i)?.ok(),
             Cbor::Array(a) => {
@@ -121,7 +125,7 @@ impl<C> Encode<C> for Cbor {
                 e.encode_with(&**v, ctx)?.ok()
             }
             Cbor::String(s) => e.str(&s)?.ok(),
-            Cbor::Bytes(b)  => e.bytes(&b)?.ok(),
+            Cbor::Bytes(b) => e.bytes(&b)?.ok(),
             Cbor::StringIndef(v) => {
                 e.begin_str()?;
                 for s in v {
@@ -147,7 +151,7 @@ impl<'b, C> Decode<'b, C> for Cbor {
             Type::Array => {
                 if let Some(n) = d.array()? {
                     let mut v = Vec::new();
-                    for _ in 0 .. n {
+                    for _ in 0..n {
                         v.push(Self::decode(d, ctx)?)
                     }
                     Ok(Cbor::Array(v))
@@ -164,13 +168,14 @@ impl<'b, C> Decode<'b, C> for Cbor {
                     d.skip()?;
                     Ok(Cbor::ArrayIndef(v))
                 } else {
-                    Err(decode::Error::type_mismatch(Type::ArrayIndef).with_message("unexpected length"))
+                    Err(decode::Error::type_mismatch(Type::ArrayIndef)
+                        .with_message("unexpected length"))
                 }
             }
             Type::Map => {
                 if let Some(n) = d.map()? {
                     let mut m = BTreeMap::new();
-                    for _ in 0 .. n {
+                    for _ in 0..n {
                         let k = Self::decode(d, ctx)?;
                         let v = Self::decode(d, ctx)?;
                         m.insert(k, v);
@@ -221,7 +226,9 @@ impl<'b, C> Decode<'b, C> for Cbor {
                 }
                 Ok(Cbor::BytesIndef(v))
             }
-            other => Err(decode::Error::type_mismatch(other).with_message("unknown type").at(d.position()))
+            other => Err(decode::Error::type_mismatch(other)
+                .with_message("unknown type")
+                .at(d.position())),
         }
     }
 }
@@ -243,7 +250,7 @@ fn gen_cbor(g: &mut Gen, indef: bool, rem: usize) -> Cbor {
             let n = usize::arbitrary(g) % 5;
             let mut v = Vec::with_capacity(n);
             if rem > 0 {
-                for _ in 0 .. n {
+                for _ in 0..n {
                     v.push(gen_cbor(g, indef, rem - 1))
                 }
             }
@@ -253,7 +260,7 @@ fn gen_cbor(g: &mut Gen, indef: bool, rem: usize) -> Cbor {
             let n = usize::arbitrary(g) % 5;
             let mut m = BTreeMap::new();
             if rem > 0 {
-                for _ in 0 .. n {
+                for _ in 0..n {
                     let k = gen_cbor(g, indef, rem - 1);
                     let v = gen_cbor(g, indef, rem - 1);
                     m.insert(k, v);
@@ -261,23 +268,15 @@ fn gen_cbor(g: &mut Gen, indef: bool, rem: usize) -> Cbor {
             }
             Cbor::Map(m)
         }
-        Some(4) => {
-            Cbor::String(Arbitrary::arbitrary(g))
-        }
-        Some(5) => {
-            Cbor::Bytes(Arbitrary::arbitrary(g))
-        }
-        Some(6) => {
-            Cbor::StringIndef(Arbitrary::arbitrary(g))
-        }
-        Some(7) => {
-            Cbor::BytesIndef(Arbitrary::arbitrary(g))
-        }
+        Some(4) => Cbor::String(Arbitrary::arbitrary(g)),
+        Some(5) => Cbor::Bytes(Arbitrary::arbitrary(g)),
+        Some(6) => Cbor::StringIndef(Arbitrary::arbitrary(g)),
+        Some(7) => Cbor::BytesIndef(Arbitrary::arbitrary(g)),
         Some(8) if indef => {
             let n = usize::arbitrary(g) % 5;
             let mut v = Vec::with_capacity(n);
             if rem > 0 {
-                for _ in 0 .. n {
+                for _ in 0..n {
                     v.push(gen_cbor(g, indef, rem - 1))
                 }
             }
@@ -287,7 +286,7 @@ fn gen_cbor(g: &mut Gen, indef: bool, rem: usize) -> Cbor {
             let n = usize::arbitrary(g) % 5;
             let mut m = BTreeMap::new();
             if rem > 0 {
-                for _ in 0 .. n {
+                for _ in 0..n {
                     let k = gen_cbor(g, indef, rem - 1);
                     let v = gen_cbor(g, indef, rem - 1);
                     m.insert(k, v);
@@ -295,9 +294,9 @@ fn gen_cbor(g: &mut Gen, indef: bool, rem: usize) -> Cbor {
             }
             Cbor::MapIndef(m)
         }
-        _ => {
-            Cbor::Tagged(IanaTag::Base64.tag(), Box::new(Cbor::String(Arbitrary::arbitrary(g))))
-        }
+        _ => Cbor::Tagged(
+            IanaTag::Base64.tag(),
+            Box::new(Cbor::String(Arbitrary::arbitrary(g))),
+        ),
     }
 }
-

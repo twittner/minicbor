@@ -1,6 +1,9 @@
 #![cfg(feature = "std")]
 
-use minicbor::{data, decode, Decoder, encode::{self, Write}, Encode, Encoder};
+use minicbor::{
+    Decoder, Encode, Encoder, data, decode,
+    encode::{self, Write},
+};
 use quickcheck::{Arbitrary, Gen};
 use rand::Rng;
 use serde_cbor::Value;
@@ -36,7 +39,11 @@ impl Arbitrary for Cbor {
 }
 
 impl<C> Encode<C> for Cbor {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), encode::Error<W::Error>> {
+    fn encode<W: Write>(
+        &self,
+        e: &mut Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), encode::Error<W::Error>> {
         encode_value(&self.0, e)
     }
 }
@@ -48,17 +55,18 @@ fn check<'a>(d: &mut Decoder<'a>, c: Cbor) -> Result<(), decode::Error> {
             assert_eq!(data::Type::Null, d.datatype()?);
             d.skip()?
         }
-        Value::Bool(b)    => assert_eq!(b, d.bool()?),
-        Value::Integer(i) =>
+        Value::Bool(b) => assert_eq!(b, d.bool()?),
+        Value::Integer(i) => {
             if let Ok(i) = i64::try_from(i) {
                 assert_eq!(i, d.i64()?)
             } else {
                 assert_eq!(i, d.int()?.into())
             }
-        Value::Float(f)   => assert_eq!(f, d.f64()?),
-        Value::Bytes(b)   => assert_eq!(b, d.bytes()?),
-        Value::Text(s)    => assert_eq!(s, d.str()?),
-        Value::Array(a)   => {
+        }
+        Value::Float(f) => assert_eq!(f, d.f64()?),
+        Value::Bytes(b) => assert_eq!(b, d.bytes()?),
+        Value::Text(s) => assert_eq!(s, d.str()?),
+        Value::Array(a) => {
             assert_eq!(Some(a.len() as u64), d.array()?);
             for x in a {
                 check(d, Cbor(x))?
@@ -80,18 +88,18 @@ fn check<'a>(d: &mut Decoder<'a>, c: Cbor) -> Result<(), decode::Error> {
 // (`rem` denotes the remaining recursion depth.)
 fn gen_value(g: &mut Gen, rem: usize) -> Value {
     let mut r = rand::rng();
-    match r.random_range(0 .. 9) {
+    match r.random_range(0..9) {
         0 => Value::Null,
         1 => Value::Bool(true),
         2 => Value::Bool(false),
-        3 => Value::Integer(r.random_range(-2_i128.pow(64) .. 2_i128.pow(64))),
+        3 => Value::Integer(r.random_range(-2_i128.pow(64)..2_i128.pow(64))),
         4 => Value::Float(r.random()),
         5 => Value::Bytes(Arbitrary::arbitrary(g)),
         6 => Value::Text(Arbitrary::arbitrary(g)),
         7 => Value::Array({
             let mut v = Vec::new();
             if rem > 0 {
-                for _ in 0 .. r.random_range(0 .. 12) {
+                for _ in 0..r.random_range(0..12) {
                     v.push(gen_value(g, rem - 1))
                 }
             }
@@ -100,28 +108,40 @@ fn gen_value(g: &mut Gen, rem: usize) -> Value {
         _ => Value::Map({
             let mut m = BTreeMap::new();
             if rem > 0 {
-                for _ in 0 .. r.random_range(0 .. 12) {
+                for _ in 0..r.random_range(0..12) {
                     m.insert(gen_value(g, rem - 1), gen_value(g, rem - 1));
                 }
             }
             m
-        })
+        }),
     }
 }
 
 // Encode a `serde_cbor::Value` with a `minicbor::Encoder`.
 fn encode_value<W>(val: &Value, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>>
 where
-    W: encode::Write
+    W: encode::Write,
 {
     match val {
-        Value::Null       => { e.null()?; }
-        Value::Bool(b)    => { e.bool(*b)?; }
-        Value::Integer(i) => { e.int((*i).try_into().unwrap())?; }
-        Value::Float(f)   => { e.f64(*f)?; }
-        Value::Bytes(b)   => { e.bytes(b)?; }
-        Value::Text(s)    => { e.str(s)?; }
-        Value::Array(a)   => {
+        Value::Null => {
+            e.null()?;
+        }
+        Value::Bool(b) => {
+            e.bool(*b)?;
+        }
+        Value::Integer(i) => {
+            e.int((*i).try_into().unwrap())?;
+        }
+        Value::Float(f) => {
+            e.f64(*f)?;
+        }
+        Value::Bytes(b) => {
+            e.bytes(b)?;
+        }
+        Value::Text(s) => {
+            e.str(s)?;
+        }
+        Value::Array(a) => {
             e.array(a.len() as u64)?;
             for x in a {
                 encode_value(x, e)?
@@ -134,8 +154,7 @@ where
                 encode_value(v, e)?
             }
         }
-        _ => ()
+        _ => (),
     }
     Ok(())
 }
-

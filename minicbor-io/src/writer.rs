@@ -7,7 +7,7 @@ use std::io;
 pub struct Writer<W> {
     writer: W,
     buffer: Vec<u8>,
-    max_len: usize
+    max_len: usize,
 }
 
 impl<W> Writer<W> {
@@ -18,7 +18,11 @@ impl<W> Writer<W> {
 
     /// Create a new writer with a max. buffer size of 512KiB.
     pub fn with_buffer(writer: W, buffer: Vec<u8>) -> Self {
-        Self { writer, buffer, max_len: 512 * 1024 }
+        Self {
+            writer,
+            buffer,
+            max_len: 512 * 1024,
+        }
     }
 
     /// Set the max. buffer size in bytes.
@@ -56,10 +60,10 @@ impl<W: io::Write> Writer<W> {
         self.buffer.resize(4, 0u8);
         minicbor::encode_with(val, &mut self.buffer, ctx)?;
         if self.buffer.len() - 4 > self.max_len {
-            return Err(Error::InvalidLen)
+            return Err(Error::InvalidLen);
         }
         let prefix = (self.buffer.len() as u32 - 4).to_be_bytes();
-        self.buffer[.. 4].copy_from_slice(&prefix);
+        self.buffer[..4].copy_from_slice(&prefix);
         self.writer.write_all(&self.buffer)?;
         Ok(self.buffer.len() - 4)
     }

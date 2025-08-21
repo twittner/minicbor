@@ -12,7 +12,7 @@ pub struct AsyncReader<R> {
     reader: R,
     buffer: Vec<u8>,
     max_len: usize,
-    state: State
+    state: State,
 }
 
 /// Read state.
@@ -21,7 +21,7 @@ enum State {
     /// Reading length prefix.
     ReadLen([u8; 4], u8),
     /// Reading CBOR item bytes.
-    ReadVal(usize)
+    ReadVal(usize),
 }
 
 impl State {
@@ -39,7 +39,12 @@ impl<R> AsyncReader<R> {
 
     /// Create a new reader with a max. buffer size of 512KiB.
     pub fn with_buffer(reader: R, buffer: Vec<u8>) -> Self {
-        Self { reader, buffer, max_len: 512 * 1024, state: State::new() }
+        Self {
+            reader,
+            buffer,
+            max_len: 512 * 1024,
+            state: State::new(),
+        }
     }
 
     /// Set the max. buffer size in bytes.
@@ -85,37 +90,42 @@ impl<R: AsyncRead + Unpin> AsyncReader<R> {
     }
 
     /// Like [`AsyncReader::read`] but accepting a user provided decoding context.
-    pub async fn read_with<'a, C, T: Decode<'a, C>>(&'a mut self, ctx: &mut C) -> Result<Option<T>, Error> {
+    pub async fn read_with<'a, C, T: Decode<'a, C>>(
+        &'a mut self,
+        ctx: &mut C,
+    ) -> Result<Option<T>, Error> {
         loop {
             match self.state {
                 State::ReadLen(buf, 4) => {
                     let len = u32::from_be_bytes(buf) as usize;
                     if len > self.max_len {
-                        return Err(Error::InvalidLen)
+                        return Err(Error::InvalidLen);
                     }
                     self.buffer.clear();
                     self.buffer.resize(len, 0u8);
                     self.state = State::ReadVal(0)
                 }
                 State::ReadLen(ref mut buf, ref mut o) => {
-                    let n = self.reader.read(&mut buf[usize::from(*o) ..]).await?;
+                    let n = self.reader.read(&mut buf[usize::from(*o)..]).await?;
                     if n == 0 {
                         return if *o == 0 {
                             Ok(None)
                         } else {
                             Err(Error::Io(io::ErrorKind::UnexpectedEof.into()))
-                        }
+                        };
                     }
                     *o += n as u8
                 }
                 State::ReadVal(o) if o >= self.buffer.len() => {
                     self.state = State::new();
-                    return minicbor::decode_with(&self.buffer, ctx).map_err(Error::Decode).map(Some)
+                    return minicbor::decode_with(&self.buffer, ctx)
+                        .map_err(Error::Decode)
+                        .map(Some);
                 }
                 State::ReadVal(ref mut o) => {
-                    let n = self.reader.read(&mut self.buffer[*o ..]).await?;
+                    let n = self.reader.read(&mut self.buffer[*o..]).await?;
                     if n == 0 {
-                        return Err(Error::Io(io::ErrorKind::UnexpectedEof.into()))
+                        return Err(Error::Io(io::ErrorKind::UnexpectedEof.into()));
                     }
                     *o += n
                 }
@@ -123,4 +133,3 @@ impl<R: AsyncRead + Unpin> AsyncReader<R> {
         }
     }
 }
-

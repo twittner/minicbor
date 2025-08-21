@@ -146,17 +146,17 @@ pub mod decode;
 pub mod encode;
 
 const UNSIGNED: u8 = 0x00;
-const SIGNED: u8   = 0x20;
-const BYTES: u8    = 0x40;
-const TEXT: u8     = 0x60;
-const ARRAY: u8    = 0x80;
-const MAP: u8      = 0xa0;
-const TAGGED: u8   = 0xc0;
-const SIMPLE: u8   = 0xe0;
-const BREAK: u8    = 0xff;
+const SIGNED: u8 = 0x20;
+const BYTES: u8 = 0x40;
+const TEXT: u8 = 0x60;
+const ARRAY: u8 = 0x80;
+const MAP: u8 = 0xa0;
+const TAGGED: u8 = 0xc0;
+const SIMPLE: u8 = 0xe0;
+const BREAK: u8 = 0xff;
 
 pub use decode::{Decode, Decoder};
-pub use encode::{Encode, Encoder, CborLen};
+pub use encode::{CborLen, Encode, Encoder};
 
 #[cfg(feature = "derive")]
 pub use minicbor_derive::*;
@@ -170,7 +170,7 @@ use alloc::vec::Vec;
 /// Decode a type implementing [`Decode`] from the given byte slice.
 pub fn decode<'b, T>(b: &'b [u8]) -> Result<T, decode::Error>
 where
-    T: Decode<'b, ()>
+    T: Decode<'b, ()>,
 {
     Decoder::new(b).decode()
 }
@@ -178,7 +178,7 @@ where
 /// Decode a type implementing [`Decode`] from the given byte slice.
 pub fn decode_with<'b, C, T>(b: &'b [u8], ctx: &mut C) -> Result<T, decode::Error>
 where
-    T: Decode<'b, C>
+    T: Decode<'b, C>,
 {
     Decoder::new(b).decode_with(ctx)
 }
@@ -187,7 +187,7 @@ where
 pub fn encode<T, W>(x: T, w: W) -> Result<(), encode::Error<W::Error>>
 where
     T: Encode<()>,
-    W: encode::Write
+    W: encode::Write,
 {
     Encoder::new(w).encode(x)?.ok()
 }
@@ -196,7 +196,7 @@ where
 pub fn encode_with<C, T, W>(x: T, w: W, ctx: &mut C) -> Result<(), encode::Error<W::Error>>
 where
     T: Encode<C>,
-    W: encode::Write
+    W: encode::Write,
 {
     Encoder::new(w).encode_with(x, ctx)?.ok()
 }
@@ -207,7 +207,7 @@ where
 #[cfg(feature = "alloc")]
 pub fn to_vec<T>(x: T) -> Result<Vec<u8>, encode::Error<Infallible>>
 where
-    T: Encode<()>
+    T: Encode<()>,
 {
     let mut e = Encoder::new(Vec::new());
     x.encode(&mut e, &mut ())?;
@@ -220,7 +220,7 @@ where
 #[cfg(feature = "alloc")]
 pub fn to_vec_with<C, T>(x: T, ctx: &mut C) -> Result<Vec<u8>, encode::Error<Infallible>>
 where
-    T: Encode<C>
+    T: Encode<C>,
 {
     let mut e = Encoder::new(Vec::new());
     x.encode(&mut e, ctx)?;
@@ -264,7 +264,7 @@ pub fn display<'b>(cbor: &'b [u8]) -> impl core::fmt::Display + 'b {
 /// Calculate the length in bytes of the given value's CBOR representation.
 pub fn len<T>(x: T) -> usize
 where
-    T: CborLen<()>
+    T: CborLen<()>,
 {
     x.cbor_len(&mut ())
 }
@@ -272,7 +272,7 @@ where
 /// Calculate the length in bytes of the given value's CBOR representation.
 pub fn len_with<C, T>(x: T, ctx: &mut C) -> usize
 where
-    T: CborLen<C>
+    T: CborLen<C>,
 {
     x.cbor_len(ctx)
 }

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::ops::Deref;
 
-use crate::{collect_type_params, is_phantom_data, Mode};
+use crate::{Mode, collect_type_params, is_phantom_data};
 use crate::{attrs::CustomCodec, fields::Fields};
 
 #[derive(Default)]
@@ -17,28 +17,35 @@ impl Blacklist {
     /// - Fields with a `PhantomData` type.
     pub(crate) fn new(mode: Mode, fields: &Fields, g: &syn::Generics) -> Blacklist {
         // Start with custom encode/decode/cbor_len functions.
-        let mut blacklist = collect_type_params(g, fields.fields().filter(|f| {
-            match mode {
+        let mut blacklist = collect_type_params(
+            g,
+            fields.fields().filter(|f| match mode {
                 Mode::Encode => f.attrs.codec().map(|c| c.is_encode()).unwrap_or(false),
                 Mode::Decode => f.attrs.codec().map(|c| c.is_decode()).unwrap_or(false),
-                Mode::Length => f.attrs.cbor_len().is_some()
-                    || f.attrs.codec()
-                        .map(|c| matches!(c, CustomCodec::Module(..)))
-                        .unwrap_or(false)
-            }
-        }));
+                Mode::Length => {
+                    f.attrs.cbor_len().is_some()
+                        || f.attrs
+                            .codec()
+                            .map(|c| matches!(c, CustomCodec::Module(..)))
+                            .unwrap_or(false)
+                }
+            }),
+        );
         if !blacklist.is_empty() {
-            let others = collect_type_params(g, fields.fields().filter(|f| {
-                match mode {
+            let others = collect_type_params(
+                g,
+                fields.fields().filter(|f| match mode {
                     Mode::Encode => f.attrs.codec().map(|c| !c.is_encode()).unwrap_or(true),
                     Mode::Decode => f.attrs.codec().map(|c| !c.is_decode()).unwrap_or(true),
-                    Mode::Length => f.attrs.cbor_len().is_none()
-                        && f.attrs.codec()
-                            .map(|c| !matches!(c, CustomCodec::Module(..)))
-                            .unwrap_or(true)
-
-                }
-            }));
+                    Mode::Length => {
+                        f.attrs.cbor_len().is_none()
+                            && f.attrs
+                                .codec()
+                                .map(|c| !matches!(c, CustomCodec::Module(..)))
+                                .unwrap_or(true)
+                    }
+                }),
+            );
             blacklist.retain(|ident| !others.contains(ident));
         }
 
@@ -50,13 +57,21 @@ impl Blacklist {
         }
 
         // And finally also by type parameters only appearing in `PhantomData`.
-        let phantoms = collect_type_params(g, fields.fields().chain(fields.skipped()).filter(|f| {
-            is_phantom_data(&f.typ)
-        }));
+        let phantoms = collect_type_params(
+            g,
+            fields
+                .fields()
+                .chain(fields.skipped())
+                .filter(|f| is_phantom_data(&f.typ)),
+        );
         if !phantoms.is_empty() {
-            let non_phantom = collect_type_params(g, fields.fields().chain(fields.skipped()).filter(|f| {
-                !is_phantom_data(&f.typ)
-            }));
+            let non_phantom = collect_type_params(
+                g,
+                fields
+                    .fields()
+                    .chain(fields.skipped())
+                    .filter(|f| !is_phantom_data(&f.typ)),
+            );
             blacklist.extend(phantoms.difference(&non_phantom).cloned());
         }
 
@@ -82,7 +97,7 @@ impl Blacklist {
 
     pub(crate) fn add<I>(&mut self, it: I)
     where
-        I: IntoIterator<Item = syn::Ident>
+        I: IntoIterator<Item = syn::Ident>,
     {
         for id in it.into_iter() {
             self.0.insert(id);
