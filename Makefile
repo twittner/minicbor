@@ -1,8 +1,7 @@
 .PHONY: build test fuzz doc clean
 
 build:
-	cd minicbor-tests-nostd && cargo rustc -- -C link-arg=-nostartfiles
-	cargo build -p minicbor
+	cargo build -p minicbor --target aarch64-unknown-none
 	cargo build -p minicbor-io
 	cargo build --all --features="derive"
 	cargo build --all --features="alloc,derive"

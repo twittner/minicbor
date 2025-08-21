@@ -31,6 +31,9 @@ jobs:
             toolchain: ${{ matrix.toolchain }}
             components: clippy
 
+      - name: rustup target add aarch64-unknown-none
+        run: rustup target add aarch64-unknown-none
+
       - name: Build
         run: make build
 
