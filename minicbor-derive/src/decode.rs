@@ -442,10 +442,6 @@ fn make_transparent_impl
         .and_then(CustomCodec::to_decode_path)
         .unwrap_or_else(|| default_decode_fn.clone());
 
-    let nil_fn = field.attrs.codec()
-        .and_then(|cc| cc.to_nil_path())
-        .unwrap_or_else(|| default_nil_fn.clone());
-
     let decode_call =
         if cfg!(any(feature = "alloc", feature = "std"))
             && (field.attrs.borrow().is_some() || field.index.is_b())
@@ -486,15 +482,39 @@ fn make_transparent_impl
             }
         };
 
-    let nil_call =
-        if field.is_name {
+    let nil_impl =
+        if let Some(codec) = field.attrs.codec().filter(|cc| cc.is_decode()) {
+            if let Some(f) = codec.to_nil_path() {
+                if field.is_name {
+                    let id = &field.ident;
+                    quote! {
+                        fn nil() -> core::option::Option<Self> {
+                            #f().map(|v| Self { #id: v })
+                        }
+                    }
+                } else {
+                    quote! {
+                        fn nil() -> core::option::Option<Self> {
+                            #f().map(Self)
+                        }
+                    }
+                }
+            } else {
+                // without a `nil()` do not override the default impl
+                quote!()
+            }
+        } else if field.is_name { // no custom codec => forward to inner type
             let id = &field.ident;
             quote! {
-                #nil_fn().map(|v| Self { #id: v })
+                fn nil() -> core::option::Option<Self> {
+                    #default_nil_fn().map(|v| Self { #id: v })
+                }
             }
-        } else {
+        } else { // no custom codec => forward to inner type
             quote! {
-                #nil_fn().map(Self)
+                fn nil() -> core::option::Option<Self> {
+                    #default_nil_fn().map(Self)
+                }
             }
         };
 
@@ -504,9 +524,7 @@ fn make_transparent_impl
                 #decode_call
             }
 
-            fn nil() -> core::option::Option<Self> {
-                #nil_call
-            }
+            #nil_impl
         }
     })
 }
@@ -555,7 +573,6 @@ fn nil(f: &Field) -> proc_macro2::TokenStream {
         quote!(<#ty as minicbor::Decode::<Ctx>>::nil())
     }
 }
-
 
 fn decode_tag(a: &Attributes) -> proc_macro2::TokenStream {
     if let Some(t) = a.tag() {
