@@ -478,7 +478,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                                     #encode_fn(&self.#i, __e777, __ctx777)?
                                 }
                             }
-                         }
+                        }
                         // enum tuple
                         (NO_NAME, NO_SELF, HAS_GAPS) => quote! {
                             if #idx <= __i777 {
@@ -574,10 +574,6 @@ fn make_transparent_impl
         .and_then(CustomCodec::to_encode_path)
         .unwrap_or_else(|| default_encode_fn.clone());
 
-    let is_nil_fn = field.attrs.codec()
-        .and_then(|cc| cc.to_is_nil_path())
-        .unwrap_or_else(|| default_is_nil_fn.clone());
-
     let encode_call =
         if field.is_name {
             let id = &field.ident;
@@ -586,12 +582,40 @@ fn make_transparent_impl
             quote!(#encode_fn(&self.0, __e777, __ctx777))
         };
 
-    let is_nil_call =
-        if field.is_name {
+    let is_nil_impl =
+        if let Some(codec) = field.attrs.codec().filter(|cc| cc.is_encode()) {
+            if let Some(f) = codec.to_is_nil_path() {
+                if field.is_name {
+                    let id = &field.ident;
+                    quote! {
+                        fn is_nil(&self) -> bool {
+                            #f(&self.#id)
+                        }
+                    }
+                } else {
+                    quote! {
+                        fn is_nil(&self) -> bool {
+                            #f(&self.0)
+                        }
+                    }
+                }
+            } else {
+                // without an `is_nil()` do not override the default impl
+                quote!()
+            }
+        } else if field.is_name { // no custom codec => forward to inner type
             let id = &field.ident;
-            quote!(#is_nil_fn(&self.#id))
-        } else {
-            quote!(#is_nil_fn(&self.0))
+            quote! {
+                fn is_nil(&self) -> bool {
+                    #default_is_nil_fn(&self.#id)
+                }
+            }
+        } else { // no custom codec => forward to inner type
+            quote! {
+                fn is_nil(&self) -> bool {
+                    #default_is_nil_fn(&self.0)
+                }
+            }
         };
 
     Ok(quote! {
@@ -603,9 +627,7 @@ fn make_transparent_impl
                 #encode_call
             }
 
-            fn is_nil(&self) -> bool {
-                #is_nil_call
-            }
+            #is_nil_impl
         }
     })
 }
