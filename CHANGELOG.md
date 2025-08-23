@@ -7,6 +7,10 @@
 
 # minicbor
 
+## `2.1.1`
+
+- Depends on `minicbor-derive-0.18.2`.
+
 ## `2.1.0`
 
 - Added `Encoder::str_len`, mirroring `Encoder::bytes_len` which was added in 0.26.1.
@@ -423,6 +427,12 @@
 - Added `Encode` and `Decode` impls for tuples (see merge request [1][mr1] by @koushiro).
 
 # minicbor-derive
+
+## `0.18.2`
+
+- Using `#[cbor(transparent)]` together with a custom codec (e.g. `#[cbor(with = "...")]`) will
+  only override `Encode::is_nil` and `Decode::nil` if the `has_nil` attribute or its equivalent
+  is present.
 
 ## `0.18.1`
 
