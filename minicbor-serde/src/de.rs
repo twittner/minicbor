@@ -315,7 +315,7 @@ impl<'a, 'de> SeqAccess<'de> for Seq<'a, 'de> {
     type Error = DecodeError;
 
     fn size_hint(&self) -> Option<usize> {
-        self.len.map(|len| len as usize)
+        self.len.and_then(|n| n.try_into().ok())
     }
 
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
