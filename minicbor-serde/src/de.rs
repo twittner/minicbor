@@ -314,6 +314,10 @@ impl<'a, 'de> Seq<'a, 'de> {
 impl<'a, 'de> SeqAccess<'de> for Seq<'a, 'de> {
     type Error = DecodeError;
 
+    fn size_hint(&self) -> Option<usize> {
+        self.len.and_then(|n| n.try_into().ok())
+    }
+
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
     where
         T: DeserializeSeed<'de>
@@ -337,6 +341,10 @@ impl<'a, 'de> SeqAccess<'de> for Seq<'a, 'de> {
 
 impl<'a, 'de> MapAccess<'de> for Seq<'a, 'de> {
     type Error = DecodeError;
+
+    fn size_hint(&self) -> Option<usize> {
+        self.len.and_then(|n| n.try_into().ok())
+    }
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where
