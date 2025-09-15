@@ -760,6 +760,11 @@
 
 # minicbor-serde
 
+## `0.6.1`
+
+- Implements `size_hint` for sequential and map access. See pull request
+  [#41](https://github.com/twittner/minicbor/pull/41) by @Finistere for details.
+
 ## `0.6.0`
 
 - Depends on `minicbor-2.0.0`.
