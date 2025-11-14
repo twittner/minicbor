@@ -1,9 +1,15 @@
-use serde::de::{self, DeserializeSeed, EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor};
+use serde::de::{
+    self, DeserializeSeed, EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor,
+    value::{BorrowedStrDeserializer, U64Deserializer},
+};
 
-use minicbor::data::Type;
+use minicbor::data::{Tag, Type};
 use minicbor::decode::{Decoder, Error};
 
-use crate::error::DecodeError;
+use crate::{
+    error::DecodeError,
+    tag::{NO_TAG_IDENTIFIER, TAG_CONTAINER_IDENTIFIER, TAG_IDENTIFIER},
+};
 
 const BREAK: u8 = 0xff;
 
@@ -269,13 +275,18 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
 
     fn deserialize_enum<V>
         ( self
-        , _name: &'static str
+        , name: &'static str
         , _variants: &'static [&'static str]
         , visitor: V
         ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>
     {
+        // Handle the case when user uses our custom tag structures
+        if name == TAG_CONTAINER_IDENTIFIER {
+            return visitor.visit_enum(EnumTagAccess::new(self)?);
+        }
+
         let p = self.decoder.position();
         if Type::Map == self.decoder.datatype()? {
             let m = self.decoder.map()?;
@@ -424,5 +435,126 @@ impl<'a, 'de> VariantAccess<'de> for Enum<'a, 'de> {
         V: Visitor<'de>
     {
         de::Deserializer::deserialize_map(self.deserializer, v)
+    }
+}
+
+enum State {
+    Tag(Tag),
+    Value,
+    End,
+}
+
+struct SeqTagAccess<'a, 'de: 'a> {
+    deserializer: &'a mut Deserializer<'de>,
+    state: State,
+}
+
+impl<'a, 'de> SeqTagAccess<'a, 'de> {
+    fn new(tag: Option<Tag>, d: &'a mut Deserializer<'de>) -> Self {
+        Self {
+            state: tag.map(State::Tag).unwrap_or(State::Value),
+            deserializer: d,
+        }
+    }
+}
+
+impl<'a, 'de> de::SeqAccess<'de> for SeqTagAccess<'a, 'de> {
+    type Error = DecodeError;
+
+    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
+    where
+        T: DeserializeSeed<'de>,
+    {
+        match self.state {
+            State::Tag(tag) => {
+                self.state = State::Value;
+                Ok(Some(
+                    seed.deserialize(U64Deserializer::<DecodeError>::new(tag.as_u64()))?,
+                ))
+            }
+            State::Value => {
+                self.state = State::End;
+                Ok(Some(seed.deserialize(&mut *self.deserializer)?))
+            }
+            State::End => Ok(None),
+        }
+    }
+}
+
+struct EnumTagAccess<'a, 'de: 'a> {
+    deserializer: &'a mut Deserializer<'de>,
+    tag: Option<Tag>,
+}
+
+impl<'a, 'de> EnumTagAccess<'a, 'de> {
+    fn new(d: &'a mut Deserializer<'de>) -> Result<Self, DecodeError> {
+        let tag = match d.decoder_mut().datatype()? {
+            Type::Tag => Some(d.decoder_mut().tag()?),
+            _ => None,
+        };
+
+        Ok(Self {
+            tag,
+            deserializer: d,
+        })
+    }
+}
+
+impl<'a, 'de> de::EnumAccess<'de> for EnumTagAccess<'a, 'de> {
+    type Error = DecodeError;
+    type Variant = Self;
+
+    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
+    where
+        V: DeserializeSeed<'de>,
+    {
+        let variant = match self.tag.is_some() {
+            true => TAG_IDENTIFIER,
+            false => NO_TAG_IDENTIFIER,
+        };
+
+        Ok((
+            seed.deserialize(BorrowedStrDeserializer::<Self::Error>::new(variant))?,
+            self,
+        ))
+    }
+}
+
+impl<'a, 'de> de::VariantAccess<'de> for EnumTagAccess<'a, 'de> {
+    type Error = DecodeError;
+
+    fn unit_variant(self) -> Result<(), Self::Error> {
+        Err(de::Error::invalid_type(
+            de::Unexpected::UnitVariant,
+            &"NoTag or Tag variant",
+        ))
+    }
+
+    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
+    where
+        T: DeserializeSeed<'de>,
+    {
+        seed.deserialize(&mut *self.deserializer)
+    }
+
+    fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_seq(SeqTagAccess::new(self.tag, self.deserializer))
+    }
+
+    fn struct_variant<V>(
+        self
+        , _fields: &'static [&'static str]
+        , _visitor: V
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        Err(de::Error::invalid_type(
+            de::Unexpected::StructVariant,
+            &"NoTag or Tag variant",
+        ))
     }
 }
