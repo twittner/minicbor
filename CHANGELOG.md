@@ -760,6 +760,11 @@
 
 # minicbor-serde
 
+## `0.6.2`
+
+- Adds `EncodeError::as_write` to allow access to an underlying `Write` error.
+  See issue [#45](https://github.com/twittner/minicbor/issues/45) for details.
+
 ## `0.6.1`
 
 - Implements `size_hint` for sequential and map access. See pull request
