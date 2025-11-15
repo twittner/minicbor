@@ -10,6 +10,12 @@ pub struct DecodeError(decode::Error);
 #[derive(Debug)]
 pub struct EncodeError<E>(encode::Error<E>);
 
+impl<E> EncodeError<E> {
+    pub fn as_write(&self) -> Option<&E> {
+        self.0.as_write()
+    }
+}
+
 impl<E> From<encode::Error<E>> for EncodeError<E> {
     fn from(e: encode::Error<E>) -> Self {
         Self(e)
