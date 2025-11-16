@@ -19,8 +19,8 @@ impl Blacklist {
         // Start with custom encode/decode/cbor_len functions.
         let mut blacklist = collect_type_params(g, fields.fields().filter(|f| {
             match mode {
-                Mode::Encode => f.attrs.codec().map(|c| c.is_encode()).unwrap_or(false),
-                Mode::Decode => f.attrs.codec().map(|c| c.is_decode()).unwrap_or(false),
+                Mode::Encode => f.attrs.codec().map(|c| !c.require_encode_bound()).unwrap_or(false),
+                Mode::Decode => f.attrs.codec().map(|c| !c.require_decode_bound()).unwrap_or(false),
                 Mode::Length => f.attrs.cbor_len().is_some()
                     || f.attrs.codec()
                         .map(|c| matches!(c, CustomCodec::Module(..)))
@@ -30,8 +30,8 @@ impl Blacklist {
         if !blacklist.is_empty() {
             let others = collect_type_params(g, fields.fields().filter(|f| {
                 match mode {
-                    Mode::Encode => f.attrs.codec().map(|c| !c.is_encode()).unwrap_or(true),
-                    Mode::Decode => f.attrs.codec().map(|c| !c.is_decode()).unwrap_or(true),
+                    Mode::Encode => f.attrs.codec().map(|c| c.require_encode_bound()).unwrap_or(true),
+                    Mode::Decode => f.attrs.codec().map(|c| c.require_decode_bound()).unwrap_or(true),
                     Mode::Length => f.attrs.cbor_len().is_none()
                         && f.attrs.codec()
                             .map(|c| !matches!(c, CustomCodec::Module(..)))

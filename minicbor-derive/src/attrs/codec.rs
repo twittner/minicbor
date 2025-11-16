@@ -50,13 +50,15 @@ pub enum CustomCodec {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Encode {
     pub encode: syn::ExprPath,
-    pub is_nil: Option<syn::ExprPath>
+    pub is_nil: Option<syn::ExprPath>,
+    pub require_bound: bool
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Decode {
     pub decode: syn::ExprPath,
-    pub nil: Option<syn::ExprPath>
+    pub nil: Option<syn::ExprPath>,
+    pub require_bound: bool
 }
 
 impl CustomCodec {
@@ -156,6 +158,24 @@ impl CustomCodec {
             Some(p)
         } else {
             None
+        }
+    }
+
+    pub fn require_encode_bound(&self) -> bool {
+        match self {
+            CustomCodec::Encode(e)  => e.require_bound,
+            CustomCodec::Decode(_)  => true,
+            CustomCodec::Both(e, _) => e.require_bound,
+            CustomCodec::Module(..) => true
+        }
+    }
+
+    pub fn require_decode_bound(&self) -> bool {
+        match self {
+            CustomCodec::Encode(_)  => true,
+            CustomCodec::Decode(d)  => d.require_bound,
+            CustomCodec::Both(_, d) => d.require_bound,
+            CustomCodec::Module(..) => true
         }
     }
 }
