@@ -94,6 +94,7 @@
 //! - [`#[cbor(index_only)]`](#cborindex_only)
 //! - [`#[cbor(transparent)]`](#cbortransparent)
 //! - [`#[cbor(skip)]`](#cborskip)
+//! - [`#[cbor(skip_if)]`](#cborskip_if)
 //! - [`#[cbor(default)]`](#cbordefault)
 //! - [`#[cbor(tag(...))]`](#cbortag)
 //! - [`#[cbor(decode_with)]`](#cbordecode_with--path)
@@ -175,6 +176,24 @@
 //! This attribute can be attached to fields in structs and enums and prevents
 //! those fields from being encoded. Field types must implement [`Default`] and
 //! when decoding the fields are initialised with `Default::default()`.
+//!
+//! ## `#[cbor(skip_if = "<path>")]`
+//!
+//! This attribute can be attached to fields in structs and enums and prevents
+//! those fields from being encoded if the predicate function denoted by `path`
+//! returns true. The predicate function must satisfy the following signature
+//!
+//! ```no_run
+//! fn pred<T>(_: &T) -> bool {
+//!     todo!()
+//! }
+//! ```
+//!
+//! Field types must implement [`Default`] and when decoding, the fields are
+//! initialised with `Default::default()` if no value is present.
+//!
+//! Please note that `skip_if` is mutually exclusive with `nil`, `is_nil`, and
+//! `has_nil`.
 //!
 //! ## `#[cbor(default)]`
 //!

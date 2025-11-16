@@ -49,7 +49,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     // Collect type parameters which require a `Default` bound.
     let default_types =
         collect_type_params(&inp.generics, fields.fields().chain(fields.skipped()).filter(|f| {
-            (f.attrs.default() || f.attrs.skip()) && !is_phantom_data(&f.typ)
+            (f.attrs.default() || f.attrs.skip() || f.attrs.skip_if_codec()) && !is_phantom_data(&f.typ)
         }))
         .into_iter()
         .collect();
@@ -170,7 +170,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             // Collect type parameters which require a `Default` bound.
             defaults.extend(
                 collect_type_params(&inp.generics, fields.fields().chain(fields.skipped()).filter(|f| {
-                    (f.attrs.default() || f.attrs.skip()) && !is_phantom_data(&f.typ)
+                    (f.attrs.default() || f.attrs.skip() || f.attrs.skip_if_codec()) && !is_phantom_data(&f.typ)
                 }))
                 .into_iter()
             );

@@ -7,6 +7,7 @@ use core::mem::MaybeUninit;
 mod decoder;
 mod error;
 pub mod info;
+pub mod internal;
 
 use crate::data::{Int, Tag, Tagged};
 

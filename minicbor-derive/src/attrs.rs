@@ -10,13 +10,15 @@ use std::fmt;
 use std::hash::Hash;
 use std::iter;
 
-use syn::{LitInt, LitStr};
+use syn::{parse_quote, LitInt, LitStr};
 use syn::spanned::Spanned;
 
 pub use typeparam::TypeParams;
 pub use codec::CustomCodec;
 pub use encoding::Encoding;
 pub use idx::Idx;
+
+use crate::attrs::codec::{Decode, Encode};
 
 /// Recognised attributes.
 #[derive(Debug, Clone)]
@@ -41,6 +43,7 @@ pub enum Kind {
     CborLen,
     Tag,
     Skip,
+    SkipIf,
     Flat,
     Default
 }
@@ -61,6 +64,7 @@ enum Value {
     CborLen(syn::ExprPath, proc_macro2::Span),
     Tag(u64, proc_macro2::Span),
     Skip(proc_macro2::Span),
+    SkipIf(Option<syn::ExprPath>, proc_macro2::Span),
     Flat(proc_macro2::Span),
     Default(proc_macro2::Span)
 }
@@ -130,6 +134,89 @@ impl Attributes {
                 return Err(syn::Error::new(*s, "flat enum does not support map encoding"))
             }
         }
+        // `skip_if` triggers the creation of a custom codec where `encode` and `decode`
+        // correspond the the default routines, `is_nil` is defined via `skip_if`'s
+        // predicate and `nil` points to an internal helper that matches the signature
+        // of `nil` and uses `Default::default` to create a default value.
+        //
+        // If a custom codec is already defined, `is_nil` and `nil` are overriden by
+        // `skip_if`'s predicate and the internal default helper.
+        if let Some(Value::SkipIf(is_nil@Some(_), skip_if_span)) = this.get_mut(Kind::SkipIf) {
+            let is_nil  = is_nil.take().expect("some is_nil");
+            let encode  = parse_quote!(minicbor::Encode::encode);
+            let decode  = parse_quote!(minicbor::Decode::decode);
+            let default = parse_quote!(minicbor::decode::internal::some_default);
+            let skip_if_span = *skip_if_span;
+            match this.remove(Kind::Codec) {
+                None => {
+                    let e = Encode { encode, is_nil: Some(is_nil), require_bound: true };
+                    let d = Decode { decode, nil: Some(default), require_bound: true };
+                    let c = CustomCodec::Both(Box::new(e), Box::new(d));
+                    this.attrs.insert(Kind::Codec, Value::Codec(c, skip_if_span));
+                }
+                Some(Value::Codec(CustomCodec::Encode(mut e), span)) => {
+                    if e.is_nil.is_some() {
+                        let msg = "skip_if and `is_nil` are mutually exclusive";
+                        return Err(syn::Error::new(skip_if_span, msg))
+                    }
+                    let c = {
+                        let d = Decode { decode, nil: Some(default), require_bound: true };
+                        e.is_nil = Some(is_nil);
+                        CustomCodec::Both(Box::new(e), Box::new(d))
+                    };
+                    this.attrs.insert(Kind::Codec, Value::Codec(c, span));
+                }
+                Some(Value::Codec(CustomCodec::Decode(mut d), span)) => {
+                    if d.nil.is_some() {
+                        let msg = "skip_if and `nil` are mutually exclusive";
+                        return Err(syn::Error::new(skip_if_span, msg))
+                    }
+                    let c = {
+                        let e = Encode { encode, is_nil: Some(is_nil), require_bound: true };
+                        d.nil = Some(default);
+                        CustomCodec::Both(Box::new(e), Box::new(d))
+                    };
+                    this.attrs.insert(Kind::Codec, Value::Codec(c, span));
+                }
+                Some(Value::Codec(CustomCodec::Both(mut e, mut d), span)) => {
+                    if e.is_nil.is_some() {
+                        let msg = "skip_if and `is_nil` are mutually exclusive";
+                        return Err(syn::Error::new(skip_if_span, msg))
+                    }
+                    if d.nil.is_some() {
+                        let msg = "skip_if and `nil` are mutually exclusive";
+                        return Err(syn::Error::new(skip_if_span, msg))
+                    }
+                    let c = {
+                        e.is_nil = Some(is_nil);
+                        d.nil = Some(default);
+                        CustomCodec::Both(e, d)
+                    };
+                    this.attrs.insert(Kind::Codec, Value::Codec(c, span));
+                }
+                Some(Value::Codec(m@CustomCodec::Module(_, has_nil), span)) => {
+                    if has_nil {
+                        let msg = "skip_if and `has_nil` are mutually exclusive";
+                        return Err(syn::Error::new(skip_if_span, msg))
+                    }
+                    let c = {
+                        let e = Encode {
+                            encode: m.to_encode_path().expect("module => encode path"),
+                            is_nil: Some(is_nil),
+                            require_bound: false,
+                        };
+                        let d = Decode {
+                            decode: m.to_decode_path().expect("module => decode path"),
+                            nil: Some(default),
+                            require_bound: false
+                        };
+                        CustomCodec::Both(Box::new(e), Box::new(d))
+                    };
+                    this.attrs.insert(Kind::Codec, Value::Codec(c, span));
+                }
+                _ => {}
+            }
+        }
         Ok(this)
     }
 
@@ -168,18 +255,29 @@ impl Attributes {
                 attrs.try_insert(Kind::HasNil, Value::HasNil(meta.path.span()))?
             } else if meta.path.is_ident("encode_with") {
                 let s: LitStr = meta.value()?.parse()?;
-                let c = CustomCodec::Encode(codec::Encode { encode: s.parse()?, is_nil: None });
+                let c = CustomCodec::Encode(codec::Encode {
+                    encode: s.parse()?,
+                    is_nil: None,
+                    require_bound: false
+                });
                 attrs.try_insert(Kind::Codec, Value::Codec(c, meta.path.span()))?
             } else if meta.path.is_ident("is_nil") {
                 let s: LitStr = meta.value()?.parse()?;
                 attrs.try_insert(Kind::IsNil, Value::IsNil(s.parse()?, meta.path.span()))?
             } else if meta.path.is_ident("decode_with") {
                 let s: LitStr = meta.value()?.parse()?;
-                let c = CustomCodec::Decode(codec::Decode { decode: s.parse()?, nil: None });
+                let c = CustomCodec::Decode(codec::Decode {
+                    decode: s.parse()?,
+                    nil: None,
+                    require_bound: false
+                });
                 attrs.try_insert(Kind::Codec, Value::Codec(c, meta.path.span()))?
             } else if meta.path.is_ident("nil") {
                 let s: LitStr = meta.value()?.parse()?;
                 attrs.try_insert(Kind::Nil, Value::Nil(s.parse()?, meta.path.span()))?
+            } else if meta.path.is_ident("skip_if") {
+                let s: LitStr = meta.value()?.parse()?;
+                attrs.try_insert(Kind::SkipIf, Value::SkipIf(Some(s.parse()?), meta.path.span()))?;
             } else if meta.path.is_ident("with") {
                 let s: LitStr = meta.value()?.parse()?;
                 let c = CustomCodec::Module(s.parse()?, false);
@@ -305,6 +403,10 @@ impl Attributes {
         self.contains_key(Kind::Skip)
     }
 
+    pub fn skip_if_codec(&self) -> bool {
+        self.contains_key(Kind::SkipIf)
+    }
+
     pub fn flat(&self) -> bool {
         self.contains_key(Kind::Flat)
     }
@@ -347,6 +449,7 @@ impl Attributes {
                 | Kind::HasNil
                 | Kind::CborLen
                 | Kind::Skip
+                | Kind::SkipIf
                 | Kind::Flat
                 | Kind::Default
                 => {
@@ -365,6 +468,7 @@ impl Attributes {
                 | Kind::CborLen
                 | Kind::Tag
                 | Kind::Skip
+                | Kind::SkipIf
                 | Kind::Default
                 => {}
                 | Kind::Encoding
@@ -394,6 +498,7 @@ impl Attributes {
                 | Kind::HasNil
                 | Kind::CborLen
                 | Kind::Skip
+                | Kind::SkipIf
                 | Kind::Default
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.level);
@@ -416,6 +521,7 @@ impl Attributes {
                 | Kind::ContextBound
                 | Kind::CborLen
                 | Kind::Skip
+                | Kind::SkipIf
                 | Kind::Flat
                 | Kind::Default
                 => {
@@ -429,12 +535,20 @@ impl Attributes {
                 let s = val.span();
                 match (val, &cc) {
                     (Value::Codec(CustomCodec::Encode(e), _), CustomCodec::Decode(d)) => {
-                        let d = codec::Decode { decode: d.decode.clone(), nil: d.nil.clone() };
+                        let d = codec::Decode {
+                            decode: d.decode.clone(),
+                            nil: d.nil.clone(),
+                            require_bound: d.require_bound
+                        };
                         *cc = CustomCodec::Both(Box::new(e), Box::new(d));
                         return Ok(())
                     }
                     (Value::Codec(CustomCodec::Decode(d), _), CustomCodec::Encode(e)) => {
-                        let e = codec::Encode { encode: e.encode.clone(), is_nil: e.is_nil.clone() };
+                        let e = codec::Encode {
+                            encode: e.encode.clone(),
+                            is_nil: e.is_nil.clone(),
+                            require_bound: e.require_bound
+                        };
                         *cc = CustomCodec::Both(Box::new(e), Box::new(d));
                         return Ok(())
                     }
@@ -590,6 +704,7 @@ impl Value {
             Value::CborLen(_, s)      => *s,
             Value::Tag(_, s)          => *s,
             Value::Skip(s)            => *s,
+            Value::SkipIf(_, s)       => *s,
             Value::Flat(s)            => *s,
             Value::Default(s)         => *s
         }
