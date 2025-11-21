@@ -13,8 +13,8 @@ categories    = ["encoding"]
 proc-macro = true
 
 [features]
-alloc = []
-std   = ["alloc"]
+alloc = [] # unused
+std   = [] # unused
 
 [dependencies]
 proc-macro2 = "1.0.79"
