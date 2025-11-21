@@ -622,7 +622,13 @@ encode_nonzero! {
     core::num::NonZeroIsize
 }
 
-#[cfg(any(atomic32, atomic64))]
+#[cfg(any(
+    target_has_atomic = "8",
+    target_has_atomic = "16",
+    target_has_atomic = "32",
+    target_has_atomic = "64",
+    target_has_atomic = "ptr",
+))]
 macro_rules! encode_atomic {
     ($($t:ty)*) => {
         $(
@@ -642,31 +648,34 @@ macro_rules! encode_atomic {
     }
 }
 
-#[cfg(atomic32)]
+#[cfg(target_has_atomic = "8")]
 encode_atomic! {
     core::sync::atomic::AtomicBool
     core::sync::atomic::AtomicU8
-    core::sync::atomic::AtomicU16
-    core::sync::atomic::AtomicU32
-    core::sync::atomic::AtomicUsize
     core::sync::atomic::AtomicI8
-    core::sync::atomic::AtomicI16
-    core::sync::atomic::AtomicI32
-    core::sync::atomic::AtomicIsize
 }
 
-#[cfg(atomic64)]
+#[cfg(target_has_atomic = "16")]
 encode_atomic! {
-    core::sync::atomic::AtomicBool
-    core::sync::atomic::AtomicU8
     core::sync::atomic::AtomicU16
-    core::sync::atomic::AtomicU32
-    core::sync::atomic::AtomicU64
-    core::sync::atomic::AtomicUsize
-    core::sync::atomic::AtomicI8
     core::sync::atomic::AtomicI16
+}
+
+#[cfg(target_has_atomic = "32")]
+encode_atomic! {
+    core::sync::atomic::AtomicU32
     core::sync::atomic::AtomicI32
+}
+
+#[cfg(target_has_atomic = "64")]
+encode_atomic! {
+    core::sync::atomic::AtomicU64
     core::sync::atomic::AtomicI64
+}
+
+#[cfg(target_has_atomic = "ptr")]
+encode_atomic! {
+    core::sync::atomic::AtomicUsize
     core::sync::atomic::AtomicIsize
 }
 
