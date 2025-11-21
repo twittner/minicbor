@@ -7,6 +7,11 @@
 
 # minicbor
 
+## `2.1.2`
+
+- Replaces `build.rs` with `target_has_atomic`. See pull request
+  [#47](https://github.com/twittner/minicbor/pull/47) by @dtolnay for details.
+
 ## `2.1.1`
 
 - Depends on `minicbor-derive-0.18.2`.
