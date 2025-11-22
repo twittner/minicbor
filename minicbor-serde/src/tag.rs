@@ -1,7 +1,7 @@
 //!  Module providing types to support custom tags in CBOR
 use core::ops::{Deref, DerefMut};
 use minicbor::data::Tag;
-use serde::{Deserialize, de};
+use serde::{Deserialize, Serialize, de};
 
 /// Enum alias for [`TagContainer`]
 pub(crate) const TAG_CONTAINER_IDENTIFIER: &str = "$#minicbor_serde_tag_container#$";
@@ -16,6 +16,10 @@ pub(crate) const NO_TAG_IDENTIFIER: &str = "$#minicbor_serde_no_tag#$";
 /// value.
 ///
 /// [`de::Deserialize`] implementation for this enum renames the fields to
+/// custom aliases to ensure that [`crate::de::Deserializer`] is able to drive
+/// the [`minicbor::Decoder`] correctly.
+///
+/// /// [`ser::Serializer`] implementation for this enum renames the fields to
 /// custom aliases to ensure that [`crate::de::Deserializer`] is able to drive
 /// the [`minicbor::Decoder`] correctly.
 enum TagContainer<T> {
@@ -136,6 +140,34 @@ impl core::fmt::Display for ExpectedTagError {
     }
 }
 
+impl<T: Serialize> Serialize for TagContainer<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeTupleVariant;
+        match self {
+            TagContainer::Tag(tag, val) => {
+                let mut tv = serializer.serialize_tuple_variant(
+                    TAG_CONTAINER_IDENTIFIER,
+                    0,
+                    TAG_IDENTIFIER,
+                    2,
+                )?;
+                tv.serialize_field(&tag.as_u64())?;
+                tv.serialize_field(val)?;
+                tv.end()
+            }
+            TagContainer::NoTag(val) => serializer.serialize_newtype_variant(
+                TAG_CONTAINER_IDENTIFIER,
+                1,
+                NO_TAG_IDENTIFIER,
+                val,
+            ),
+        }
+    }
+}
+
 /// Requires unique tag to be present during deserialization
 ///
 /// Tags will always be emitted during serialization
@@ -189,6 +221,15 @@ impl<'de, const TAG: u64, T: Deserialize<'de>> Deserialize<'de> for Required<TAG
             ))),
             _ => Err(de::Error::custom(ExpectedTagError::new(Self::EXPECTED_TAG))),
         }
+    }
+}
+
+impl<const TAG: u64, T: Serialize> Serialize for Required<TAG, T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        TagContainer::Tag(Self::EXPECTED_TAG, &self.0).serialize(serializer)
     }
 }
 
@@ -255,6 +296,18 @@ impl<'de, const TAG: u64, T: Deserialize<'de>> Deserialize<'de> for Optional<TAG
     }
 }
 
+impl<const TAG: u64, T: Serialize> Serialize for Optional<TAG, T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self.0 {
+            Some(tag) => TagContainer::Tag(tag, &self.1).serialize(serializer),
+            None => TagContainer::NoTag(&self.1).serialize(serializer),
+        }
+    }
+}
+
 /// Accepts any tag during deserialization, if present
 ///
 /// Tag will be emitted during serialization, if present
@@ -306,6 +359,18 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Any<T> {
         match container {
             TagContainer::Tag(tag, val) => Ok(Any(Some(tag), val)),
             TagContainer::NoTag(val) => Ok(Any(None, val)),
+        }
+    }
+}
+
+impl<T: Serialize> Serialize for Any<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self.0 {
+            Some(tag) => TagContainer::Tag(tag, &self.1).serialize(serializer),
+            None => TagContainer::NoTag(&self.1).serialize(serializer),
         }
     }
 }
