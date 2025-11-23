@@ -4,10 +4,13 @@ use std::ops::Deref;
 use crate::{collect_type_params, is_phantom_data, Mode};
 use crate::{attrs::CustomCodec, fields::Fields};
 
-#[derive(Default)]
 pub(crate) struct Blacklist(HashSet<syn::Ident>);
 
 impl Blacklist {
+    pub(crate) fn empty() -> Self {
+        Self(HashSet::new())
+    }
+
     /// Generate a blacklist of type parameters that should not have bounds attached.
     ///
     /// This includes:
@@ -15,8 +18,14 @@ impl Blacklist {
     /// - Type parameters of fields with a custom encode, decode or cbor_len function.
     /// - Fields that are skipped over.
     /// - Fields with a `PhantomData` type.
-    pub(crate) fn new(mode: Mode, fields: &Fields, g: &syn::Generics) -> Blacklist {
-        // Start with custom encode/decode/cbor_len functions.
+    pub(crate) fn new(mode: Mode, fields: &Fields, g: &syn::Generics) -> Self {
+        Self::empty()
+            .with_mode(mode, fields, g)
+            .with_skipped(fields, g)
+            .with_phantoms(fields, g)
+    }
+
+    pub(crate) fn with_mode(mut self, mode: Mode, fields: &Fields, g: &syn::Generics) -> Self {
         let mut blacklist = collect_type_params(g, fields.fields().filter(|f| {
             match mode {
                 Mode::Encode => f.attrs.codec().map(|c| !c.require_encode_bound()).unwrap_or(false),
@@ -41,15 +50,21 @@ impl Blacklist {
             }));
             blacklist.retain(|ident| !others.contains(ident));
         }
+        self.0.extend(blacklist);
+        self
+    }
 
-        // Extend the blacklist by type parameters only appearing in skipped fields.
+    /// Extend the blacklist by type parameters only appearing in skipped fields.
+    pub(crate) fn with_skipped(mut self, fields: &Fields, g: &syn::Generics) -> Self {
         let skipped = collect_type_params(g, fields.skipped());
         if !skipped.is_empty() {
             let regular = collect_type_params(g, fields.fields());
-            blacklist.extend(skipped.difference(&regular).cloned())
+            self.0.extend(skipped.difference(&regular).cloned())
         }
+        self
+    }
 
-        // And finally also by type parameters only appearing in `PhantomData`.
+    pub(crate) fn with_phantoms(mut self, fields: &Fields, g: &syn::Generics) -> Self {
         let phantoms = collect_type_params(g, fields.fields().chain(fields.skipped()).filter(|f| {
             is_phantom_data(&f.typ)
         }));
@@ -57,11 +72,11 @@ impl Blacklist {
             let non_phantom = collect_type_params(g, fields.fields().chain(fields.skipped()).filter(|f| {
                 !is_phantom_data(&f.typ)
             }));
-            blacklist.extend(phantoms.difference(&non_phantom).cloned());
+            self.0.extend(phantoms.difference(&non_phantom).cloned());
         }
-
-        Self(blacklist)
+        self
     }
+
 
     /// Merge in another set of fields.
     ///
@@ -70,14 +85,14 @@ impl Blacklist {
     ///
     /// Any types in negative position, i.e. blacklisted in the given fields
     /// argument will be add to the blacklist.
-    pub(crate) fn merge(&mut self, m: Mode, f: &Fields, g: &syn::Generics) {
-        let b = Blacklist::new(m, f, g);
+    pub(crate) fn merge(&mut self, f: &Fields, g: &syn::Generics, b: Self) -> &mut Self {
         for t in collect_type_params(g, f.fields()).difference(&b) {
             self.0.remove(t);
         }
         for t in b.0 {
             self.0.insert(t);
         }
+        self
     }
 
     pub(crate) fn add<I>(&mut self, it: I)

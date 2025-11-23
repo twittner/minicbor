@@ -577,38 +577,29 @@ pub fn derive_cbor_len(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 
 /// Check if the given type is an `Option` whose inner type matches the predicate.
 fn is_option(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> bool {
-    if let syn::Type::Path(t) = ty {
-        if let Some(s) = t.path.segments.last() {
-            if s.ident == "Option" {
-                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
-                    if b.args.len() == 1 {
-                        if let syn::GenericArgument::Type(ty) = &b.args[0] {
-                            return pred(ty)
-                        }
-                    }
-                }
-            }
-        }
+    if let syn::Type::Path(t) = ty
+        && let Some(s) = t.path.segments.last()
+        && s.ident == "Option"
+        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
+        && b.args.len() == 1
+        && let syn::GenericArgument::Type(ty) = &b.args[0]
+    {
+        return pred(ty)
     }
     false
 }
 
 /// Check if the given type is a `Cow` whose inner type matches the predicate.
 fn is_cow(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> bool {
-    if let syn::Type::Path(t) = ty {
-        if let Some(s) = t.path.segments.last() {
-            if s.ident == "Cow" {
-                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
-                    if b.args.len() == 2 {
-                        if let syn::GenericArgument::Lifetime(_) = &b.args[0] {
-                            if let syn::GenericArgument::Type(ty) = &b.args[1] {
-                                return pred(ty)
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    if let syn::Type::Path(t) = ty
+        && let Some(s) = t.path.segments.last()
+        && s.ident == "Cow"
+        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
+        && b.args.len() == 2
+        && let syn::GenericArgument::Lifetime(_) = &b.args[0]
+        && let syn::GenericArgument::Type(ty) = &b.args[1]
+    {
+        return pred(ty)
     }
     false
 }
@@ -683,11 +674,11 @@ where
 }
 
 fn add_bound_to_type_params<'a, I, A>
-    ( bound: syn::TypeParamBound
+    ( mode: Mode
+    , bound: syn::TypeParamBound
     , params: I
     , blacklist: &HashSet<syn::Ident>
     , attrs: A
-    , mode: Mode
     )
 where
     I: IntoIterator<Item = &'a mut syn::TypeParam>,
@@ -710,21 +701,6 @@ where
                 }
             }
         } else if !blacklist.contains(&p.ident) {
-            p.bounds.push(bound.clone())
-        }
-    }
-}
-
-fn add_bound_to_matching_type_params<'a, I>
-    ( bound: syn::TypeParamBound
-    , params: I
-    , whitelist: &HashSet<syn::Ident>
-    )
-where
-    I: IntoIterator<Item = &'a mut syn::TypeParam>,
-{
-    for p in params {
-        if whitelist.contains(&p.ident) {
             p.bounds.push(bound.clone())
         }
     }

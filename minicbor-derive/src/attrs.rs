@@ -124,15 +124,17 @@ impl Attributes {
                 return Err(syn::Error::new(*s, "`tag` and `transparent` are mutually exclusive"))
             }
         }
-        if let Some(Value::Skip(s)) = this.get(Kind::Skip) {
-            if this.attrs.len() > 1 {
-                return Err(syn::Error::new(*s, "`skip` does not allow other attributes"))
-            }
+        if this.contains_key(Kind::Skip)
+            && let Some((_, a)) = this.attrs
+                .iter()
+                .find(|(k, _)| !matches!(k, Kind::Skip | Kind::TypeParam))
+        {
+            return Err(syn::Error::new(a.span(), "`skip` can not be used with this attribute"))
         }
-        if let Some(Value::Flat(_)) = this.get(Kind::Flat) {
-            if let Some(Value::Encoding(Encoding::Map, s)) = this.get(Kind::Encoding) {
-                return Err(syn::Error::new(*s, "flat enum does not support map encoding"))
-            }
+        if this.contains_key(Kind::Flat)
+            && let Some(Value::Encoding(Encoding::Map, s)) = this.get(Kind::Encoding)
+        {
+            return Err(syn::Error::new(*s, "flat enum does not support map encoding"))
         }
         // `skip_if` triggers the creation of a custom codec where `encode` and `decode`
         // correspond the the default routines, `is_nil` is defined via `skip_if`'s
@@ -662,17 +664,13 @@ impl Attributes {
                 }
             }
             Value::CborLen(_, s) => {
-                if let Some(Value::Codec(c, _)) = self.get(Kind::Codec) {
-                    if c.is_module() {
-                        return Err(syn::Error::new(*s, "`cbor_len` and `with` are mutually exclusive"))
-                    }
+                if let Some(Value::Codec(c, _)) = self.get(Kind::Codec) && c.is_module() {
+                    return Err(syn::Error::new(*s, "`cbor_len` and `with` are mutually exclusive"))
                 }
             }
             Value::Borrow(_, s) => {
-                if let Some(idx) = self.index() {
-                    if idx.is_b() {
-                        return Err(syn::Error::new(*s, "`borrow` and `b` are mutually exclusive"))
-                    }
+                if let Some(idx) = self.index() && idx.is_b() {
+                    return Err(syn::Error::new(*s, "`borrow` and `b` are mutually exclusive"))
                 }
             }
             Value::Index(idx, s) if idx.is_b() => {

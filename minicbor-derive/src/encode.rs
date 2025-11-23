@@ -40,7 +40,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     let bound  = gen_encode_bound()?;
     let params = inp.generics.type_params_mut();
-    add_bound_to_type_params(bound, params, &blacklist, fields.fields().attributes(), Mode::Encode);
+    add_bound_to_type_params(Mode::Encode, bound, params, &blacklist, fields.fields().attributes());
 
     let generics = add_typeparam(&inp.generics, gen_ctx_param()?, attrs.context_bound());
     let impl_generics = generics.split_for_impl().0;
@@ -90,13 +90,13 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
-    let mut blacklist = Blacklist::default();
+    let mut blacklist = Blacklist::empty();
     let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
 
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
-        blacklist.merge(Mode::Encode, &fields, &inp.generics);
+        blacklist.merge(&fields, &inp.generics, Blacklist::new(Mode::Encode, &fields, &inp.generics));
         let con = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag = encode_tag(attrs);
@@ -207,7 +207,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     {
         let bound  = gen_encode_bound()?;
         let params = inp.generics.type_params_mut();
-        add_bound_to_type_params(bound, params, &blacklist, &field_attrs, Mode::Encode);
+        add_bound_to_type_params(Mode::Encode, bound, params, &blacklist, &field_attrs);
     }
 
     let generics = add_typeparam(&inp.generics, gen_ctx_param()?, enum_attrs.context_bound());
