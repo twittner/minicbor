@@ -1,6 +1,6 @@
 [package]
 name          = "minicbor-derive"
-version       = "0.18.2"
+version       = "0.18.3"
 authors       = ["Toralf Wittner <tw@dtex.org>"]
 license       = "BlueOak-1.0.0"
 edition       = "2024"
@@ -13,8 +13,8 @@ categories    = ["encoding"]
 proc-macro = true
 
 [features]
-alloc = []
-std   = ["alloc"]
+alloc = [] # unused
+std   = [] # unused
 
 [dependencies]
 proc-macro2 = "1.0.79"

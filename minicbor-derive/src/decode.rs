@@ -330,15 +330,14 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
             };
 
             let value =
-                if cfg!(any(feature = "alloc", feature = "std"))
-                    && (field.attrs.borrow().is_some() || field.index.is_b())
+                if (field.attrs.borrow().is_some() || field.index.is_b())
                     && is_cow(&field.typ, |t| is_str(t) || is_byte_slice(t))
                 {
-                    if cfg!(feature = "std") {
-                        quote!(Some(std::borrow::Cow::Borrowed(__v777)))
-                    } else {
-                        quote!(Some(alloc::borrow::Cow::Borrowed(__v777)))
-                    }
+                    quote!(minicbor::__minicbor_cfg! {
+                        'std { Some(std::borrow::Cow::Borrowed(__v777)) }
+                        'alloc { Some(alloc::borrow::Cow::Borrowed(__v777)) }
+                        'otherwise { Some(__v777) }
+                    })
                 } else {
                     quote!(Some(__v777))
                 };
@@ -443,42 +442,41 @@ fn make_transparent_impl
         .unwrap_or_else(|| default_decode_fn.clone());
 
     let decode_call =
-        if cfg!(any(feature = "alloc", feature = "std"))
-            && (field.attrs.borrow().is_some() || field.index.is_b())
+        if (field.attrs.borrow().is_some() || field.index.is_b())
             && is_cow(&field.typ, |t| is_str(t) || is_byte_slice(t))
         {
-            let cow =
-                if cfg!(feature = "std") {
-                    quote!(std::borrow::Cow::Borrowed(v))
-                } else {
-                    quote!(alloc::borrow::Cow::Borrowed(v))
-                };
-            if field.is_name {
-                let id = &field.ident;
-                quote! {
-                    Ok(#name {
-                        #id: match #decode_fn(__d777, __ctx777) {
-                            Ok(v)  => #cow,
-                            Err(e) => return Err(e)
-                        }
-                    })
-                }
-            } else {
-                quote! {
-                    Ok(#name(match #decode_fn(__d777, __ctx777) {
-                        Ok(v)  => #cow,
+            quote!(minicbor::__minicbor_cfg! {
+                'std {
+                    match #decode_fn(__d777, __ctx777) {
+                        Ok(v)  => std::borrow::Cow::Borrowed(v),
                         Err(e) => return Err(e)
-                    }))
+                    }
                 }
+                'alloc {
+                    match #decode_fn(__d777, __ctx777) {
+                        Ok(v)  => alloc::borrow::Cow::Borrowed(v),
+                        Err(e) => return Err(e)
+                    }
+                }
+                'otherwise {
+                    #decode_fn(__d777, __ctx777)?
+                }
+            })
+        } else {
+            quote! {
+                #decode_fn(__d777, __ctx777)?
             }
-        } else if field.is_name {
+        };
+
+    let decode_body =
+        if field.is_name {
             let id = &field.ident;
             quote! {
-                Ok(#name { #id: #decode_fn(__d777, __ctx777)? })
+                Ok(#name { #id: #decode_call })
             }
         } else {
             quote! {
-                Ok(#name(#decode_fn(__d777, __ctx777)?))
+                Ok(#name(#decode_call))
             }
         };
 
@@ -521,7 +519,7 @@ fn make_transparent_impl
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
             fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
-                #decode_call
+                #decode_body
             }
 
             #nil_impl
@@ -576,27 +574,25 @@ fn nil(f: &Field) -> proc_macro2::TokenStream {
 
 fn decode_tag(a: &Attributes) -> proc_macro2::TokenStream {
     if let Some(t) = a.tag() {
-        let err =
-            if cfg!(feature = "std") {
-                quote! {
-                    minicbor::decode::Error::tag_mismatch(__t777)
-                        .with_message(format!("expected tag {}", #t))
-                        .at(__p777)
-                }
-            } else if cfg!(feature = "alloc") {
-                quote! {
-                    minicbor::decode::Error::tag_mismatch(__t777)
-                        .with_message(alloc::format!("expected tag {}", #t))
-                        .at(__p777)
-                }
-            } else {
-                quote!(minicbor::decode::Error::tag_mismatch(__t777).at(__p777))
-            };
         quote! {
             let __p777 = __d777.position();
             let __t777 = __d777.tag()?;
             if #t != __t777.as_u64() {
-                return Err(#err)
+                return Err(minicbor::__minicbor_cfg! {
+                    'std {
+                        minicbor::decode::Error::tag_mismatch(__t777)
+                            .with_message(format!("expected tag {}", #t))
+                            .at(__p777)
+                    }
+                    'alloc {
+                        minicbor::decode::Error::tag_mismatch(__t777)
+                            .with_message(alloc::format!("expected tag {}", #t))
+                            .at(__p777)
+                    }
+                    'otherwise {
+                        minicbor::decode::Error::tag_mismatch(__t777).at(__p777)
+                    }
+                });
             }
         }
     } else {

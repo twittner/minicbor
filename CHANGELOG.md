@@ -7,6 +7,10 @@
 
 # minicbor
 
+## `2.1.3`
+
+- Depends on `minicbor-derive-0.18.3`.
+
 ## `2.1.2`
 
 - Replaces `build.rs` with `target_has_atomic`. See pull request
@@ -432,6 +436,11 @@
 - Added `Encode` and `Decode` impls for tuples (see merge request [1][mr1] by @koushiro).
 
 # minicbor-derive
+
+## `0.18.3`
+
+- Fixes feature-handling, see pull request [#48](https://github.com/twittner/minicbor/pull/48) by
+  @dtolnay for details.
 
 ## `0.18.2`
 
