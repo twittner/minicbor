@@ -142,13 +142,14 @@ impl Attributes {
         // predicate and `nil` points to an internal helper that matches the signature
         // of `nil` and uses `Default::default` to create a default value.
         //
-        // If a custom codec is already defined, `is_nil` and `nil` are overriden by
-        // `skip_if`'s predicate and the internal default helper.
+        // If a custom codec is already defined, `is_nil` and `nil` are set to `skip_if`'s
+        // predicate and the internal default helper. If `is_nil` or `nil` already exist
+        // in a pre-existing custom codec, an error is returned.
         if let Some(Value::SkipIf(is_nil@Some(_), skip_if_span)) = this.get_mut(Kind::SkipIf) {
             let is_nil  = is_nil.take().expect("some is_nil");
             let encode  = parse_quote!(minicbor::Encode::encode);
             let decode  = parse_quote!(minicbor::Decode::decode);
-            let default = parse_quote!(minicbor::decode::internal::some_default);
+            let default = parse_quote!(minicbor::derive::__some_default);
             let skip_if_span = *skip_if_span;
             match this.remove(Kind::Codec) {
                 None => {
