@@ -36,17 +36,17 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let attrs  = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
     let fields = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
 
-    let blacklist      = Blacklist::new(Mode::Length, &fields, &inp.generics);
-    let cbor_len_bound = gen_cbor_len_bound()?;
+    let blacklist      = Blacklist::full(Mode::Length, &fields, &inp.generics);
+    let cbor_len_bound = gen_cbor_len_bound();
     let params         = inp.generics.type_params_mut();
-    add_bound_to_type_params(cbor_len_bound, params, &blacklist, fields.fields().attributes(), Mode::Length);
+    add_bound_to_type_params(Mode::Length, cbor_len_bound, params, &blacklist, fields.fields().attributes());
 
     let blacklist    = blacklist_is_nil_params(&inp.generics, &fields);
-    let encode_bound = gen_encode_bound()?;
+    let encode_bound = gen_encode_bound();
     let params       = inp.generics.type_params_mut();
-    add_bound_to_type_params(encode_bound, params, &blacklist, fields.fields().attributes(), Mode::Length);
+    add_bound_to_type_params(Mode::Length, encode_bound, params, &blacklist, fields.fields().attributes());
 
-    let generics = add_typeparam(&inp.generics, gen_ctx_param()?, attrs.context_bound());
+    let generics = add_typeparam(&inp.generics, gen_ctx_param(), attrs.context_bound());
     let impl_generics = generics.split_for_impl().0;
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
@@ -90,13 +90,13 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
 
-    let mut blacklist_len = Blacklist::default();
-    let mut blacklist_enc = Blacklist::default();
+    let mut blacklist_len = Blacklist::empty();
+    let mut blacklist_enc = Blacklist::empty();
     let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
-        blacklist_len.merge(Mode::Length, &fields, &inp.generics);
+        blacklist_len.merge(&fields, &inp.generics, Blacklist::full(Mode::Length, &fields, &inp.generics));
         blacklist_enc.add(HashSet::from(blacklist_is_nil_params(&inp.generics, &fields)));
         let con      = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
@@ -156,15 +156,15 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         rows.push(row)
     }
 
-    let cbor_len_bound = gen_cbor_len_bound()?;
+    let cbor_len_bound = gen_cbor_len_bound();
     let params         = inp.generics.type_params_mut();
-    add_bound_to_type_params(cbor_len_bound, params, &blacklist_len, &field_attrs, Mode::Length);
+    add_bound_to_type_params(Mode::Length, cbor_len_bound, params, &blacklist_len, &field_attrs);
 
-    let encode_bound   = gen_encode_bound()?;
+    let encode_bound   = gen_encode_bound();
     let params         = inp.generics.type_params_mut();
-    add_bound_to_type_params(encode_bound, params, &blacklist_enc, &field_attrs, Mode::Length);
+    add_bound_to_type_params(Mode::Length, encode_bound, params, &blacklist_enc, &field_attrs);
 
-    let generics = add_typeparam(&inp.generics, gen_ctx_param()?, enum_attrs.context_bound());
+    let generics = add_typeparam(&inp.generics, gen_ctx_param(), enum_attrs.context_bound());
     let impl_generics = generics.split_for_impl().0;
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
@@ -296,10 +296,8 @@ fn cbor_len(custom: Option<&syn::ExprPath>, codec: Option<&CustomCodec>) -> proc
     if let Some(cu) = custom {
         return cu.to_token_stream()
     }
-    if let Some(ce) = codec {
-        if let Some(p) = ce.to_cbor_len_path() {
-            return p.to_token_stream()
-        }
+    if let Some(ce) = codec && let Some(p) = ce.to_cbor_len_path() {
+        return p.to_token_stream()
     }
     quote!(minicbor::CborLen::<Ctx>::cbor_len)
 }
@@ -332,12 +330,12 @@ fn make_transparent_impl
     })
 }
 
-fn gen_cbor_len_bound() -> syn::Result<syn::TypeParamBound> {
-    syn::parse_str("minicbor::CborLen<Ctx>")
+fn gen_cbor_len_bound() -> syn::TypeParamBound {
+    syn::parse_quote!(minicbor::CborLen<Ctx>)
 }
 
-fn gen_encode_bound() -> syn::Result<syn::TypeParamBound> {
-    syn::parse_str("minicbor::Encode<Ctx>")
+fn gen_encode_bound() -> syn::TypeParamBound {
+    syn::parse_quote!(minicbor::Encode<Ctx>)
 }
 
 fn on_tag(a: &Attributes) -> proc_macro2::TokenStream {
@@ -349,7 +347,7 @@ fn on_tag(a: &Attributes) -> proc_macro2::TokenStream {
 }
 
 fn blacklist_is_nil_params(generics: &syn::Generics, fields: &Fields) -> Blacklist {
-    let mut blacklist = Blacklist::default();
+    let mut blacklist = Blacklist::empty();
     blacklist.add({
         let mut with_is_nil = collect_type_params(generics, fields.fields().filter(|f| {
             f.attrs.codec().map(|c| c.is_is_nil()).unwrap_or(false)
