@@ -46,7 +46,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         }
     }
 
-    let blacklist = Blacklist::new(Mode::Decode, &fields, &inp.generics);
+    let blacklist = Blacklist::full(Mode::Decode, &fields, &inp.generics);
     let bound  = gen_decode_bound();
     let params = inp.generics.type_params_mut();
     add_bound_to_type_params(Mode::Decode, bound, params, &blacklist, fields.fields().attributes());
@@ -70,7 +70,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     );
 
     let generics = add_lifetime(&inp.generics, lifetime);
-    let generics = add_typeparam(&generics, gen_ctx_param()?, attrs.context_bound());
+    let generics = add_typeparam(&generics, gen_ctx_param(), attrs.context_bound());
     let impl_generics = generics.split_for_impl().0;
 
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
@@ -175,7 +175,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     lifetime.bounds.push(l.clone())
                 }
             }
-            decode_blacklist.merge(&fields, &inp.generics, Blacklist::new(Mode::Decode, &fields, &inp.generics));
+            decode_blacklist.merge(&fields, &inp.generics, Blacklist::full(Mode::Decode, &fields, &inp.generics));
             default_blacklist.merge(&fields, &inp.generics, Blacklist::empty()
                 .with_mode(Mode::Decode, &fields, &inp.generics)
                 .with_phantoms(&fields, &inp.generics));
@@ -240,7 +240,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     );
 
     let generics = add_lifetime(&inp.generics, lifetime);
-    let generics = add_typeparam(&generics, gen_ctx_param()?, enum_attrs.context_bound());
+    let generics = add_typeparam(&generics, gen_ctx_param(), enum_attrs.context_bound());
     let impl_generics = generics.split_for_impl().0;
 
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
@@ -305,7 +305,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 // `on_struct` and their inner value will be used to initialise a field.
 // If not present, an error will be produced.
 fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Result<proc_macro2::TokenStream> {
-    let default_decode_fn: syn::ExprPath = syn::parse_str("minicbor::Decode::decode")?;
+    let default_decode_fn: syn::ExprPath = syn::parse_quote!(minicbor::Decode::decode);
 
     let actions = fields.fields().map(|field| {
         let decode_fn = field.attrs.codec()
@@ -448,8 +448,8 @@ fn make_transparent_impl
     , where_clause: Option<&syn::WhereClause>
     ) -> syn::Result<proc_macro2::TokenStream>
 {
-    let default_decode_fn: syn::ExprPath = syn::parse_str("minicbor::Decode::decode")?;
-    let default_nil_fn: syn::ExprPath = syn::parse_str("minicbor::Decode::<Ctx>::nil")?;
+    let default_decode_fn: syn::ExprPath = syn::parse_quote!(minicbor::Decode::decode);
+    let default_nil_fn: syn::ExprPath = syn::parse_quote!(minicbor::Decode::<Ctx>::nil);
 
     let decode_fn = field.attrs.codec()
         .filter(|cc| cc.is_decode())

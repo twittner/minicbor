@@ -637,6 +637,49 @@ fn is_byte_slice(ty: &syn::Type) -> bool {
     }
 }
 
+/// Does the given bound match `Encode<Ctx>`?
+fn is_encode_bound(bound: &syn::TypeParamBound) -> bool {
+    if let syn::TypeParamBound::Trait(t) = bound
+        && let Some(s) = t.path.segments.last()
+        && s.ident == "Encode"
+        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
+        && b.args.len() == 1
+        && let syn::GenericArgument::Type(syn::Type::Path(p)) = &b.args[0]
+    {
+        return p.path.is_ident("Ctx")
+    }
+    false
+}
+
+/// Does the given bound match `CborLen<Ctx>`?
+fn is_length_bound(bound: &syn::TypeParamBound) -> bool {
+    if let syn::TypeParamBound::Trait(t) = bound
+        && let Some(s) = t.path.segments.last()
+        && s.ident == "CborLen"
+        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
+        && b.args.len() == 1
+        && let syn::GenericArgument::Type(syn::Type::Path(p)) = &b.args[0]
+    {
+        return p.path.is_ident("Ctx")
+    }
+    false
+}
+
+/// Does the given bound match `Decode<'bytes, Ctx>`?
+fn is_decode_bound(bound: &syn::TypeParamBound) -> bool {
+    if let syn::TypeParamBound::Trait(t) = bound
+        && let Some(s) = t.path.segments.last()
+        && s.ident == "Decode"
+        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
+        && b.args.len() == 2
+        && let syn::GenericArgument::Lifetime(lt) = &b.args[0]
+        && let syn::GenericArgument::Type(syn::Type::Path(p)) = &b.args[1]
+    {
+        return lt.ident == "bytes" && p.path.is_ident("Ctx")
+    }
+    false
+}
+
 /// Traverse all field types and collect all type parameters along the way.
 fn collect_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashSet<syn::Ident>
 where
@@ -718,8 +761,8 @@ where
     g2
 }
 
-fn gen_ctx_param() -> syn::Result<syn::TypeParam> {
-    syn::parse_str("Ctx")
+fn gen_ctx_param() -> syn::TypeParam {
+    syn::parse_quote!(Ctx)
 }
 
 fn is_phantom_data(t: &syn::Type) -> bool {

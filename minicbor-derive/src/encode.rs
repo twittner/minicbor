@@ -36,13 +36,13 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     let attrs     = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
     let encoding  = attrs.encoding().unwrap_or_default();
     let fields    = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
-    let blacklist = Blacklist::new(Mode::Encode, &fields, &inp.generics);
+    let blacklist = Blacklist::full(Mode::Encode, &fields, &inp.generics);
 
-    let bound  = gen_encode_bound()?;
+    let bound  = gen_encode_bound();
     let params = inp.generics.type_params_mut();
     add_bound_to_type_params(Mode::Encode, bound, params, &blacklist, fields.fields().attributes());
 
-    let generics = add_typeparam(&inp.generics, gen_ctx_param()?, attrs.context_bound());
+    let generics = add_typeparam(&inp.generics, gen_ctx_param(), attrs.context_bound());
     let impl_generics = generics.split_for_impl().0;
 
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
@@ -96,7 +96,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
-        blacklist.merge(&fields, &inp.generics, Blacklist::new(Mode::Encode, &fields, &inp.generics));
+        blacklist.merge(&fields, &inp.generics, Blacklist::full(Mode::Encode, &fields, &inp.generics));
         let con = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag = encode_tag(attrs);
@@ -205,12 +205,12 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     }
 
     {
-        let bound  = gen_encode_bound()?;
+        let bound  = gen_encode_bound();
         let params = inp.generics.type_params_mut();
         add_bound_to_type_params(Mode::Encode, bound, params, &blacklist, &field_attrs);
     }
 
-    let generics = add_typeparam(&inp.generics, gen_ctx_param()?, enum_attrs.context_bound());
+    let generics = add_typeparam(&inp.generics, gen_ctx_param(), enum_attrs.context_bound());
     let impl_generics = generics.split_for_impl().0;
 
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
@@ -255,7 +255,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 ///
 /// NB: The `fields` parameter is assumed to be sorted by index.
 fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool) -> syn::Result<(proc_macro2::TokenStream, proc_macro2::TokenStream)> {
-    let default_encode_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::encode")?;
+    let default_encode_fn: syn::ExprPath = syn::parse_quote!(minicbor::Encode::encode);
 
     let mut tests = Vec::new();
 
@@ -566,8 +566,8 @@ fn make_transparent_impl
     , where_clause: Option<&syn::WhereClause>
     ) -> syn::Result<proc_macro2::TokenStream>
 {
-    let default_encode_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::encode")?;
-    let default_is_nil_fn: syn::ExprPath = syn::parse_str("minicbor::Encode::<Ctx>::is_nil")?;
+    let default_encode_fn: syn::ExprPath = syn::parse_quote!(minicbor::Encode::encode);
+    let default_is_nil_fn: syn::ExprPath = syn::parse_quote!(minicbor::Encode::<Ctx>::is_nil);
 
     let encode_fn = field.attrs.codec()
         .filter(|cc| cc.is_encode())
@@ -632,8 +632,8 @@ fn make_transparent_impl
     })
 }
 
-fn gen_encode_bound() -> syn::Result<syn::TypeParamBound> {
-    syn::parse_str("minicbor::Encode<Ctx>")
+fn gen_encode_bound() -> syn::TypeParamBound {
+    syn::parse_quote!(minicbor::Encode<Ctx>)
 }
 
 pub(crate) fn is_nil(ty: &syn::Type, codec: Option<&CustomCodec>) -> proc_macro2::TokenStream {

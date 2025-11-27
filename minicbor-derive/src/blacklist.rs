@@ -18,7 +18,7 @@ impl Blacklist {
     /// - Type parameters of fields with a custom encode, decode or cbor_len function.
     /// - Fields that are skipped over.
     /// - Fields with a `PhantomData` type.
-    pub(crate) fn new(mode: Mode, fields: &Fields, g: &syn::Generics) -> Self {
+    pub(crate) fn full(mode: Mode, fields: &Fields, g: &syn::Generics) -> Self {
         Self::empty()
             .with_mode(mode, fields, g)
             .with_skipped(fields, g)
@@ -85,8 +85,8 @@ impl Blacklist {
     ///
     /// Any types in negative position, i.e. blacklisted in the given fields
     /// argument will be add to the blacklist.
-    pub(crate) fn merge(&mut self, f: &Fields, g: &syn::Generics, b: Self) -> &mut Self {
-        for t in collect_type_params(g, f.fields()).difference(&b) {
+    pub(crate) fn merge(&mut self, f: &Fields, g: &syn::Generics, b: Blacklist) -> &mut Self {
+        for t in collect_type_params(g, f.fields().chain(f.skipped())).difference(&b) {
             self.0.remove(t);
         }
         for t in b.0 {

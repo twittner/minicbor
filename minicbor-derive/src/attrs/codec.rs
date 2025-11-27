@@ -166,7 +166,7 @@ impl CustomCodec {
             CustomCodec::Encode(e)  => e.require_bound,
             CustomCodec::Decode(_)  => true,
             CustomCodec::Both(e, _) => e.require_bound,
-            CustomCodec::Module(..) => true
+            CustomCodec::Module(..) => false
         }
     }
 
@@ -175,7 +175,7 @@ impl CustomCodec {
             CustomCodec::Encode(_)  => true,
             CustomCodec::Decode(d)  => d.require_bound,
             CustomCodec::Both(_, d) => d.require_bound,
-            CustomCodec::Module(..) => true
+            CustomCodec::Module(..) => false
         }
     }
 }

@@ -19,6 +19,7 @@ pub use encoding::Encoding;
 pub use idx::Idx;
 
 use crate::attrs::codec::{Decode, Encode};
+use crate::{is_decode_bound, is_encode_bound, is_length_bound};
 
 /// Recognised attributes.
 #[derive(Debug, Clone)]
@@ -311,8 +312,32 @@ impl Attributes {
             } else if meta.path.is_ident("bound") {
                 let s: LitStr = meta.value()?.parse()?;
                 let t: syn::TypeParam = s.parse()?;
-                let m = iter::once((t.ident.clone(), t)).collect::<HashMap<_, _>>();
-                let b = TypeParams::All { encode: m.clone(), length: m.clone(), decode: m };
+                let b = TypeParams::All {
+                    encode: {
+                        let mut e = t.clone();
+                        e.bounds = e.bounds
+                            .into_iter()
+                            .filter(|b| !(is_decode_bound(b) || is_length_bound(b)))
+                            .collect();
+                        HashMap::from_iter([(e.ident.clone(), e)])
+                    },
+                    length: {
+                        let mut e = t.clone();
+                        e.bounds = e.bounds
+                            .into_iter()
+                            .filter(|b| !(is_encode_bound(b) || is_decode_bound(b)))
+                            .collect();
+                        HashMap::from_iter([(e.ident.clone(), e)])
+                    },
+                    decode: {
+                        let mut d = t;
+                        d.bounds = d.bounds
+                            .into_iter()
+                            .filter(|b| !(is_encode_bound(b) || is_length_bound(b)))
+                            .collect();
+                        HashMap::from_iter([(d.ident.clone(), d)])
+                    }
+                };
                 attrs.try_insert(Kind::TypeParam, Value::TypeParam(b, meta.path.span()))?
             } else if meta.path.is_ident("context_bound") {
                 let s: LitStr = meta.value()?.parse()?;
