@@ -94,6 +94,7 @@
 //! - [`#[cbor(index_only)]`](#cborindex_only)
 //! - [`#[cbor(transparent)]`](#cbortransparent)
 //! - [`#[cbor(skip)]`](#cborskip)
+//! - [`#[cbor(skip_if)]`](#cborskip_if)
 //! - [`#[cbor(default)]`](#cbordefault)
 //! - [`#[cbor(tag(...))]`](#cbortag)
 //! - [`#[cbor(decode_with)]`](#cbordecode_with--path)
@@ -175,6 +176,24 @@
 //! This attribute can be attached to fields in structs and enums and prevents
 //! those fields from being encoded. Field types must implement [`Default`] and
 //! when decoding the fields are initialised with `Default::default()`.
+//!
+//! ## `#[cbor(skip_if = "<path>")]`
+//!
+//! This attribute can be attached to fields in structs and enums and prevents
+//! those fields from being encoded if the predicate function denoted by `path`
+//! returns true. The predicate function must satisfy the following type signature
+//!
+//! ```no_run
+//! fn pred<T>(_: &T) -> bool {
+//!     todo!()
+//! }
+//! ```
+//!
+//! Field types must implement [`Default`] and when decoding, the fields are
+//! initialised with `Default::default()` if no value is present.
+//!
+//! Please note that `skip_if` is mutually exclusive with `nil`, `is_nil`, and
+//! `has_nil`.
 //!
 //! ## `#[cbor(default)]`
 //!
@@ -558,38 +577,29 @@ pub fn derive_cbor_len(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 
 /// Check if the given type is an `Option` whose inner type matches the predicate.
 fn is_option(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> bool {
-    if let syn::Type::Path(t) = ty {
-        if let Some(s) = t.path.segments.last() {
-            if s.ident == "Option" {
-                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
-                    if b.args.len() == 1 {
-                        if let syn::GenericArgument::Type(ty) = &b.args[0] {
-                            return pred(ty)
-                        }
-                    }
-                }
-            }
-        }
+    if let syn::Type::Path(t) = ty
+        && let Some(s) = t.path.segments.last()
+        && s.ident == "Option"
+        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
+        && b.args.len() == 1
+        && let syn::GenericArgument::Type(ty) = &b.args[0]
+    {
+        return pred(ty)
     }
     false
 }
 
 /// Check if the given type is a `Cow` whose inner type matches the predicate.
 fn is_cow(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> bool {
-    if let syn::Type::Path(t) = ty {
-        if let Some(s) = t.path.segments.last() {
-            if s.ident == "Cow" {
-                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
-                    if b.args.len() == 2 {
-                        if let syn::GenericArgument::Lifetime(_) = &b.args[0] {
-                            if let syn::GenericArgument::Type(ty) = &b.args[1] {
-                                return pred(ty)
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    if let syn::Type::Path(t) = ty
+        && let Some(s) = t.path.segments.last()
+        && s.ident == "Cow"
+        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
+        && b.args.len() == 2
+        && let syn::GenericArgument::Lifetime(_) = &b.args[0]
+        && let syn::GenericArgument::Type(ty) = &b.args[1]
+    {
+        return pred(ty)
     }
     false
 }
@@ -625,6 +635,49 @@ fn is_byte_slice(ty: &syn::Type) -> bool {
     } else {
         false
     }
+}
+
+/// Does the given bound match `Encode<Ctx>`?
+fn is_encode_bound(bound: &syn::TypeParamBound) -> bool {
+    if let syn::TypeParamBound::Trait(t) = bound
+        && let Some(s) = t.path.segments.last()
+        && s.ident == "Encode"
+        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
+        && b.args.len() == 1
+        && let syn::GenericArgument::Type(syn::Type::Path(p)) = &b.args[0]
+    {
+        return p.path.is_ident("Ctx")
+    }
+    false
+}
+
+/// Does the given bound match `CborLen<Ctx>`?
+fn is_length_bound(bound: &syn::TypeParamBound) -> bool {
+    if let syn::TypeParamBound::Trait(t) = bound
+        && let Some(s) = t.path.segments.last()
+        && s.ident == "CborLen"
+        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
+        && b.args.len() == 1
+        && let syn::GenericArgument::Type(syn::Type::Path(p)) = &b.args[0]
+    {
+        return p.path.is_ident("Ctx")
+    }
+    false
+}
+
+/// Does the given bound match `Decode<'bytes, Ctx>`?
+fn is_decode_bound(bound: &syn::TypeParamBound) -> bool {
+    if let syn::TypeParamBound::Trait(t) = bound
+        && let Some(s) = t.path.segments.last()
+        && s.ident == "Decode"
+        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
+        && b.args.len() == 2
+        && let syn::GenericArgument::Lifetime(lt) = &b.args[0]
+        && let syn::GenericArgument::Type(syn::Type::Path(p)) = &b.args[1]
+    {
+        return lt.ident == "bytes" && p.path.is_ident("Ctx")
+    }
+    false
 }
 
 /// Traverse all field types and collect all type parameters along the way.
@@ -664,11 +717,11 @@ where
 }
 
 fn add_bound_to_type_params<'a, I, A>
-    ( bound: syn::TypeParamBound
+    ( mode: Mode
+    , bound: syn::TypeParamBound
     , params: I
     , blacklist: &HashSet<syn::Ident>
     , attrs: A
-    , mode: Mode
     )
 where
     I: IntoIterator<Item = &'a mut syn::TypeParam>,
@@ -696,21 +749,6 @@ where
     }
 }
 
-fn add_bound_to_matching_type_params<'a, I>
-    ( bound: syn::TypeParamBound
-    , params: I
-    , whitelist: &HashSet<syn::Ident>
-    )
-where
-    I: IntoIterator<Item = &'a mut syn::TypeParam>,
-{
-    for p in params {
-        if whitelist.contains(&p.ident) {
-            p.bounds.push(bound.clone())
-        }
-    }
-}
-
 fn add_typeparam<'a, I>(g: &syn::Generics, mut t: syn::TypeParam, b: Option<I>) -> syn::Generics
 where
     I: Iterator<Item = &'a syn::TraitBound>
@@ -723,8 +761,8 @@ where
     g2
 }
 
-fn gen_ctx_param() -> syn::Result<syn::TypeParam> {
-    syn::parse_str("Ctx")
+fn gen_ctx_param() -> syn::TypeParam {
+    syn::parse_quote!(Ctx)
 }
 
 fn is_phantom_data(t: &syn::Type) -> bool {
