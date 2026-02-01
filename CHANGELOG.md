@@ -7,6 +7,10 @@
 
 # minicbor
 
+## `2.2.0`
+
+- Depends on `minicbor-derive-0.19.0`.
+
 ## `2.1.3`
 
 - Depends on `minicbor-derive-0.18.3`.
@@ -436,6 +440,11 @@
 - Added `Encode` and `Decode` impls for tuples (see merge request [1][mr1] by @koushiro).
 
 # minicbor-derive
+
+## `0.19.0`
+
+- Adds attribute `skip_if`. See issue [#43](https://github.com/twittner/minicbor/issues/43) for
+  details.
 
 ## `0.18.3`
 
