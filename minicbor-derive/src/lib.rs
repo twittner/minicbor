@@ -181,7 +181,7 @@
 //!
 //! This attribute can be attached to fields in structs and enums and prevents
 //! those fields from being encoded if the predicate function denoted by `path`
-//! returns true. The predicate function must satisfy the following signature
+//! returns true. The predicate function must satisfy the following type signature
 //!
 //! ```no_run
 //! fn pred<T>(_: &T) -> bool {

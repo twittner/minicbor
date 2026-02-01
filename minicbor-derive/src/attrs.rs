@@ -138,7 +138,7 @@ impl Attributes {
             return Err(syn::Error::new(*s, "flat enum does not support map encoding"))
         }
         // `skip_if` triggers the creation of a custom codec where `encode` and `decode`
-        // correspond the the default routines, `is_nil` is defined via `skip_if`'s
+        // correspond to the default routines, `is_nil` is defined via `skip_if`'s
         // predicate and `nil` points to an internal helper that matches the signature
         // of `nil` and uses `Default::default` to create a default value.
         //

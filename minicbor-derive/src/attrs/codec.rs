@@ -51,6 +51,10 @@ pub enum CustomCodec {
 pub struct Encode {
     pub encode: syn::ExprPath,
     pub is_nil: Option<syn::ExprPath>,
+    /// Is an `Encode` bound required on type parameters?
+    ///
+    /// This is only `true` if `encode` points to `minicbor::Encode::encode`
+    /// which is the case when constructed for a `skip_if` attribute.
     pub require_bound: bool
 }
 
@@ -58,6 +62,10 @@ pub struct Encode {
 pub struct Decode {
     pub decode: syn::ExprPath,
     pub nil: Option<syn::ExprPath>,
+    /// Is a `Decode` bound required on type parameters?
+    ///
+    /// This is only `true` if `decode` points to `minicbor::Decode::decode`
+    /// which is the case when constructed for a `skip_if` attribute.
     pub require_bound: bool
 }
 
