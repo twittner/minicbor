@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use quote::quote;
 use syn::spanned::Spanned;
 
+use crate::attrs::codec::PathOrClosure;
 use crate::blacklist::Blacklist;
 use crate::{collect_type_params, Mode};
 use crate::{add_bound_to_type_params, is_cow, is_option, is_str, is_byte_slice};
@@ -314,11 +315,15 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
 
         let unknown_var_err =
             if let Some(cd) = field.attrs.codec() {
-                if let Some(p) = cd.to_nil_path() {
+                if let Some(expr) = cd.to_nil_expr() {
                     let ty = &field.typ;
+                    let nil = match expr {
+                        PathOrClosure::Path(p) => quote!(#p()),
+                        PathOrClosure::Closure(f) => quote!((#f)())
+                    };
                     quote! {
                         Err(e) if e.is_unknown_variant() && {
-                            let __nil777: Option<#ty> = #p();
+                            let __nil777: Option<#ty> = #nil;
                             __nil777.is_some()
                         } => {
                             __d777.skip()?
@@ -497,18 +502,22 @@ fn make_transparent_impl
 
     let nil_impl =
         if let Some(codec) = field.attrs.codec().filter(|cc| cc.is_decode()) {
-            if let Some(f) = codec.to_nil_path() {
+            if let Some(expr) = codec.to_nil_expr() {
+                let nil = match expr {
+                    PathOrClosure::Path(p) => quote!(#p()),
+                    PathOrClosure::Closure(f) => quote!((#f)())
+                };
                 if field.is_name {
                     let id = &field.ident;
                     quote! {
                         fn nil() -> core::option::Option<Self> {
-                            #f().map(|v| Self { #id: v })
+                            #nil.map(|v| Self { #id: v })
                         }
                     }
                 } else {
                     quote! {
                         fn nil() -> core::option::Option<Self> {
-                            #f().map(Self)
+                            #nil.map(Self)
                         }
                     }
                 }
@@ -574,12 +583,14 @@ where
 
 fn nil(f: &Field) -> proc_macro2::TokenStream {
     if let Some(d) = f.attrs.codec() {
-        if let Some(p) = d.to_nil_path() {
-            quote!(#p())
-        } else if is_option(&f.typ, |_| true) {
-            quote!(Some(None))
-        } else {
-            quote!(None)
+        match d.to_nil_expr() {
+            Some(PathOrClosure::Path(p)) => quote!(#p()),
+            Some(PathOrClosure::Closure(f)) => quote!((#f)()),
+            None => if is_option(&f.typ, |_| true) {
+                quote!(Some(None))
+            } else {
+                quote!(None)
+            }
         }
     } else {
         let ty = &f.typ;

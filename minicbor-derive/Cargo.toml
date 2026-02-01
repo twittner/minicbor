@@ -17,9 +17,9 @@ alloc = [] # unused
 std   = [] # unused
 
 [dependencies]
-proc-macro2 = "1.0.79"
-quote       = "1.0.35"
-syn         = { version = "2.0.58", features = ["derive", "extra-traits", "visit"] }
+proc-macro2 = "1.0.106"
+quote       = "1.0.44"
+syn         = { version = "2.0.114", features = ["derive", "extra-traits", "visit"] }
 
 [dev-dependencies]
 minicbor = { path = "../minicbor", features = ["std", "derive"] }

@@ -1,5 +1,3 @@
-//! Internal module that other crates should not rely on.
-
 #[cfg(feature = "std")]
 #[doc(hidden)]
 #[macro_export]
@@ -37,9 +35,4 @@ macro_rules! __minicbor_cfg {
     ) => {
         $($otherwise)*
     };
-}
-
-/// Wrap a default value in `Option::Some`.
-pub fn __some_default<T: Default>() -> Option<T> {
-    Some(Default::default())
 }

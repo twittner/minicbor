@@ -160,9 +160,8 @@ pub use encode::{Encode, Encoder, CborLen};
 
 #[cfg(feature = "derive")]
 pub use minicbor_derive::*;
-
 #[cfg(feature = "derive")]
-pub mod derive;
+mod derive;
 
 #[cfg(feature = "alloc")]
 use core::convert::Infallible;
