@@ -441,6 +441,10 @@
 
 # minicbor-derive
 
+## `0.19.2`
+
+- Documentation fix.
+
 ## `0.19.1`
 
 - Maintenance release.
