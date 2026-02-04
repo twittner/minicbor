@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use quote::quote;
 use syn::spanned::Spanned;
 
-use crate::attrs::codec::PathOrClosure;
+use crate::attrs::codec::PathOrDefault;
 use crate::blacklist::Blacklist;
 use crate::{collect_type_params, Mode};
 use crate::{add_bound_to_type_params, is_cow, is_option, is_str, is_byte_slice};
@@ -318,8 +318,8 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
                 if let Some(expr) = cd.to_nil_expr() {
                     let ty = &field.typ;
                     let nil = match expr {
-                        PathOrClosure::Path(p) => quote!(#p()),
-                        PathOrClosure::Closure(f) => quote!((#f)())
+                        PathOrDefault::Path(p) => quote!(#p()),
+                        PathOrDefault::Default => quote!(Some(Default::default()))
                     };
                     quote! {
                         Err(e) if e.is_unknown_variant() && {
@@ -504,8 +504,8 @@ fn make_transparent_impl
         if let Some(codec) = field.attrs.codec().filter(|cc| cc.is_decode()) {
             if let Some(expr) = codec.to_nil_expr() {
                 let nil = match expr {
-                    PathOrClosure::Path(p) => quote!(#p()),
-                    PathOrClosure::Closure(f) => quote!((#f)())
+                    PathOrDefault::Path(p) => quote!(#p()),
+                    PathOrDefault::Default => quote!(Some(Default::default()))
                 };
                 if field.is_name {
                     let id = &field.ident;
@@ -584,8 +584,8 @@ where
 fn nil(f: &Field) -> proc_macro2::TokenStream {
     if let Some(d) = f.attrs.codec() {
         match d.to_nil_expr() {
-            Some(PathOrClosure::Path(p)) => quote!(#p()),
-            Some(PathOrClosure::Closure(f)) => quote!((#f)()),
+            Some(PathOrDefault::Path(p)) => quote!(#p()),
+            Some(PathOrDefault::Default) => quote!(Some(Default::default())),
             None => if is_option(&f.typ, |_| true) {
                 quote!(Some(None))
             } else {
