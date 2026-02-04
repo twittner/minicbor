@@ -540,7 +540,7 @@ pub(crate) mod lifetimes;
 pub(crate) mod variants;
 pub(crate) mod blacklist;
 
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 /// Derive the `minicbor::Decode` trait for a struct or enum.
 ///
@@ -681,15 +681,15 @@ fn is_decode_bound(bound: &syn::TypeParamBound) -> bool {
 }
 
 /// Traverse all field types and collect all type parameters along the way.
-fn collect_type_params<'a, I>(all: &syn::Generics, fields: I) -> HashSet<syn::Ident>
+fn collect_type_params<'a, I>(all: &syn::Generics, fields: I) -> BTreeSet<syn::Ident>
 where
     I: Iterator<Item = &'a fields::Field>
 {
     use syn::visit::Visit;
 
     struct Collector {
-        all: HashSet<syn::Ident>,
-        found: HashSet<syn::Ident>
+        all: BTreeSet<syn::Ident>,
+        found: BTreeSet<syn::Ident>
     }
 
     impl<'a> Visit<'a> for Collector {
@@ -706,7 +706,7 @@ where
 
     let mut c = Collector {
         all: all.type_params().map(|tp| tp.ident.clone()).collect(),
-        found: HashSet::new()
+        found: BTreeSet::new()
     };
 
     for f in fields {
@@ -720,7 +720,7 @@ fn add_bound_to_type_params<'a, I, A>
     ( mode: Mode
     , bound: syn::TypeParamBound
     , params: I
-    , blacklist: &HashSet<syn::Ident>
+    , blacklist: &BTreeSet<syn::Ident>
     , attrs: A
     )
 where

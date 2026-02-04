@@ -1,14 +1,14 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::ops::Deref;
 
 use crate::{collect_type_params, is_phantom_data, Mode};
 use crate::{attrs::CustomCodec, fields::Fields};
 
-pub(crate) struct Blacklist(HashSet<syn::Ident>);
+pub(crate) struct Blacklist(BTreeSet<syn::Ident>);
 
 impl Blacklist {
     pub(crate) fn empty() -> Self {
-        Self(HashSet::new())
+        Self(BTreeSet::new())
     }
 
     /// Generate a blacklist of type parameters that should not have bounds attached.
@@ -105,14 +105,14 @@ impl Blacklist {
     }
 }
 
-impl From<Blacklist> for HashSet<syn::Ident> {
+impl From<Blacklist> for BTreeSet<syn::Ident> {
     fn from(b: Blacklist) -> Self {
         b.0
     }
 }
 
 impl Deref for Blacklist {
-    type Target = HashSet<syn::Ident>;
+    type Target = BTreeSet<syn::Ident>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

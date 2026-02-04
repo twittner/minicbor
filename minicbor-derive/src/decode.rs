@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 use quote::quote;
 use syn::spanned::Spanned;
@@ -53,7 +53,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     add_bound_to_type_params(Mode::Decode, bound, params, &blacklist, fields.fields().attributes());
 
     // Collect type parameters which require a `Default` bound.
-    let default_types: HashSet<syn::Ident> =
+    let default_types: BTreeSet<syn::Ident> =
         collect_type_params(&inp.generics, fields.fields().chain(fields.skipped()).filter(|f| {
             f.attrs.default() || f.attrs.skip() || f.attrs.skip_if_codec()
         }));
@@ -151,7 +151,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let mut decode_blacklist = Blacklist::empty();
     let mut field_attrs = Vec::new();
     let mut default_blacklist = Blacklist::empty();
-    let mut defaults = HashSet::new();
+    let mut defaults = BTreeSet::new();
     let mut default_attrs = Vec::new();
     let mut lifetime = gen_lifetime();
     let mut rows = Vec::new();
