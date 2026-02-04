@@ -94,7 +94,7 @@
 //! - [`#[cbor(index_only)]`](#cborindex_only)
 //! - [`#[cbor(transparent)]`](#cbortransparent)
 //! - [`#[cbor(skip)]`](#cborskip)
-//! - [`#[cbor(skip_if)]`](#cborskip_if)
+//! - [`#[cbor(skip_if)]`](#cborskip_if--path)
 //! - [`#[cbor(default)]`](#cbordefault)
 //! - [`#[cbor(tag(...))]`](#cbortag)
 //! - [`#[cbor(decode_with)]`](#cbordecode_with--path)
