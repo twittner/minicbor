@@ -441,6 +441,10 @@
 
 # minicbor-derive
 
+## `0.19.1`
+
+- Maintenance release.
+
 ## `0.19.0`
 
 - Adds attribute `skip_if`. See issue [#43](https://github.com/twittner/minicbor/issues/43) for
