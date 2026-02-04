@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
@@ -97,7 +97,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         blacklist_len.merge(&fields, &inp.generics, Blacklist::full(Mode::Length, &fields, &inp.generics));
-        blacklist_enc.add(HashSet::from(blacklist_is_nil_params(&inp.generics, &fields)));
+        blacklist_enc.add(BTreeSet::from(blacklist_is_nil_params(&inp.generics, &fields)));
         let con      = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag      = on_tag(attrs);

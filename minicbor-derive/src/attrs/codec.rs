@@ -61,7 +61,7 @@ pub struct Encode {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Decode {
     pub decode: syn::ExprPath,
-    pub nil: Option<PathOrClosure>,
+    pub nil: Option<PathOrDefault>,
     /// Is a `Decode` bound required on type parameters?
     ///
     /// This is only `true` if `decode` points to `minicbor::Decode::decode`
@@ -70,9 +70,9 @@ pub struct Decode {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum PathOrClosure {
+pub enum PathOrDefault {
     Path(syn::ExprPath),
-    Closure(syn::ExprClosure)
+    Default
 }
 
 impl CustomCodec {
@@ -148,7 +148,7 @@ impl CustomCodec {
     }
 
     /// Extract the `nil` function if possible.
-    pub fn to_nil_expr(&self) -> Option<PathOrClosure> {
+    pub fn to_nil_expr(&self) -> Option<PathOrDefault> {
         match self {
             CustomCodec::Decode(d)       => d.nil.clone(),
             CustomCodec::Both(_, d)      => d.nil.clone(),
@@ -156,7 +156,7 @@ impl CustomCodec {
                 let mut p = p.clone();
                 let ident = syn::Ident::new("nil", proc_macro2::Span::call_site());
                 p.path.segments.push(ident.into());
-                Some(PathOrClosure::Path(p))
+                Some(PathOrDefault::Path(p))
             }
             CustomCodec::Module(_, false) => None,
             CustomCodec::Encode(_)        => None

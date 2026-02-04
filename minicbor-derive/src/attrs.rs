@@ -18,7 +18,7 @@ pub use codec::CustomCodec;
 pub use encoding::Encoding;
 pub use idx::Idx;
 
-use crate::attrs::codec::{Decode, Encode, PathOrClosure};
+use crate::attrs::codec::{Decode, Encode, PathOrDefault};
 use crate::{is_decode_bound, is_encode_bound, is_length_bound};
 
 /// Recognised attributes.
@@ -149,7 +149,7 @@ impl Attributes {
             let is_nil  = is_nil.take().expect("some is_nil");
             let encode  = parse_quote!(minicbor::Encode::encode);
             let decode  = parse_quote!(minicbor::Decode::decode);
-            let default = PathOrClosure::Closure(parse_quote!(|| Some(Default::default())));
+            let default = PathOrDefault::Default;
             let skip_if_span = *skip_if_span;
             match this.remove(Kind::Codec) {
                 None => {
@@ -626,14 +626,14 @@ impl Attributes {
                         if d.nil.is_some() {
                             return Err(syn::Error::new(*s, "duplicate attribute"))
                         }
-                        d.nil = Some(PathOrClosure::Path(nil.clone()));
+                        d.nil = Some(PathOrDefault::Path(nil.clone()));
                         return Ok(())
                     }
                     Some(Value::Codec(CustomCodec::Both(_, d), _)) => {
                         if d.nil.is_some() {
                             return Err(syn::Error::new(*s, "duplicate attribute"))
                         }
-                        d.nil = Some(PathOrClosure::Path(nil.clone()));
+                        d.nil = Some(PathOrDefault::Path(nil.clone()));
                         return Ok(())
                     }
                     _ => {}
@@ -661,7 +661,7 @@ impl Attributes {
                     if d.nil.is_some() {
                         return Err(syn::Error::new(*s, "duplicate attribute"))
                     }
-                    d.nil = Some(PathOrClosure::Path(nil))
+                    d.nil = Some(PathOrDefault::Path(nil))
                 }
             }
             Value::Codec(CustomCodec::Both(e, d), s) => {
@@ -675,7 +675,7 @@ impl Attributes {
                     if d.nil.is_some() {
                         return Err(syn::Error::new(*s, "duplicate attribute"))
                     }
-                    d.nil = Some(PathOrClosure::Path(nil))
+                    d.nil = Some(PathOrDefault::Path(nil))
                 }
             }
             Value::Codec(CustomCodec::Module(_, b), s) => {
