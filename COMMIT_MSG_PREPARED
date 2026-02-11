@@ -1,0 +1,10 @@
+Use Rust 2021 edition for all crates
+
+Set edition = "2021" in every Cargo.toml (minicbor, minicbor-derive,
+minicbor-io, minicbor-serde, minicbor-bench, minicbor-tests,
+minicbor-tests-client, minicbor-tests/fuzz).
+
+Rewrite let chains (Rust 2024-only) in minicbor-derive to nested
+if-let and condition checks so the code compiles on edition 2021:
+lib.rs (is_option, is_cow, is_encode_bound, is_length_bound,
+is_decode_bound), cbor_len.rs, attrs.rs, lifetimes.rs.

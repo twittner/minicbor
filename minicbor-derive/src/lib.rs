@@ -577,29 +577,38 @@ pub fn derive_cbor_len(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 
 /// Check if the given type is an `Option` whose inner type matches the predicate.
 fn is_option(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> bool {
-    if let syn::Type::Path(t) = ty
-        && let Some(s) = t.path.segments.last()
-        && s.ident == "Option"
-        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
-        && b.args.len() == 1
-        && let syn::GenericArgument::Type(ty) = &b.args[0]
-    {
-        return pred(ty)
+    if let syn::Type::Path(t) = ty {
+        if let Some(s) = t.path.segments.last() {
+            if s.ident == "Option" {
+                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
+                    if b.args.len() == 1 {
+                        if let syn::GenericArgument::Type(inner) = &b.args[0] {
+                            return pred(inner)
+                        }
+                    }
+                }
+            }
+        }
     }
     false
 }
 
 /// Check if the given type is a `Cow` whose inner type matches the predicate.
 fn is_cow(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> bool {
-    if let syn::Type::Path(t) = ty
-        && let Some(s) = t.path.segments.last()
-        && s.ident == "Cow"
-        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
-        && b.args.len() == 2
-        && let syn::GenericArgument::Lifetime(_) = &b.args[0]
-        && let syn::GenericArgument::Type(ty) = &b.args[1]
-    {
-        return pred(ty)
+    if let syn::Type::Path(t) = ty {
+        if let Some(s) = t.path.segments.last() {
+            if s.ident == "Cow" {
+                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
+                    if b.args.len() == 2 {
+                        if let (syn::GenericArgument::Lifetime(_), syn::GenericArgument::Type(inner)) =
+                            (&b.args[0], &b.args[1])
+                        {
+                            return pred(inner)
+                        }
+                    }
+                }
+            }
+        }
     }
     false
 }
@@ -639,43 +648,56 @@ fn is_byte_slice(ty: &syn::Type) -> bool {
 
 /// Does the given bound match `Encode<Ctx>`?
 fn is_encode_bound(bound: &syn::TypeParamBound) -> bool {
-    if let syn::TypeParamBound::Trait(t) = bound
-        && let Some(s) = t.path.segments.last()
-        && s.ident == "Encode"
-        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
-        && b.args.len() == 1
-        && let syn::GenericArgument::Type(syn::Type::Path(p)) = &b.args[0]
-    {
-        return p.path.is_ident("Ctx")
+    if let syn::TypeParamBound::Trait(t) = bound {
+        if let Some(s) = t.path.segments.last() {
+            if s.ident == "Encode" {
+                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
+                    if b.args.len() == 1 {
+                        if let syn::GenericArgument::Type(syn::Type::Path(p)) = &b.args[0] {
+                            return p.path.is_ident("Ctx")
+                        }
+                    }
+                }
+            }
+        }
     }
     false
 }
 
 /// Does the given bound match `CborLen<Ctx>`?
 fn is_length_bound(bound: &syn::TypeParamBound) -> bool {
-    if let syn::TypeParamBound::Trait(t) = bound
-        && let Some(s) = t.path.segments.last()
-        && s.ident == "CborLen"
-        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
-        && b.args.len() == 1
-        && let syn::GenericArgument::Type(syn::Type::Path(p)) = &b.args[0]
-    {
-        return p.path.is_ident("Ctx")
+    if let syn::TypeParamBound::Trait(t) = bound {
+        if let Some(s) = t.path.segments.last() {
+            if s.ident == "CborLen" {
+                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
+                    if b.args.len() == 1 {
+                        if let syn::GenericArgument::Type(syn::Type::Path(p)) = &b.args[0] {
+                            return p.path.is_ident("Ctx")
+                        }
+                    }
+                }
+            }
+        }
     }
     false
 }
 
 /// Does the given bound match `Decode<'bytes, Ctx>`?
 fn is_decode_bound(bound: &syn::TypeParamBound) -> bool {
-    if let syn::TypeParamBound::Trait(t) = bound
-        && let Some(s) = t.path.segments.last()
-        && s.ident == "Decode"
-        && let syn::PathArguments::AngleBracketed(b) = &s.arguments
-        && b.args.len() == 2
-        && let syn::GenericArgument::Lifetime(lt) = &b.args[0]
-        && let syn::GenericArgument::Type(syn::Type::Path(p)) = &b.args[1]
-    {
-        return lt.ident == "bytes" && p.path.is_ident("Ctx")
+    if let syn::TypeParamBound::Trait(t) = bound {
+        if let Some(s) = t.path.segments.last() {
+            if s.ident == "Decode" {
+                if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
+                    if b.args.len() == 2 {
+                        if let (syn::GenericArgument::Lifetime(lt), syn::GenericArgument::Type(syn::Type::Path(p))) =
+                            (&b.args[0], &b.args[1])
+                        {
+                            return lt.ident == "bytes" && p.path.is_ident("Ctx")
+                        }
+                    }
+                }
+            }
+        }
     }
     false
 }

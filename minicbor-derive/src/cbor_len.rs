@@ -296,8 +296,10 @@ fn cbor_len(custom: Option<&syn::ExprPath>, codec: Option<&CustomCodec>) -> proc
     if let Some(cu) = custom {
         return cu.to_token_stream()
     }
-    if let Some(ce) = codec && let Some(p) = ce.to_cbor_len_path() {
-        return p.to_token_stream()
+    if let Some(ce) = codec {
+        if let Some(p) = ce.to_cbor_len_path() {
+            return p.to_token_stream()
+        }
     }
     quote!(minicbor::CborLen::<Ctx>::cbor_len)
 }

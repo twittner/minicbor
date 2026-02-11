@@ -23,8 +23,10 @@ where
 {
     // Get the lifetime of a reference if its type matches the predicate.
     fn tyref_lifetime(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> Option<syn::Lifetime> {
-        if let syn::Type::Reference(p) = ty && pred(&p.elem) {
-            return p.lifetime.clone()
+        if let syn::Type::Reference(p) = ty {
+            if pred(&p.elem) {
+                return p.lifetime.clone()
+            }
         }
         None
     }
@@ -38,8 +40,10 @@ where
             syn::Type::Group(t) => get_lifetimes(&t.elem, set, filter),
             syn::Type::Ptr(t)   => get_lifetimes(&t.elem, set, filter),
             syn::Type::Reference(t) => {
-                if let Some(l) = &t.lifetime && (filter.is_empty() || filter.contains(l)) {
-                    set.insert(l.clone());
+                if let Some(l) = &t.lifetime {
+                    if filter.is_empty() || filter.contains(l) {
+                        set.insert(l.clone());
+                    }
                 }
                 get_lifetimes(&t.elem, set, filter)
             }
@@ -72,15 +76,20 @@ where
 
     // Get the lifetime of the given type if it is an `Option` whose inner type matches the predicate.
     fn option_lifetime(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> Option<syn::Lifetime> {
-        if let syn::Type::Path(t) = ty
-            && let Some(s) = t.path.segments.last()
-            && s.ident == "Option"
-            && let syn::PathArguments::AngleBracketed(b) = &s.arguments
-            && b.args.len() == 1
-            && let syn::GenericArgument::Type(syn::Type::Reference(ty)) = &b.args[0]
-            && pred(&ty.elem)
-        {
-            return ty.lifetime.clone()
+        if let syn::Type::Path(t) = ty {
+            if let Some(s) = t.path.segments.last() {
+                if s.ident == "Option" {
+                    if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
+                        if b.args.len() == 1 {
+                            if let syn::GenericArgument::Type(syn::Type::Reference(inner)) = &b.args[0] {
+                                if pred(&inner.elem) {
+                                    return inner.lifetime.clone()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
         None
     }
