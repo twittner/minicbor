@@ -207,7 +207,7 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                 let cbor_len = cbor_len(field.attrs.cbor_len(), field.attrs.codec());
                 let is_nil   = is_nil(&field.typ, field.attrs.codec());
                 let ident    = &field.ident;
-                let idx      = field.index;
+                let idx      = &field.index;
                 let tag      = on_tag(&field.attrs);
                 if has_self {
                     if field.is_name {
@@ -250,7 +250,7 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                 if field.attrs.skip() {
                     continue
                 }
-                let n: usize = field.index.val()
+                let n: usize = field.index.unwrap_numeric().val()
                     .try_into()
                     .map_err(|_| syn::Error::new(field.orig.span(), "index does not fit into usize"))?;
                 let cbor_len = cbor_len(field.attrs.cbor_len(), field.attrs.codec());

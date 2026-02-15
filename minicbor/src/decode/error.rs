@@ -96,11 +96,43 @@ impl Error {
         }
     }
 
-    /// A value, expected at the given index, was missing.
+    /// An unknown enum variant (denoted by the given index) was encountered.
+    #[doc(hidden)]
+    #[cfg(not(feature = "alloc"))]
+    pub fn unknown_variant_str() -> Self {
+        Error {
+            err: ErrorImpl::UnknownVariantStr,
+            pos: None,
+            msg: Default::default()
+        }
+    }
+
+    /// An unknown enum variant (denoted by the given index) was encountered.
+    #[doc(hidden)]
+    #[cfg(feature = "alloc")]
+    pub fn unknown_variant_str<T: fmt::Display>(idx: T) -> Self {
+        Error {
+            err: ErrorImpl::UnknownVariantStr(idx.to_string()),
+            pos: None,
+            msg: Default::default()
+        }
+    }
+
+    /// A value, expected at the given numeric index, was missing.
     #[doc(hidden)]
     pub fn missing_value(idx: i64) -> Self {
         Error {
             err: ErrorImpl::MissingValue(idx),
+            pos: None,
+            msg: Default::default()
+        }
+    }
+
+    /// A value, expected at the given string index, was missing.
+    #[doc(hidden)]
+    pub fn missing_value_str(idx: &'static str) -> Self {
+        Error {
+            err: ErrorImpl::MissingValueStr(idx),
             pos: None,
             msg: Default::default()
         }
@@ -186,12 +218,15 @@ impl Error {
 
     #[doc(hidden)]
     pub fn is_unknown_variant(&self) -> bool {
-        matches!(self.err, ErrorImpl::UnknownVariant(_))
+        #[cfg(feature = "alloc")]
+        return matches!(self.err, ErrorImpl::UnknownVariant(_) | ErrorImpl::UnknownVariantStr(_));
+        #[cfg(not(feature = "alloc"))]
+        matches!(self.err, ErrorImpl::UnknownVariant(_) | ErrorImpl::UnknownVariantStr)
     }
 
     #[doc(hidden)]
     pub fn is_missing_value(&self) -> bool {
-        matches!(self.err, ErrorImpl::MissingValue(_))
+        matches!(self.err, ErrorImpl::MissingValue(_) | ErrorImpl::MissingValueStr(_))
     }
 }
 
@@ -210,10 +245,18 @@ enum ErrorImpl {
     TypeMismatch(Type),
     /// An unexpected tag was encountered.
     TagMismatch(Tag),
-    /// An unknown enum variant was encountered.
+    /// An unknown enum variant number was encountered.
     UnknownVariant(i64),
-    /// A value was missing at the specified index.
+    /// An unknown enum variant string was encountered.
+    #[cfg(not(feature = "alloc"))]
+    UnknownVariantStr,
+    /// An unknown enum variant string was encountered.
+    #[cfg(feature = "alloc")]
+    UnknownVariantStr(alloc::string::String),
+    /// A value was missing at the specified numeric index.
     MissingValue(i64),
+    /// A value was missing at the specified string index.
+    MissingValueStr(&'static str),
     /// Generic error message.
     Message,
     /// Custom error.
@@ -282,12 +325,35 @@ impl fmt::Display for Error {
                     (m, None)     => write!(f, "unknown enum variant {n}: {m}"),
                     (m, Some(p))  => write!(f, "unknown enum variant {n} at position {p}: {m}")
                 }
+            #[cfg(not(feature = "alloc"))]
+            ErrorImpl::UnknownVariantStr =>
+                match (self.msg.as_ref(), self.pos) {
+                    ("", None)    => write!(f, "unknown enum variant"),
+                    ("", Some(p)) => write!(f, "unknown enum variant at position {p}"),
+                    (m, None)     => write!(f, "unknown enum variant: {m}"),
+                    (m, Some(p))  => write!(f, "unknown enum variant at position {p}: {m}")
+                }
+            #[cfg(feature = "alloc")]
+            ErrorImpl::UnknownVariantStr(s) =>
+                match (self.msg.as_ref(), self.pos) {
+                    ("", None)    => write!(f, "unknown enum variant {s}"),
+                    ("", Some(p)) => write!(f, "unknown enum variant {s} at position {p}"),
+                    (m, None)     => write!(f, "unknown enum variant {s}: {m}"),
+                    (m, Some(p))  => write!(f, "unknown enum variant {s} at position {p}: {m}")
+                }
             ErrorImpl::MissingValue(n) =>
                 match (self.msg.as_ref(), self.pos) {
                     ("", None)    => write!(f, "missing value at index {n}"),
                     ("", Some(p)) => write!(f, "missing value at index {n} in map or array starting at position {p}"),
                     (m, None)     => write!(f, "missing value at index {n} ({m})"),
                     (m, Some(p))  => write!(f, "missing value at index {n} ({m}) in map or array starting at position {p}")
+                }
+            ErrorImpl::MissingValueStr(s) =>
+                match (self.msg.as_ref(), self.pos) {
+                    ("", None)    => write!(f, "missing value at index {s}"),
+                    ("", Some(p)) => write!(f, "missing value at index {s} starting at position {p}"),
+                    (m, None)     => write!(f, "missing value at index {s} ({m})"),
+                    (m, Some(p))  => write!(f, "missing value at index {s} ({m}) starting at position {p}")
                 }
             ErrorImpl::Message =>
                 if let Some(p) = self.pos {
@@ -317,9 +383,14 @@ impl core::error::Error for Error {
             | ErrorImpl::TagMismatch(_)
             | ErrorImpl::UnknownVariant(_)
             | ErrorImpl::MissingValue(_)
+            | ErrorImpl::MissingValueStr(_)
             | ErrorImpl::Message
             => None,
             ErrorImpl::Utf8(e)   => Some(e),
+            #[cfg(not(feature = "alloc"))]
+            ErrorImpl::UnknownVariantStr => None,
+            #[cfg(feature = "alloc")]
+            ErrorImpl::UnknownVariantStr(_) => None,
             #[cfg(feature = "alloc")]
             ErrorImpl::Custom(e) => Some(&**e)
         }

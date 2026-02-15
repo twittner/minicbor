@@ -19,6 +19,7 @@ pub use encoding::Encoding;
 pub use idx::Idx;
 
 use crate::attrs::codec::{Decode, Encode, PathOrDefault};
+use crate::attrs::idx::Index;
 use crate::{is_decode_bound, is_encode_bound, is_length_bound};
 
 /// Recognised attributes.
@@ -54,7 +55,7 @@ enum Value {
     Borrow(BTreeSet<syn::Lifetime>, proc_macro2::Span),
     Codec(CustomCodec, proc_macro2::Span),
     Encoding(Encoding, proc_macro2::Span),
-    Index(Idx, proc_macro2::Span),
+    Index(Index, proc_macro2::Span),
     IndexOnly(proc_macro2::Span),
     Transparent(proc_macro2::Span),
     TypeParam(TypeParams, proc_macro2::Span),
@@ -230,14 +231,21 @@ impl Attributes {
         // #[n(...)]
         if a.path().is_ident("n") {
             let idx = parse_i64_arg(a).map(Idx::N)?;
-            attrs.try_insert(Kind::Index, Value::Index(idx, a.path().span()))?;
+            attrs.try_insert(Kind::Index, Value::Index(Index::Num(idx), a.path().span()))?;
             return Ok(attrs)
         }
 
         // #[b(...)]
         if a.path().is_ident("b") {
             let idx = parse_i64_arg(a).map(Idx::B)?;
-            attrs.try_insert(Kind::Index, Value::Index(idx, a.path().span()))?;
+            attrs.try_insert(Kind::Index, Value::Index(Index::Num(idx), a.path().span()))?;
+            return Ok(attrs)
+        }
+
+        // #[s(...)]
+        if a.path().is_ident("s") {
+            let s: LitStr = a.parse_args()?;
+            attrs.try_insert(Kind::Index, Value::Index(Index::Str(s.value()), a.path().span()))?;
             return Ok(attrs)
         }
 
@@ -355,13 +363,18 @@ impl Attributes {
                 syn::parenthesized!(content in meta.input);
                 let n: LitInt = content.parse()?;
                 let i = parse_int(&n).map(Idx::N)?;
-                attrs.try_insert(Kind::Index, Value::Index(i, meta.path.span()))?
+                attrs.try_insert(Kind::Index, Value::Index(Index::Num(i), meta.path.span()))?
             } else if meta.path.is_ident("b") {
                 let content;
                 syn::parenthesized!(content in meta.input);
                 let n: LitInt = content.parse()?;
                 let i = parse_int(&n).map(Idx::B)?;
-                attrs.try_insert(Kind::Index, Value::Index(i, meta.path.span()))?
+                attrs.try_insert(Kind::Index, Value::Index(Index::Num(i), meta.path.span()))?
+            } else if meta.path.is_ident("s") {
+                let content;
+                syn::parenthesized!(content in meta.input);
+                let s: LitStr = content.parse()?;
+                attrs.try_insert(Kind::Index, Value::Index(Index::Str(s.value()), meta.path.span()))?
             } else if meta.path.is_ident("tag") {
                 let content;
                 syn::parenthesized!(content in meta.input);
@@ -395,7 +408,7 @@ impl Attributes {
         self.get(Kind::Encoding).and_then(|v| v.encoding())
     }
 
-    pub fn index(&self) -> Option<Idx> {
+    pub fn index(&self) -> Option<&Index> {
         self.get(Kind::Index).and_then(|v| v.index())
     }
 
@@ -742,9 +755,9 @@ impl Value {
         }
     }
 
-    fn index(&self) -> Option<Idx> {
+    fn index(&self) -> Option<&Index> {
         if let Value::Index(i, _) = self {
-            Some(*i)
+            Some(i)
         } else {
             None
         }
@@ -803,6 +816,6 @@ fn parse_i64_arg(a: &syn::Attribute) -> syn::Result<i64> {
     parse_int(&a.parse_args()?)
 }
 
-fn parse_int(n: &syn::LitInt) -> syn::Result<i64> {
+fn parse_int(n: &LitInt) -> syn::Result<i64> {
     n.base10_parse().map_err(|_| syn::Error::new(n.span(), "expected `i64` value"))
 }

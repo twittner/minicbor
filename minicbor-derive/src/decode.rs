@@ -95,6 +95,13 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         let idents    = fields.fields().idents();
         let field_str = fields.fields().idents().map(|n| format!("{name}::{n}"));
         let skipped   = fields.skipped().idents();
+        let funs      = fields.fields().indices().map(|i| {
+            if i.is_num() {
+                quote!(missing_value)
+            } else {
+                quote!(missing_value_str)
+            }
+        });
         quote! {
             Ok(#name {
                 #(#idents : if let Some(x) = #idents {
@@ -104,7 +111,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
                 } else if let Some(z) = #nils {
                     z
                 } else {
-                    return Err(minicbor::decode::Error::missing_value(#indices).with_message(#field_str).at(__p777))
+                    return Err(minicbor::decode::Error::#funs(#indices).with_message(#field_str).at(__p777))
                 },)*
                 #(#skipped : Default::default(),)*
             })
@@ -154,7 +161,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let mut defaults = BTreeSet::new();
     let mut default_attrs = Vec::new();
     let mut lifetime = gen_lifetime();
-    let mut rows = Vec::new();
+    let mut num_rows = Vec::new();
+    let mut str_rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
@@ -193,6 +201,13 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 let idents    = fields.fields().idents();
                 let field_str = fields.fields().idents().map(|n| format!("{name}::{con}::{n}"));
                 let skipped   = fields.skipped().idents();
+                let funs      = fields.fields().indices().map(|i| {
+                    if i.is_num() {
+                        quote!(missing_value)
+                    } else {
+                        quote!(missing_value_str)
+                    }
+                });
                 quote! {
                     #idx => {
                         #tag
@@ -205,7 +220,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                             } else if let Some(z) = #nils {
                                 z
                             } else {
-                                return Err(minicbor::decode::Error::missing_value(#indices).with_message(#field_str).at(__p777))
+                                return Err(minicbor::decode::Error::#funs(#indices).with_message(#field_str).at(__p777))
                             },)*
                             #(#skipped : Default::default(),)*
                         })
@@ -225,7 +240,11 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         };
         field_attrs.extend(fields.fields().attributes().cloned());
         default_attrs.extend(fields.fields().attributes().chain(fields.skipped().attributes()).cloned());
-        rows.push(row)
+        if idx.is_str() {
+            str_rows.push(row)
+        } else {
+            num_rows.push(row)
+        }
     }
 
     let bound  = gen_decode_bound();
@@ -273,15 +292,45 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let tag = decode_tag(&enum_attrs);
 
+    let match_fragement = if str_rows.is_empty() {
+        quote! {
+            match __d777.i64()? {
+                #(#num_rows)*
+                n => Err(minicbor::decode::Error::unknown_variant(n).at(__p778))
+            }
+        }
+    } else {
+        quote! {
+            if matches!(__d777.datatype()?, minicbor::data::Type::String) {
+                match __d777.str()? {
+                    #(#str_rows)*
+                    s => Err(minicbor::__minicbor_cfg! {
+                        'std {
+                            minicbor::decode::Error::unknown_variant_str(s.to_string()).at(__p778)
+                        }
+                        'alloc {
+                            minicbor::decode::Error::unknown_variant_str(s.to_string()).at(__p778)
+                        }
+                        'otherwise {
+                            minicbor::decode::Error::unknown_variant_str().at(__p778)
+                        }
+                    })
+                }
+            } else {
+                match __d777.i64()? {
+                    #(#num_rows)*
+                    n => Err(minicbor::decode::Error::unknown_variant(n).at(__p778))
+                }
+            }
+        }
+    };
+
     Ok(quote! {
         impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
             fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #tag
                 #check
-                match __d777.i64()? {
-                    #(#rows)*
-                    n => Err(minicbor::decode::Error::unknown_variant(n).at(__p778))
-                }
+                #match_fragement
             }
         }
     })
@@ -421,6 +470,76 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
                 __d777.skip()?
             }
         },
+        Encoding::Map if fields.has_str_index() => {
+            let (numerics, strings): (Vec<_>, Vec<_>) = fields
+                .fields()
+                .partition(|f| f.index.is_num());
+
+            let num_inits = numerics.iter().map(|f| {
+                if is_option(&f.typ, |_| true) {
+                    quote!(Some(None))
+                } else {
+                    quote!(None)
+                }
+            });
+            let num_idents  = numerics.iter().map(|f| &f.ident);
+            let num_types   = numerics.iter().map(|f| &f.typ);
+            let num_indices = numerics.iter().map(|f| &f.index).collect::<Vec<_>>();
+
+            let str_inits = strings.iter().map(|f| {
+                if is_option(&f.typ, |_| true) {
+                    quote!(Some(None))
+                } else {
+                    quote!(None)
+                }
+            });
+            let str_idents  = strings.iter().map(|f| &f.ident);
+            let str_types   = strings.iter().map(|f| &f.typ);
+            let str_indices = strings.iter().map(|f| &f.index).collect::<Vec<_>>();
+
+            let (num_actions, str_actions): (Vec<_>, Vec<_>) = actions
+                .into_iter()
+                .zip(fields.fields())
+                .partition(|(_, f)| f.index.is_num());
+            let num_actions = num_actions.into_iter().map(|(a, _)| a).collect::<Vec<_>>();
+            let str_actions = str_actions.into_iter().map(|(a, _)| a).collect::<Vec<_>>();
+
+            quote! {
+                #(let mut #num_idents : core::option::Option<#num_types> = #num_inits;)*
+                #(let mut #str_idents : core::option::Option<#str_types> = #str_inits;)*
+
+                if let Some(__len777) = __d777.map()? {
+                    for _ in 0 .. __len777 {
+                        if matches!(__d777.datatype()?, minicbor::data::Type::String) {
+                            match __d777.str()? {
+                                #(#str_indices => #str_actions)*
+                                _              => __d777.skip()?
+                            }
+                        } else {
+                            match __d777.i64()? {
+                                #(#num_indices => #num_actions)*
+                                _              => __d777.skip()?
+                            }
+                        }
+                    }
+                } else {
+                    while minicbor::data::Type::Break != __d777.datatype()? {
+                        if matches!(__d777.datatype()?, minicbor::data::Type::String) {
+                            match __d777.str()? {
+                                #(#str_indices => #str_actions)*
+                                _              => __d777.skip()?
+                            }
+                        } else {
+                            match __d777.i64()? {
+                                #(#num_indices => #num_actions)*
+                                _              => __d777.skip()?
+                            }
+                        }
+                    }
+                    __d777.skip()?
+                }
+            }
+        }
         Encoding::Map => quote! {
             #(let mut #idents : core::option::Option<#types> = #inits;)*
 
@@ -631,12 +750,17 @@ fn field_inits(name: &str, fields: &Fields) -> proc_macro2::TokenStream {
     for field in fields.fields() {
         let nil = nil(field);
         let idt = &field.ident;
-        let idx = field.index;
+        let idx = &field.index;
         let str = format!("{name}::{idt}");
         let def = if field.attrs.default() {
             quote!(Some(Default::default()))
         } else {
             quote!(None)
+        };
+        let fun = if field.index.is_num() {
+            quote!(missing_value)
+        } else {
+            quote!(missing_value_str)
         };
         fragments.push((field.pos, quote! {
             if let Some(x) = #idt {
@@ -646,7 +770,7 @@ fn field_inits(name: &str, fields: &Fields) -> proc_macro2::TokenStream {
             } else if let Some(z) = #nil {
                 z
             } else {
-                return Err(minicbor::decode::Error::missing_value(#idx).with_message(#str).at(__p777))
+                return Err(minicbor::decode::Error::#fun(#idx).with_message(#str).at(__p777))
             },
         }))
     }

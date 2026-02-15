@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 
-use crate::{is_str, is_byte_slice};
 use crate::attrs::Idx;
+use crate::attrs::idx::Index;
+use crate::{is_str, is_byte_slice};
 
 /// Generate the decode lifetime.
 pub fn gen_lifetime() -> syn::LifetimeParam {
@@ -19,7 +20,7 @@ pub fn add_lifetime(g: &syn::Generics, l: syn::LifetimeParam) -> syn::Generics {
 /// Get the set of lifetimes which need to be constrained to the decoding input lifetime.
 pub fn lifetimes_to_constrain<'a, I>(types: I) -> BTreeSet<syn::Lifetime>
 where
-    I: Iterator<Item = (&'a Idx, Option<&'a BTreeSet<syn::Lifetime>>, &'a syn::Type)>
+    I: Iterator<Item = (&'a Index, Option<&'a BTreeSet<syn::Lifetime>>, &'a syn::Type)>
 {
     // Get the lifetime of a reference if its type matches the predicate.
     fn tyref_lifetime(ty: &syn::Type, pred: impl FnOnce(&syn::Type) -> bool) -> Option<syn::Lifetime> {
@@ -106,7 +107,7 @@ where
         if let Some(l) = l {
             get_lifetimes(t, &mut set, l)
         }
-        if i.is_b() {
+        if let Index::Num(Idx::B(_)) = i {
             get_lifetimes(t, &mut set, &BTreeSet::new())
         }
     }
