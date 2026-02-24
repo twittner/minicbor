@@ -326,7 +326,7 @@ impl Attributes {
                         let mut e = t.clone();
                         e.bounds = e.bounds
                             .into_iter()
-                            .filter(|b| !(is_encode_bound(b) || is_decode_bound(b)))
+                            .filter(|b| !is_decode_bound(b))
                             .collect();
                         HashMap::from_iter([(e.ident.clone(), e)])
                     },
