@@ -1,5 +1,5 @@
 use proc_macro2::Span;
-use quote::{ToTokens, TokenStreamExt};
+use quote::{ToTokens, TokenStreamExt, quote};
 use std::collections::HashSet;
 
 /// The index attribute.
@@ -13,7 +13,13 @@ pub enum Idx {
 
 impl ToTokens for Idx {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        tokens.append(proc_macro2::Literal::i64_unsuffixed(self.val()))
+        let idx = self.val();
+        let lit = proc_macro2::Literal::i64_unsuffixed(idx);
+        if idx.is_negative() {
+            tokens.extend(quote!((#lit)))
+        } else {
+            tokens.append(lit)
+        }
     }
 }
 
