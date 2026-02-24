@@ -7,6 +7,10 @@
 
 # minicbor
 
+## `2.2.1`
+
+- Depends on `minicbor-derive-0.19.3`.
+
 ## `2.2.0`
 
 - Depends on `minicbor-derive-0.19.0`.
@@ -440,6 +444,10 @@
 - Added `Encode` and `Decode` impls for tuples (see merge request [1][mr1] by @koushiro).
 
 # minicbor-derive
+
+## `0.19.3`
+
+- Bugfix release. Fixes issue [#54](https://github.com/twittner/minicbor/issues/54).
 
 ## `0.19.2`
 
