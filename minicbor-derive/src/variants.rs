@@ -18,13 +18,25 @@ impl Variants {
         let mut indices = Vec::new();
         let mut attrs   = Vec::new();
 
-        let parent_encoding = parent.encoding().unwrap_or_default();
+        let parent_encoding = parent.effective_encoding();
+
+        let text_keys = parent.text_keys();
 
         for v in iter.into_iter() {
             let attr = Attributes::try_from_iter(Level::Variant, &v.attrs)?;
-            let idex = attr.index().ok_or_else(|| {
-                syn::Error::new(v.ident.span(), "missing `#[n(...)]`, `#[b(...)]`, or `#[s(...)]` attribute")
-            })?;
+            if !text_keys && attr.key().is_some() {
+                return Err(syn::Error::new(v.ident.span(), "`#[cbor(key = \"...\")]` requires `#[cbor(text_keys)]` on the enum"))
+            }
+            let idex = if let Some(i) = attr.index() {
+                i.clone()
+            } else if text_keys {
+                let key = attr.key()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| v.ident.to_string());
+                Index::Str(key)
+            } else {
+                return Err(syn::Error::new(v.ident.span(), "missing `#[n(...)]`, `#[b(...)]`, or `#[s(...)]` attribute"))
+            };
             if idex.is_str() && attr.encoding().unwrap_or(parent_encoding).is_array() {
                 let span = attr.span(Kind::Index).unwrap_or_else(|| v.ident.span());
                 return Err(syn::Error::new(span, "array encoding does not support constructors with string indices"))

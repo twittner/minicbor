@@ -34,7 +34,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     let name      = &inp.ident;
     let attrs     = Attributes::try_from_iter(Level::Struct, inp.attrs.iter())?;
-    let encoding  = attrs.encoding().unwrap_or_default();
+    let encoding  = attrs.effective_encoding();
     let fields    = Fields::try_from(name.span(), data.fields.iter(), &[&attrs])?;
     let blacklist = Blacklist::full(Mode::Encode, &fields, &inp.generics);
 
@@ -85,7 +85,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let name          = &inp.ident;
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
-    let enum_encoding = enum_attrs.encoding().unwrap_or_default();
+    let enum_encoding = enum_attrs.effective_encoding();
     let index_only    = enum_attrs.index_only();
     let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
@@ -94,6 +94,8 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let mut field_attrs = Vec::new();
     let mut rows = Vec::new();
 
+    let text_keys = enum_attrs.text_keys();
+
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
         let fields = Fields::try_from(var.ident.span(), var.fields.iter(), &[attrs, &enum_attrs])?;
         blacklist.merge(&fields, &inp.generics, Blacklist::full(Mode::Encode, &fields, &inp.generics));
@@ -101,102 +103,139 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag = encode_tag(attrs);
         let fun = idx.to_method();
-        let row = match &var.fields {
-            syn::Fields::Unit => match encoding {
-                Encoding::Array | Encoding::Map if index_only => quote! {
+        let row = if text_keys {
+            // text_keys enum: unit → naked string, non-unit → map(1) { "Name": fields }
+            match &var.fields {
+                syn::Fields::Unit => quote! {
                     #name::#con => {
-                        __e777.#fun(#idx)?;
+                        __e777.str(#idx)?;
                         Ok(())
                     }
                 },
-                Encoding::Array if flat => quote! {
-                    #name::#con => {
-                        __e777.array(1)?;
-                        __e777.#fun(#idx)?;
-                        Ok(())
-                    }
-                },
-                Encoding::Array => quote! {
-                    #name::#con => {
-                        __e777.array(2)?;
-                        __e777.#fun(#idx)?;
-                        #tag
-                        __e777.array(0)?;
-                        Ok(())
-                    }
-                },
-                Encoding::Map => quote! {
-                    #name::#con => {
-                        __e777.array(2)?;
-                        __e777.#fun(#idx)?;
-                        #tag
-                        __e777.map(0)?;
-                        Ok(())
-                    }
-                }
-            }
-            syn::Fields::Named(f) if index_only => {
-                return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
-            }
-            syn::Fields::Named(_) if flat => {
-                let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
-                let idents = fields.fields().idents();
-                quote! {
-                    #name::#con{#(#idents,)* ..} => {
-                        #tests
-                        if let Some(__i777) = __max_index777 {
-                            __e777.array(__i777 + 2)?; // max index + 1 + (1 for constructor index)
-                        } else {
-                            __e777.array(1)?;
+                syn::Fields::Named(_) => {
+                    let (tests, statements) = encode_fields(&fields, false, encoding, false)?;
+                    let idents = fields.fields().idents();
+                    quote! {
+                        #name::#con{#(#idents,)* ..} => {
+                            #tests
+                            __e777.map(1)?;
+                            __e777.str(#idx)?;
+                            #tag
+                            #statements
                         }
-                        __e777.#fun(#idx)?;
-                        #statements
                     }
                 }
-            }
-            syn::Fields::Named(_) => {
-                let (tests, statements) = encode_fields(&fields, false, encoding, false)?;
-                let idents = fields.fields().idents();
-                quote! {
-                    #name::#con{#(#idents,)* ..} => {
-                        #tests
-                        __e777.array(2)?;
-                        __e777.#fun(#idx)?;
-                        #tag
-                        #statements
-                    }
-                }
-            }
-            syn::Fields::Unnamed(f) if index_only => {
-                return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
-            }
-            syn::Fields::Unnamed(_) if flat => {
-                let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
-                let idents = fields.match_idents();
-                quote! {
-                    #name::#con(#(#idents,)*) => {
-                        #tests
-                        if let Some(__i777) = __max_index777 {
-                            __e777.array(__i777 + 2)?; // max index + 1 + (1 for constructor index)
-                        } else {
-                            __e777.array(1)?;
+                syn::Fields::Unnamed(_) => {
+                    let (tests, statements) = encode_fields(&fields, false, encoding, false)?;
+                    let idents = fields.match_idents();
+                    quote! {
+                        #name::#con(#(#idents,)*) => {
+                            #tests
+                            __e777.map(1)?;
+                            __e777.str(#idx)?;
+                            #tag
+                            #statements
                         }
-                        __e777.#fun(#idx)?;
-                        #statements
                     }
                 }
             }
-            syn::Fields::Unnamed(_) => {
-                let (tests, statements) = encode_fields(&fields, false, encoding, false)?;
-
-                let idents = fields.match_idents();
-                quote! {
-                    #name::#con(#(#idents,)*) => {
-                        #tests
-                        __e777.array(2)?;
-                        __e777.#fun(#idx)?;
-                        #tag
-                        #statements
+        } else {
+            match &var.fields {
+                syn::Fields::Unit => match encoding {
+                    Encoding::Array | Encoding::Map if index_only => quote! {
+                        #name::#con => {
+                            __e777.#fun(#idx)?;
+                            Ok(())
+                        }
+                    },
+                    Encoding::Array if flat => quote! {
+                        #name::#con => {
+                            __e777.array(1)?;
+                            __e777.#fun(#idx)?;
+                            Ok(())
+                        }
+                    },
+                    Encoding::Array => quote! {
+                        #name::#con => {
+                            __e777.array(2)?;
+                            __e777.#fun(#idx)?;
+                            #tag
+                            __e777.array(0)?;
+                            Ok(())
+                        }
+                    },
+                    Encoding::Map => quote! {
+                        #name::#con => {
+                            __e777.array(2)?;
+                            __e777.#fun(#idx)?;
+                            #tag
+                            __e777.map(0)?;
+                            Ok(())
+                        }
+                    }
+                }
+                syn::Fields::Named(f) if index_only => {
+                    return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
+                }
+                syn::Fields::Named(_) if flat => {
+                    let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
+                    let idents = fields.fields().idents();
+                    quote! {
+                        #name::#con{#(#idents,)* ..} => {
+                            #tests
+                            if let Some(__i777) = __max_index777 {
+                                __e777.array(__i777 + 2)?;
+                            } else {
+                                __e777.array(1)?;
+                            }
+                            __e777.#fun(#idx)?;
+                            #statements
+                        }
+                    }
+                }
+                syn::Fields::Named(_) => {
+                    let (tests, statements) = encode_fields(&fields, false, encoding, false)?;
+                    let idents = fields.fields().idents();
+                    quote! {
+                        #name::#con{#(#idents,)* ..} => {
+                            #tests
+                            __e777.array(2)?;
+                            __e777.#fun(#idx)?;
+                            #tag
+                            #statements
+                        }
+                    }
+                }
+                syn::Fields::Unnamed(f) if index_only => {
+                    return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
+                }
+                syn::Fields::Unnamed(_) if flat => {
+                    let (tests, statements) = encode_fields(&fields, false, encoding, true)?;
+                    let idents = fields.match_idents();
+                    quote! {
+                        #name::#con(#(#idents,)*) => {
+                            #tests
+                            if let Some(__i777) = __max_index777 {
+                                __e777.array(__i777 + 2)?;
+                            } else {
+                                __e777.array(1)?;
+                            }
+                            __e777.#fun(#idx)?;
+                            #statements
+                        }
+                    }
+                }
+                syn::Fields::Unnamed(_) => {
+                    let (tests, statements) = encode_fields(&fields, false, encoding, false)?;
+                    let idents = fields.match_idents();
+                    quote! {
+                        #name::#con(#(#idents,)*) => {
+                            #tests
+                            __e777.array(2)?;
+                            __e777.#fun(#idx)?;
+                            #tag
+                            #statements
+                        }
                     }
                 }
             }
