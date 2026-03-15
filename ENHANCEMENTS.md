@@ -1,17 +1,15 @@
 # String-Keyed CBOR Maps
 
-This branch adds two complementary features for encoding structs and enums
-as CBOR maps with human-readable string keys.
+This branch adds two features for encoding structs and enums as CBOR maps
+with string keys instead of integer indices.
 
-It builds on the `#[s("...")]` string index support introduced by
-@twittner in [PR #53](https://github.com/twittner/minicbor/pull/53)
-and extends it with a convenience macro that automatically derives
-string keys from field and variant names.
+Based on [issue #52](https://github.com/twittner/minicbor/issues/52) and
+the `#[s("...")]` string index support from @twittner's
+[PR #53](https://github.com/twittner/minicbor/pull/53).
 
-## `#[s("...")]` — Per-field string index
+## `#[s("...")]` per-field string index
 
-Annotate individual fields or variants with a string index, just like
-`#[n(0)]` assigns a numeric index:
+Works like `#[n(0)]`, but uses a string key:
 
 ```rust
 use minicbor::{Encode, Decode};
@@ -34,10 +32,10 @@ Wire format (CBOR diagnostic notation):
 {"temperature": 23, "humidity": 65, 2: 7}
 ```
 
-## `#[cbor(text_keys)]` — Automatic string keys from field names
+## `#[cbor(text_keys)]` for automatic string keys
 
-Instead of annotating every field, apply `text_keys` at the struct or
-enum level. Each field is automatically keyed by its Rust identifier:
+Applies string keys to all fields automatically, using their Rust
+identifiers. No per-field annotations needed:
 
 ```rust
 #[derive(Encode, Decode)]
@@ -55,11 +53,11 @@ Wire format:
 {"temperature": 23, "humidity": 65, "active": true}
 ```
 
-No `#[cbor(map)]` is needed — `text_keys` implies map encoding.
+`text_keys` implies map encoding, so `#[cbor(map)]` is not required.
 
 ### Renaming keys
 
-Override individual key names with `#[cbor(key = "...")]`:
+Use `#[cbor(key = "...")]` to override individual key names:
 
 ```rust
 #[derive(Encode, Decode)]
@@ -81,7 +79,7 @@ Wire format:
 
 ### Optional fields
 
-`Option<T>` fields that are `None` are omitted from the map entirely:
+`Option<T>` fields that are `None` are omitted from the map:
 
 ```rust
 #[derive(Encode, Decode)]
@@ -92,14 +90,14 @@ struct Config {
     interval: Option<u32>,
 }
 
-// Config { name: 1, interval: None } encodes as: {"name": 1}
-// Config { name: 1, interval: Some(500) } encodes as: {"name": 1, "interval_ms": 500}
+// Config { name: 1, interval: None }      encodes as {"name": 1}
+// Config { name: 1, interval: Some(500) } encodes as {"name": 1, "interval_ms": 500}
 ```
 
 ### Skipping fields
 
-Fields annotated with `#[cbor(skip)]` are excluded from encoding and
-initialized with `Default::default()` on decode:
+`#[cbor(skip)]` excludes fields from encoding. They get `Default::default()`
+on decode:
 
 ```rust
 #[derive(Encode, Decode)]
@@ -112,8 +110,6 @@ struct State {
 ```
 
 ### Nested structs
-
-Inner structs with `text_keys` produce nested string-keyed maps:
 
 ```rust
 #[derive(Encode, Decode)]
@@ -128,13 +124,13 @@ struct Outer {
 }
 
 // Outer { inner: Inner { a: 1 }, b: 2 }
-// encodes as: {"inner": {"a": 1}, "b": 2}
+// encodes as {"inner": {"a": 1}, "b": 2}
 ```
 
 ### Enums
 
-Unit variants encode as a plain string. Non-unit variants encode as a
-single-entry map wrapping the variant's fields:
+Unit variants encode as a plain string, non-unit variants as a
+single-entry map:
 
 ```rust
 #[derive(Encode, Decode)]
@@ -144,13 +140,13 @@ enum Command {
     SetInterval { #[s("ms")] ms: u32 },
 }
 
-// Command::Reset           → "Reset"
-// Command::SetInterval { ms: 500 } → {"SetInterval": {"ms": 500}}
+// Command::Reset                        encodes as "Reset"
+// Command::SetInterval { ms: 500 }      encodes as {"SetInterval": {"ms": 500}}
 ```
 
-### Generic structs
+### Generics
 
-Works with generics — the derived bounds are added automatically:
+Trait bounds are derived automatically:
 
 ```rust
 #[derive(Encode, Decode)]
@@ -161,7 +157,7 @@ struct Wrapper<T> {
 }
 ```
 
-### Collection fields
+### Collections
 
 Standard collection types work as field values:
 
@@ -179,23 +175,23 @@ struct DataSet {
 
 ## Decode behavior
 
-- **Unknown keys** are silently skipped (forward compatible)
-- **Missing optional fields** default to `None` (backward compatible)
-- **Missing required fields** produce a decode error
-- **Key order** does not matter — the decoder handles any order
-- Both definite and indefinite-length maps are supported
+- Unknown keys are skipped (forward compatible)
+- Missing optional fields default to `None` (backward compatible)
+- Missing required fields produce a decode error
+- Key order does not matter
+- Definite and indefinite-length maps are both supported
 
-## Compile-time validation
+## Compile-time checks
 
-The following invalid usages produce compile errors:
+The following produce compile errors:
 
-- `#[cbor(text_keys)]` on a tuple struct (fields have no names)
-- `#[cbor(text_keys)]` combined with `transparent` or `index_only`
-- `#[cbor(key = "...")]` without `text_keys` on the struct/enum
+- `text_keys` on a tuple struct (fields have no names)
+- `text_keys` combined with `transparent` or `index_only`
+- `key = "..."` without `text_keys` on the struct or enum
 - Two fields with the same key name
 
-## `no_std` / `no_alloc`
+## `no_std` and `no_alloc`
 
-Both features are fully compatible with `no_std` and `no_alloc` targets.
-String keys are encoded directly by the `Encoder::str()` method and decoded
-zero-copy via `Decoder::str()` — no heap allocation is needed at any point.
+Both features work on `no_std` and `no_alloc` targets.
+`Encoder::str()` writes directly, `Decoder::str()` borrows from the
+input buffer. No heap allocation anywhere.
