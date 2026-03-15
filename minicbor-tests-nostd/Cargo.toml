@@ -1,0 +1,18 @@
+[package]
+publish = false
+name    = "minicbor-tests-nostd"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+minicbor       = { path = "../minicbor", features = ["derive"] }
+cortex-m       = { version = "0.7", features = ["critical-section-single-core"] }
+cortex-m-rt    = "0.7"
+cortex-m-semihosting = "0.5"
+panic-halt     = "1"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

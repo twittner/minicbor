@@ -61,7 +61,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
     }
 
     let tag = on_tag(&attrs);
-    let steps = on_fields(&fields, true, attrs.encoding().unwrap_or_default())?;
+    let steps = on_fields(&fields, true, attrs.effective_encoding())?;
 
     Ok(quote! {
         impl #impl_generics minicbor::CborLen<Ctx> for #name #typ_generics #where_clause {
@@ -85,7 +85,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let name          = &inp.ident;
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
-    let enum_encoding = enum_attrs.encoding().unwrap_or_default();
+    let enum_encoding = enum_attrs.effective_encoding();
     let index_only    = enum_attrs.index_only();
     let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
@@ -101,53 +101,77 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let con      = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag      = on_tag(attrs);
-        let row = match &var.fields {
-            syn::Fields::Unit => if index_only {
-                quote! {
+        let row = if enum_attrs.text_keys() {
+            // text_keys enum: unit → just string len, non-unit → map(1) header + string key + fields
+            match &var.fields {
+                syn::Fields::Unit => quote! {
                     #name::#con => { #idx.cbor_len(__ctx777) }
-                }
-            } else if flat {
-                quote! {
-                    #name::#con => { 1 + #idx.cbor_len(__ctx777) }
-                }
-            } else {
-                quote! {
-                    #name::#con => { 1 + #idx.cbor_len(__ctx777) + #tag + 1 }
-                }
-            }
-            syn::Fields::Named(f) if index_only => {
-                return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
-            }
-            syn::Fields::Named(_) => {
-                let steps = on_fields(&fields, false, encoding)?;
-                let idents = fields.fields().idents();
-                match encoding {
-                    Encoding::Map => quote! {
+                },
+                syn::Fields::Named(_) => {
+                    let steps = on_fields(&fields, false, encoding)?;
+                    let idents = fields.fields().idents();
+                    // 1 byte for map(1) header + key str + tag + fields
+                    quote! {
                         #name::#con{#(#idents,)* ..} => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
-                    },
-                    Encoding::Array if flat => quote! {
-                        #name::#con{#(#idents,)* ..} => { #(#steps)* + #idx.cbor_len(__ctx777) }
-                    },
-                    Encoding::Array => quote! {
-                        #name::#con{#(#idents,)* ..} => { #(#steps)* + #tag + 1 + #idx.cbor_len(__ctx777) }
+                    }
+                }
+                syn::Fields::Unnamed(_) => {
+                    let steps = on_fields(&fields, false, encoding)?;
+                    let idents = fields.match_idents();
+                    quote! {
+                        #name::#con(#(#idents,)*) => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
                     }
                 }
             }
-            syn::Fields::Unnamed(f) if index_only => {
-                return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
-            }
-            syn::Fields::Unnamed(_) => {
-                let steps  = on_fields(&fields, false, encoding)?;
-                let idents = fields.match_idents();
-                match encoding {
-                    Encoding::Map => quote! {
-                        #name::#con(#(#idents,)*) => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
+        } else {
+            match &var.fields {
+                syn::Fields::Unit => if index_only {
+                    quote! {
+                        #name::#con => { #idx.cbor_len(__ctx777) }
+                    }
+                } else if flat {
+                    quote! {
+                        #name::#con => { 1 + #idx.cbor_len(__ctx777) }
+                    }
+                } else {
+                    quote! {
+                        #name::#con => { 1 + #idx.cbor_len(__ctx777) + #tag + 1 }
+                    }
+                }
+                syn::Fields::Named(f) if index_only => {
+                    return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
+                }
+                syn::Fields::Named(_) => {
+                    let steps = on_fields(&fields, false, encoding)?;
+                    let idents = fields.fields().idents();
+                    match encoding {
+                        Encoding::Map => quote! {
+                            #name::#con{#(#idents,)* ..} => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
+                        },
+                        Encoding::Array if flat => quote! {
+                            #name::#con{#(#idents,)* ..} => { #(#steps)* + #idx.cbor_len(__ctx777) }
+                        },
+                        Encoding::Array => quote! {
+                            #name::#con{#(#idents,)* ..} => { #(#steps)* + #tag + 1 + #idx.cbor_len(__ctx777) }
+                        }
+                    }
+                }
+                syn::Fields::Unnamed(f) if index_only => {
+                    return Err(syn::Error::new(f.span(), "index_only enums must not have fields"))
+                }
+                syn::Fields::Unnamed(_) => {
+                    let steps  = on_fields(&fields, false, encoding)?;
+                    let idents = fields.match_idents();
+                    match encoding {
+                        Encoding::Map => quote! {
+                            #name::#con(#(#idents,)*) => { 1 + #idx.cbor_len(__ctx777) + #tag + #(#steps)* }
                     },
                     Encoding::Array if flat => quote! {
                         #name::#con(#(#idents,)*) => { #(#steps)* + #idx.cbor_len(__ctx777) }
                     },
                     Encoding::Array => quote! {
                         #name::#con(#(#idents,)*) => { #(#steps)* + #tag + 1 + #idx.cbor_len(__ctx777) }
+                    }
                     }
                 }
             }

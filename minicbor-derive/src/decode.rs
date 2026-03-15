@@ -86,7 +86,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         return make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause)
     }
 
-    let statements = gen_statements(&fields, attrs.encoding().unwrap_or_default(), false)?;
+    let statements = gen_statements(&fields, attrs.effective_encoding(), false)?;
 
     let result = if let syn::Fields::Named(_) = data.fields {
         let defs      = defs(fields.fields());
@@ -150,7 +150,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let name          = &inp.ident;
     let enum_attrs    = Attributes::try_from_iter(Level::Enum, inp.attrs.iter())?;
-    let enum_encoding = enum_attrs.encoding().unwrap_or_default();
+    let enum_encoding = enum_attrs.effective_encoding();
     let index_only    = enum_attrs.index_only();
     let flat          = enum_attrs.flat();
     let variants      = Variants::try_from(name.span(), data.variants.iter(), &enum_attrs)?;
@@ -161,6 +161,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let mut defaults = BTreeSet::new();
     let mut default_attrs = Vec::new();
     let mut lifetime = gen_lifetime();
+    let text_keys = enum_attrs.text_keys();
     let mut num_rows = Vec::new();
     let mut str_rows = Vec::new();
     for ((var, idx), attrs) in data.variants.iter().zip(variants.indices.iter()).zip(&variants.attrs) {
@@ -169,7 +170,10 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let con = &var.ident;
         let tag = decode_tag(attrs);
         let row = if let syn::Fields::Unit = var.fields {
-            if index_only | flat {
+            if text_keys {
+                // text_keys: unit variant matched by string, no payload to skip
+                quote!(#idx => Ok(#name::#con),)
+            } else if index_only | flat {
                 quote!(#idx => Ok(#name::#con),)
             } else {
                 quote!(#idx => {
@@ -265,7 +269,12 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let (_, typ_generics, where_clause) = inp.generics.split_for_impl();
 
-    let check = if index_only {
+    let check = if text_keys {
+        quote! {
+            let __p777 = __d777.position();
+            let __p778 = __d777.position();
+        }
+    } else if index_only {
         quote! {
             let __p778 = __d777.position();
         }
@@ -292,7 +301,50 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let tag = decode_tag(&enum_attrs);
 
-    let match_fragement = if str_rows.is_empty() {
+    let match_fragement = if text_keys {
+        // text_keys enum: String → unit variant, Map(1) → non-unit variant
+        quote! {
+            match __d777.datatype()? {
+                minicbor::data::Type::String => {
+                    match __d777.str()? {
+                        #(#str_rows)*
+                        s => Err(minicbor::__minicbor_cfg! {
+                            'std {
+                                minicbor::decode::Error::unknown_variant_str(s.to_string()).at(__p778)
+                            }
+                            'alloc {
+                                minicbor::decode::Error::unknown_variant_str(s.to_string()).at(__p778)
+                            }
+                            'otherwise {
+                                minicbor::decode::Error::unknown_variant_str().at(__p778)
+                            }
+                        })
+                    }
+                }
+                minicbor::data::Type::Map => {
+                    let __len777 = __d777.map()?.ok_or_else(|| minicbor::decode::Error::message("indefinite map not supported for text_keys enum").at(__p777))?;
+                    if __len777 != 1 {
+                        return Err(minicbor::decode::Error::message("expected map with 1 entry for text_keys enum variant").at(__p777))
+                    }
+                    match __d777.str()? {
+                        #(#str_rows)*
+                        s => Err(minicbor::__minicbor_cfg! {
+                            'std {
+                                minicbor::decode::Error::unknown_variant_str(s.to_string()).at(__p778)
+                            }
+                            'alloc {
+                                minicbor::decode::Error::unknown_variant_str(s.to_string()).at(__p778)
+                            }
+                            'otherwise {
+                                minicbor::decode::Error::unknown_variant_str().at(__p778)
+                            }
+                        })
+                    }
+                }
+                _ => Err(minicbor::decode::Error::message("expected string or map for text_keys enum").at(__p777))
+            }
+        }
+    } else if str_rows.is_empty() {
         quote! {
             match __d777.i64()? {
                 #(#num_rows)*

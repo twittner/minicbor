@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use crate::attrs::{Attributes, Idx, Kind, Level};
+use crate::attrs::{Attributes, Encoding, Idx, Kind, Level};
 use crate::attrs::idx::{self, Index};
 use proc_macro2::Span;
 use syn::{Ident, Type};
@@ -40,16 +40,34 @@ impl Fields {
         let mut skipped = Vec::new();
         let mut has_str_index = false;
 
-        let encoding = parents.iter().find_map(|p| p.encoding()).unwrap_or_default();
+        let text_keys = parents.iter().any(|p| p.text_keys());
+        let encoding = if text_keys {
+            Encoding::Map
+        } else {
+            parents.iter().find_map(|p| p.encoding()).unwrap_or_default()
+        };
 
         for (pos, f) in iter.into_iter().enumerate() {
             let attrs = Attributes::try_from_iter(Level::Field, &f.attrs)?;
+            if !text_keys && attrs.key().is_some() {
+                let s = f.ident.as_ref().map(|i| i.span()).unwrap_or_else(|| f.ty.span());
+                return Err(syn::Error::new(s, "`#[cbor(key = \"...\")]` requires `#[cbor(text_keys)]` on the struct"))
+            }
             let index = if attrs.skip() {
                 debug_assert!(attrs.index().is_none());
                 Index::Num(Idx::N(i64::MAX))
             } else if let Some(i) = attrs.index() {
                 debug_assert!(!attrs.skip());
                 i.clone()
+            } else if text_keys {
+                // Auto-assign string index from key attribute or field name
+                let key = attrs.key()
+                    .map(|s| s.to_string())
+                    .or_else(|| f.ident.as_ref().map(|i| i.to_string()))
+                    .ok_or_else(|| {
+                        syn::Error::new(f.ty.span(), "`text_keys` requires named fields (not supported on tuple structs)")
+                    })?;
+                Index::Str(key)
             } else if parents.last().map(|p| p.transparent()).unwrap_or(false) {
                 Index::Num(Idx::N(i64::MAX))
             } else {

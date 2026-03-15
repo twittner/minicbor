@@ -568,7 +568,7 @@ enum Mode {
 /// Derive the `minicbor::CborLen` trait for a struct or enum.
 ///
 /// See the [crate] documentation for details.
-#[proc_macro_derive(CborLen, attributes(n, b, cbor))]
+#[proc_macro_derive(CborLen, attributes(n, b, s, cbor))]
 pub fn derive_cbor_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     cbor_len::derive_from(input)
 }
