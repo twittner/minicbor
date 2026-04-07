@@ -221,7 +221,7 @@ impl<'b> Decoder<'b> {
     /// Only available when the feature `half` is present.
     #[cfg(feature = "half")]
     pub fn f16(&mut self) -> Result<f32, Error> {
-        self.f16_half()?.to_f32()
+        Ok(self.f16_half()?.to_f32())
     }
 
     /// Decode an `f32` value.
