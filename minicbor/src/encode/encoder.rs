@@ -163,6 +163,20 @@ impl<W: Write> Encoder<W> {
         }
     }
 
+    /// Encode an `half::f16` value.
+    ///
+    /// *Requires feature* `"half"`.
+    ///
+    /// For further details please consult the [half][1] crate which is
+    /// used internally for `f16` support.
+    ///
+    /// [1]: https://crates.io/crates/half
+    #[cfg(feature = "half")]
+    pub fn f16_half(&mut self, x: half::f16) -> Result<&mut Self, Error<W::Error>> {
+        let n = x.to_bits();
+        self.put(&[SIMPLE | 25])?.put(&n.to_be_bytes()[..])
+    }
+
     /// Encode an `f32` value as a half float (`f16)`.
     ///
     /// *Requires feature* `"half"`.
@@ -182,8 +196,7 @@ impl<W: Write> Encoder<W> {
     /// [1]: https://crates.io/crates/half
     #[cfg(feature = "half")]
     pub fn f16(&mut self, x: f32) -> Result<&mut Self, Error<W::Error>> {
-        let n = half::f16::from_f32(x).to_bits();
-        self.put(&[SIMPLE | 25])?.put(&n.to_be_bytes()[..])
+        self.f16_half(half::f16::from_f32(x))
     }
 
     /// Encode an `f32` value.

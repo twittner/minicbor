@@ -203,17 +203,25 @@ impl<'b> Decoder<'b> {
         }
     }
 
-    /// Decode a half float (`f16`) and return it in an `f32`.
+    /// Decode a half float (`f16`).
     ///
     /// Only available when the feature `half` is present.
     #[cfg(feature = "half")]
-    pub fn f16(&mut self) -> Result<f32, Error> {
+    pub fn f16_half(&mut self) -> Result<half::f16, Error> {
         let p = self.pos;
         let b = self.read()?;
         if 0xf9 != b {
             return Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected f16"))
         }
-        Ok(half::f16::from_bits(u16::from_be_bytes(self.read_array()?)).to_f32())
+        Ok(half::f16::from_bits(u16::from_be_bytes(self.read_array()?)))
+    }
+
+    /// Decode a half float (`f16`) and return it in an `f32`.
+    ///
+    /// Only available when the feature `half` is present.
+    #[cfg(feature = "half")]
+    pub fn f16(&mut self) -> Result<f32, Error> {
+        self.f16_half()?.to_f32()
     }
 
     /// Decode an `f32` value.
