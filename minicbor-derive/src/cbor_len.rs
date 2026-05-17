@@ -198,8 +198,6 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
     let steps = match encoding {
         Encoding::Map => {
             let mut steps = Vec::new();
-            let len = fields.fields().len();
-            steps.push(quote!(#len.cbor_len(__ctx777)));
             for field in fields.fields() {
                 if field.attrs.skip() {
                     continue
@@ -209,36 +207,34 @@ fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result
                 let ident    = &field.ident;
                 let idx      = field.index;
                 let tag      = on_tag(&field.attrs);
-                if has_self {
-                    if field.is_name {
-                        steps.push(quote! {
-                            + if #is_nil(&self.#ident) {
-                                0
-                            } else {
-                                #idx.cbor_len(__ctx777) + #tag + #cbor_len(&self.#ident, __ctx777)
-                            }
-                        })
-                    } else {
-                        let i = syn::Index::from(field.pos);
-                        steps.push(quote! {
-                            + if #is_nil(&self.#i) {
-                                0
-                            } else {
-                                #idx.cbor_len(__ctx777) + #tag + #cbor_len(&self.#i, __ctx777)
-                            }
-                        })
-                    }
-                } else {
-                    steps.push(quote! {
-                        + if #is_nil(&#ident) {
-                            0
+                let value    =
+                    if has_self {
+                        if field.is_name {
+                            quote!(&self.#ident)
                         } else {
-                            #idx.cbor_len(__ctx777) + #tag + #cbor_len(&#ident, __ctx777)
+                            let i = syn::Index::from(field.pos);
+                            quote!(&self.#i)
                         }
-                    })
-                }
+                    } else {
+                        quote!(&#ident)
+                    };
+                steps.push(quote! {
+                    if !#is_nil(#value) {
+                        __fields777 += 1;
+                        __len777 += #idx.cbor_len(__ctx777) + #tag + #cbor_len(#value, __ctx777);
+                    }
+                })
             }
-            steps
+            vec![
+                quote! {
+                    {
+                        let mut __fields777 = 0usize;
+                        let mut __len777 = 0usize;
+                        #(#steps)*
+                        __fields777.cbor_len(__ctx777) + __len777
+                    }
+                }
+            ]
         }
         Encoding::Array => {
             let mut steps = Vec::new();

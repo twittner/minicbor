@@ -47,6 +47,35 @@ struct BytesMapEncoding {
 #[cbor(transparent)]
 struct TransparentEncoding(#[cbor(n(0))] u8);
 
+#[derive(Default, Encode, CborLen)]
+#[cbor(map)]
+struct OptionalMapEncoding {
+    #[n(0)]  f00: Option<u8>,
+    #[n(1)]  f01: Option<u8>,
+    #[n(2)]  f02: Option<u8>,
+    #[n(3)]  f03: Option<u8>,
+    #[n(4)]  f04: Option<u8>,
+    #[n(5)]  f05: Option<u8>,
+    #[n(6)]  f06: Option<u8>,
+    #[n(7)]  f07: Option<u8>,
+    #[n(8)]  f08: Option<u8>,
+    #[n(9)]  f09: Option<u8>,
+    #[n(10)] f10: Option<u8>,
+    #[n(11)] f11: Option<u8>,
+    #[n(12)] f12: Option<u8>,
+    #[n(13)] f13: Option<u8>,
+    #[n(14)] f14: Option<u8>,
+    #[n(15)] f15: Option<u8>,
+    #[n(16)] f16: Option<u8>,
+    #[n(17)] f17: Option<u8>,
+    #[n(18)] f18: Option<u8>,
+    #[n(19)] f19: Option<u8>,
+    #[n(20)] f20: Option<u8>,
+    #[n(21)] f21: Option<u8>,
+    #[n(22)] f22: Option<u8>,
+    #[n(23)] f23: Option<u8>
+}
+
 impl Arbitrary for SampleArrayEncoding<BytesArrayEncoding> {
     fn arbitrary(g: &mut Gen) -> Self {
         match g.choose(&[0, 1, 2, 3]).unwrap() {
@@ -146,6 +175,11 @@ fn token_lengths() {
 
     assert_encoded_len(Token::Bytes(&[0xff]));
     assert_encoded_len(Token::Bytes(&[0xff; 24]));
+}
+
+#[test]
+fn derived_map_length_uses_encoded_field_count() {
+    assert_encoded_len(OptionalMapEncoding::default());
 }
 
 quickcheck! {
