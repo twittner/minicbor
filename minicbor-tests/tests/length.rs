@@ -1,5 +1,6 @@
 #![cfg(feature = "std")]
 
+use minicbor::data::Token;
 use minicbor::{CborLen, Encode, Decode};
 use quickcheck::{Arbitrary, Gen, quickcheck};
 
@@ -124,6 +125,27 @@ impl Arbitrary for TransparentEncoding {
     fn arbitrary(g: &mut Gen) -> Self {
         TransparentEncoding(Arbitrary::arbitrary(g))
     }
+}
+
+fn assert_encoded_len<T>(val: T)
+where
+    T: CborLen<()> + Encode<()>
+{
+    let len = val.cbor_len(&mut ());
+    let bytes = minicbor::to_vec(val).unwrap();
+    assert_eq!(bytes.len(), len);
+}
+
+#[test]
+fn token_lengths() {
+    assert_encoded_len(Token::F16(1.0));
+
+    assert_encoded_len(Token::Simple(0x13));
+    assert_encoded_len(Token::Simple(0x14));
+    assert_encoded_len(Token::Simple(0xff));
+
+    assert_encoded_len(Token::Bytes(&[0xff]));
+    assert_encoded_len(Token::Bytes(&[0xff; 24]));
 }
 
 quickcheck! {
