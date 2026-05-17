@@ -699,10 +699,8 @@ impl Attributes {
                     return Err(syn::Error::new(*s, "`borrow` and `b` are mutually exclusive"))
                 }
             }
-            Value::Index(idx, s) if idx.is_b() => {
-                if self.contains_key(Kind::Borrow) {
-                    return Err(syn::Error::new(*s, "`b` and `borrow` are mutually exclusive"))
-                }
+            Value::Index(idx, s) if idx.is_b() && self.contains_key(Kind::Borrow) => {
+                return Err(syn::Error::new(*s, "`b` and `borrow` are mutually exclusive"))
             }
             _ => {}
         }
