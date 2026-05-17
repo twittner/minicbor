@@ -7,6 +7,12 @@
 
 # minicbor
 
+## `2.2.2`
+
+- Fixes bugs related to `CborLen` calculation, see commit cb19b238e5245729932a9cf9611818be1dc20ab6
+  for details.
+- Depends on `minicbor-derive-0.19.4`.
+
 ## `2.2.1`
 
 - Depends on `minicbor-derive-0.19.3`.
@@ -444,6 +450,10 @@
 - Added `Encode` and `Decode` impls for tuples (see merge request [1][mr1] by @koushiro).
 
 # minicbor-derive
+
+## `0.19.4`
+
+- Fixes `CborLen` related bugs, see commit 7d0b368cc92ca3be0acae5364461f5cae9df7cdd for details.
 
 ## `0.19.3`
 
