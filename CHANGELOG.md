@@ -451,6 +451,12 @@
 
 # minicbor-derive
 
+## Unreleased
+
+- Adds `#[cbor(crate = "<path>")]` to allow re-exporters of the derive macros to
+  point the generated code at a different path for the `minicbor` crate
+  (similar to serde's `#[serde(crate = "...")]`).
+
 ## `0.19.4`
 
 - Fixes `CborLen` related bugs, see commit 7d0b368cc92ca3be0acae5364461f5cae9df7cdd for details.
