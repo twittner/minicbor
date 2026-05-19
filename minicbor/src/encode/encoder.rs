@@ -1,5 +1,5 @@
 use crate::{SIGNED, BYTES, TEXT, ARRAY, MAP, TAGGED, SIMPLE};
-use crate::data::{Int, Tag};
+use crate::data::{IanaTag, Int, Tag};
 use crate::encode::{Encode, Error, Write};
 
 /// A non-allocating CBOR encoder writing encoded bytes to the given [`Write`] sink.
@@ -126,6 +126,54 @@ impl<W: Write> Encoder<W> {
             n @ 0x1_0000 ..= 0xffff_ffff => self.put(&[SIGNED | 26])?.put(&(n as u32).to_be_bytes()[..]),
             n                            => self.put(&[SIGNED | 27])?.put(&n.to_be_bytes()[..])
         }
+    }
+
+    /// Encode a `u128` value.
+    ///
+    /// Values up to [`u64::MAX`] are encoded as native CBOR unsigned integers.
+    /// Larger values are encoded as a positive bignum, i.e. tag 2 followed by
+    /// the big-endian byte string of the value (with leading zero bytes
+    /// stripped), as defined in [RFC 8949 §3.4.3][1].
+    ///
+    /// [1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-3.4.3
+    pub fn u128(&mut self, x: u128) -> Result<&mut Self, Error<W::Error>> {
+        if x <= u64::MAX as u128 {
+            return self.u64(x as u64)
+        }
+        self.tag(IanaTag::PosBignum)?;
+        let bytes = x.to_be_bytes();
+        let start = bytes.iter().position(|&b| b != 0).unwrap_or(bytes.len() - 1);
+        self.bytes(&bytes[start..])
+    }
+
+    /// Encode an `i128` value.
+    ///
+    /// Values that fit into the CBOR integer range, i.e. `[-2^64, 2^64 - 1]`,
+    /// are encoded as native CBOR integers. Values outside that range are
+    /// encoded as a positive (tag 2) or negative (tag 3) bignum, as defined
+    /// in [RFC 8949 §3.4.3][1].
+    ///
+    /// [1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-3.4.3
+    pub fn i128(&mut self, x: i128) -> Result<&mut Self, Error<W::Error>> {
+        if x >= 0 {
+            let u = x as u128;
+            if u <= u64::MAX as u128 {
+                return self.u64(u as u64)
+            }
+            self.tag(IanaTag::PosBignum)?;
+            let bytes = u.to_be_bytes();
+            let start = bytes.iter().position(|&b| b != 0).unwrap_or(bytes.len() - 1);
+            return self.bytes(&bytes[start..])
+        }
+        // `!(x as u128) == (-1 - x) as u128` for any negative `x: i128` and avoids overflow.
+        let n = !(x as u128);
+        if n <= u64::MAX as u128 {
+            return self.int(Int::neg(n as u64))
+        }
+        self.tag(IanaTag::NegBignum)?;
+        let bytes = n.to_be_bytes();
+        let start = bytes.iter().position(|&b| b != 0).unwrap_or(bytes.len() - 1);
+        self.bytes(&bytes[start..])
     }
 
     /// Encode a CBOR integer.

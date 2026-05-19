@@ -494,7 +494,7 @@ macro_rules! encode_basic {
     }
 }
 
-encode_basic!(u8 i8 u16 i16 u32 i32 u64 i64 bool f32 f64 char);
+encode_basic!(u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 bool f32 f64 char);
 
 impl<C> CborLen<C> for bool {
     fn cbor_len(&self, _: &mut C) -> usize {
@@ -575,6 +575,30 @@ impl<C> CborLen<C> for i64 {
     }
 }
 
+impl<C> CborLen<C> for u128 {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        if *self <= u64::MAX as u128 {
+            (*self as u64).cbor_len(ctx)
+        } else {
+            // tag (1) + byte string header (1) + payload bytes
+            let bytes = 16 - (self.leading_zeros() / 8) as usize;
+            2 + bytes
+        }
+    }
+}
+
+impl<C> CborLen<C> for i128 {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        let n = if *self >= 0 { *self as u128 } else { !(*self as u128) };
+        if n <= u64::MAX as u128 {
+            (n as u64).cbor_len(ctx)
+        } else {
+            let bytes = 16 - (n.leading_zeros() / 8) as usize;
+            2 + bytes
+        }
+    }
+}
+
 impl<C> CborLen<C> for f32 {
     fn cbor_len(&self, _: &mut C) -> usize {
         5
@@ -610,10 +634,12 @@ encode_nonzero! {
     core::num::NonZeroU16
     core::num::NonZeroU32
     core::num::NonZeroU64
+    core::num::NonZeroU128
     core::num::NonZeroI8
     core::num::NonZeroI16
     core::num::NonZeroI32
     core::num::NonZeroI64
+    core::num::NonZeroI128
 }
 
 #[cfg(any(target_pointer_width = "16", target_pointer_width = "32", target_pointer_width = "64"))]

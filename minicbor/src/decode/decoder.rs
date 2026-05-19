@@ -1,6 +1,6 @@
 #![allow(clippy::unusual_byte_groupings)]
 
-use crate::{ARRAY, BREAK, BYTES, MAP, SIMPLE, TAGGED, TEXT, SIGNED, UNSIGNED};
+use crate::{ARRAY, BREAK, BYTES, MAP, SIGNED, SIMPLE, TAGGED, TEXT, UNSIGNED};
 use crate::data::{Int, Tag, Type};
 use crate::decode::{Decode, Error};
 use core::{marker, str};
@@ -180,6 +180,74 @@ impl<'b> Decoder<'b> {
             0x3a              => self.read_array().map(u32::from_be_bytes).map(|n| -1 - i64::from(n)),
             0x3b              => self.read_array().map(u64::from_be_bytes).and_then(|n| try_as(n, "when converting u64 to i64", p).map(|n: i64| -1 - n)),
             b                 => Err(Error::type_mismatch(self.type_of(b)?).at(p).with_message("expected i64"))
+        }
+    }
+
+    /// Decode a `u128` value.
+    ///
+    /// Accepts either a native CBOR unsigned integer or a positive bignum,
+    /// i.e. tag 2 followed by a byte string holding the big-endian
+    /// representation of the value, as defined in [RFC 8949 §3.4.3][1].
+    ///
+    /// [1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-3.4.3
+    pub fn u128(&mut self) -> Result<u128, Error> {
+        let p = self.pos;
+        let b = self.current()?;
+        match type_of(b) {
+            UNSIGNED => self.u64().map(u128::from),
+            TAGGED => {
+                let t = self.tag()?;
+                if t.as_u64() != 2 {
+                    return Err(Error::tag_mismatch(t)
+                        .with_message("expected positive bignum tag (2)")
+                        .at(p))
+                }
+                decode_bignum_u128(self, p)
+            }
+            _ => Err(Error::type_mismatch(self.type_of(b)?)
+                .with_message("expected u128")
+                .at(p))
+        }
+    }
+
+    /// Decode an `i128` value.
+    ///
+    /// Accepts native CBOR integers as well as positive (tag 2) and negative
+    /// (tag 3) bignums, as defined in [RFC 8949 §3.4.3][1].
+    ///
+    /// [1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-3.4.3
+    pub fn i128(&mut self) -> Result<i128, Error> {
+        let p = self.pos;
+        let b = self.current()?;
+        match type_of(b) {
+            UNSIGNED => self.u64().map(i128::from),
+            SIGNED   => self.int().map(i128::from),
+            TAGGED   => {
+                let t = self.tag()?;
+                match t.as_u64() {
+                    2 => {
+                        let n = decode_bignum_u128(self, p)?;
+                        if n > i128::MAX as u128 {
+                            return Err(Error::message("positive bignum exceeds i128 range").at(p))
+                        }
+                        Ok(n as i128)
+                    }
+                    3 => {
+                        let n = decode_bignum_u128(self, p)?;
+                        if n > i128::MAX as u128 {
+                            return Err(Error::message("negative bignum exceeds i128 range").at(p))
+                        }
+                        // `!n as i128 == -1 - n` for `n <= i128::MAX as u128`.
+                        Ok((!n) as i128)
+                    }
+                    _ => Err(Error::tag_mismatch(t)
+                        .with_message("expected bignum tag (2 or 3)")
+                        .at(p))
+                }
+            }
+            _ => Err(Error::type_mismatch(self.type_of(b)?)
+                .with_message("expected i128")
+                .at(p))
         }
     }
 
@@ -1075,4 +1143,21 @@ where
     A: TryInto<B> + Into<u64> + Copy
 {
     val.try_into().map_err(|_| Error::overflow(val.into()).at(pos).with_message(msg))
+}
+
+/// Decode the byte-string payload of a bignum (tag 2 or 3) into a `u128`.
+///
+/// Leading zero bytes are tolerated; values that would not fit into 16
+/// bytes after stripping leading zeros are rejected.
+fn decode_bignum_u128(d: &mut Decoder<'_>, pos: usize) -> Result<u128, Error> {
+    let mut bytes = d.bytes()?;
+    while let Some((&0, rest)) = bytes.split_first() {
+        bytes = rest;
+    }
+    if bytes.len() > 16 {
+        return Err(Error::message("bignum exceeds 128 bits").at(pos))
+    }
+    let mut buf = [0u8; 16];
+    buf[16 - bytes.len()..].copy_from_slice(bytes);
+    Ok(u128::from_be_bytes(buf))
 }
