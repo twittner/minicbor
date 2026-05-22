@@ -1,4 +1,5 @@
 use super::{Int, Tag, Type};
+use crate::bytes::ByteSlice;
 use crate::encode::{self, Encode, Encoder, Write};
 use crate::decode::{Decode, Error};
 use crate::CborLen;
@@ -215,15 +216,15 @@ impl<'b, C> CborLen<C> for Token<'b> {
             Token::I32(val)    => val.cbor_len(ctx),
             Token::I64(val)    => val.cbor_len(ctx),
             Token::Int(val)    => val.cbor_len(ctx),
-            Token::F16(val)    => val.cbor_len(ctx),
+            Token::F16(_)      => 3,
             Token::F32(val)    => val.cbor_len(ctx),
             Token::F64(val)    => val.cbor_len(ctx),
-            Token::Bytes(val)  => val.cbor_len(ctx),
+            Token::Bytes(val)  => <&ByteSlice>::from(*val).cbor_len(ctx),
             Token::String(val) => val.cbor_len(ctx),
             Token::Array(val)  => val.cbor_len(ctx),
             Token::Map(val)    => val.cbor_len(ctx),
             Token::Tag(val)    => val.cbor_len(ctx),
-            Token::Simple(val) => val.cbor_len(ctx),
+            Token::Simple(val) => if *val < 0x14 { 1 } else { 2 },
             Token::Break       => 1,
             Token::Null        => 1,
             Token::Undefined   => 1,
