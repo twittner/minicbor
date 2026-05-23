@@ -809,6 +809,11 @@
 
 # minicbor-serde
 
+## `0.7.0`
+
+- Adds support for custom tags. See pull request
+  [#49](https://github.com/twittner/minicbor/pull/49) by @mpanav for details.
+
 ## `0.6.2`
 
 - Adds `EncodeError::as_write` to allow access to an underlying `Write` error.
