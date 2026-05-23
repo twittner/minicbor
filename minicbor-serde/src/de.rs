@@ -508,9 +508,10 @@ impl<'a, 'de> de::EnumAccess<'de> for EnumTagAccess<'a, 'de> {
     where
         V: DeserializeSeed<'de>,
     {
-        let variant = match self.tag.is_some() {
-            true => TAG_IDENTIFIER,
-            false => NO_TAG_IDENTIFIER,
+        let variant = if self.tag.is_some() {
+            TAG_IDENTIFIER
+        } else {
+            NO_TAG_IDENTIFIER
         };
 
         Ok((

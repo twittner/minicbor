@@ -18,10 +18,6 @@ pub(crate) const NO_TAG_IDENTIFIER: &str = "$#minicbor_serde_no_tag#$";
 /// [`de::Deserialize`] implementation for this enum renames the fields to
 /// custom aliases to ensure that [`crate::de::Deserializer`] is able to drive
 /// the [`minicbor::Decoder`] correctly.
-///
-/// /// [`ser::Serializer`] implementation for this enum renames the fields to
-/// custom aliases to ensure that [`crate::de::Deserializer`] is able to drive
-/// the [`minicbor::Decoder`] correctly.
 enum TagContainer<T> {
     Tag(Tag, T),
     NoTag(T),
@@ -59,7 +55,7 @@ impl<'de, T: Deserialize<'de>> de::Visitor<'de> for TagContainerVisitor<T> {
             TAG_IDENTIFIER => {
                 let (tag, val) =
                     access.tuple_variant(2, TupleVisitor(core::marker::PhantomData))?;
-                Ok(TagContainer::Tag(Tag::new(tag), val))
+                Ok(TagContainer::Tag(tag, val))
             }
             NO_TAG_IDENTIFIER => {
                 let val = access.newtype_variant()?;
@@ -76,7 +72,7 @@ impl<'de, T: Deserialize<'de>> de::Visitor<'de> for TagContainerVisitor<T> {
 struct TupleVisitor<T>(core::marker::PhantomData<T>);
 
 impl<'de, T: Deserialize<'de>> de::Visitor<'de> for TupleVisitor<T> {
-    type Value = (u64, T);
+    type Value = (Tag, T);
 
     fn expecting(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "tuple (u64, T)")
@@ -92,7 +88,7 @@ impl<'de, T: Deserialize<'de>> de::Visitor<'de> for TupleVisitor<T> {
         let val = seq
             .next_element()?
             .ok_or_else(|| de::Error::invalid_length(1, &self))?;
-        Ok((tag, val))
+        Ok((Tag::new(tag), val))
     }
 }
 
