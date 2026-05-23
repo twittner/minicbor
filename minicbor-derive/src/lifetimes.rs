@@ -53,12 +53,10 @@ where
                     if let syn::PathArguments::AngleBracketed(b) = &s.arguments {
                         for a in &b.args {
                             match a {
-                                syn::GenericArgument::Type(t)      => get_lifetimes(t, set, filter),
+                                syn::GenericArgument::Type(t) => get_lifetimes(t, set, filter),
                                 syn::GenericArgument::AssocType(b) => get_lifetimes(&b.ty, set, filter),
-                                syn::GenericArgument::Lifetime(l)  => {
-                                    if filter.is_empty() || filter.contains(l) {
-                                        set.insert(l.clone());
-                                    }
+                                syn::GenericArgument::Lifetime(l) if filter.is_empty() || filter.contains(l) => {
+                                    set.insert(l.clone());
                                 }
                                 _ => {}
                             }

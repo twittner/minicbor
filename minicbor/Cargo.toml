@@ -1,6 +1,6 @@
 [package]
 name          = "minicbor"
-version       = "2.2.1"
+version       = "2.2.2"
 authors       = ["Toralf Wittner <tw@dtex.org>"]
 license       = "BlueOak-1.0.0"
 edition       = "2024"
@@ -19,7 +19,7 @@ std    = ["alloc"]
 derive = ["minicbor-derive"]
 
 [dependencies]
-minicbor-derive = { version = "0.19.3", path = "../minicbor-derive", optional = true }
+minicbor-derive = { version = "0.19.4", path = "../minicbor-derive", optional = true }
 half            = { version = "2.4.0", default-features = false, optional = true }
 
 [dev-dependencies]
