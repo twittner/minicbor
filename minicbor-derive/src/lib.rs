@@ -545,7 +545,7 @@ use std::collections::BTreeSet;
 /// Derive the `minicbor::Decode` trait for a struct or enum.
 ///
 /// See the [crate] documentation for details.
-#[proc_macro_derive(Decode, attributes(n, b, cbor))]
+#[proc_macro_derive(Decode, attributes(n, b, s, cbor))]
 pub fn derive_decode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     decode::derive_from(input)
 }
@@ -553,7 +553,7 @@ pub fn derive_decode(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 /// Derive the `minicbor::Encode` trait for a struct or enum.
 ///
 /// See the [crate] documentation for details.
-#[proc_macro_derive(Encode, attributes(n, b, cbor))]
+#[proc_macro_derive(Encode, attributes(n, b, s, cbor))]
 pub fn derive_encode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     encode::derive_from(input)
 }

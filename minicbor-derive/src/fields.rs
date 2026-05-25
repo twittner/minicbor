@@ -1,5 +1,7 @@
+use std::cmp::Ordering;
+
 use crate::attrs::{Attributes, Idx, Kind, Level};
-use crate::attrs::idx;
+use crate::attrs::idx::{self, Index};
 use proc_macro2::Span;
 use syn::{Ident, Type};
 use syn::spanned::Spanned;
@@ -7,7 +9,8 @@ use syn::spanned::Spanned;
 #[derive(Debug, Clone)]
 pub struct Fields {
     fields: Vec<Field>,
-    skipped: Vec<Field>
+    skipped: Vec<Field>,
+    has_str_index: bool
 }
 
 #[derive(Debug, Clone)]
@@ -19,7 +22,7 @@ pub struct Field {
     /// does the field hava a name or is the identifier generated
     pub is_name: bool,
     /// CBOR index
-    pub index: Idx,
+    pub index: Index,
     /// field type
     pub typ: Type,
     /// field attributes
@@ -35,6 +38,7 @@ impl Fields {
     {
         let mut fields  = Vec::new();
         let mut skipped = Vec::new();
+        let mut has_str_index = false;
 
         let encoding = parents.iter().find_map(|p| p.encoding()).unwrap_or_default();
 
@@ -42,17 +46,23 @@ impl Fields {
             let attrs = Attributes::try_from_iter(Level::Field, &f.attrs)?;
             let index = if attrs.skip() {
                 debug_assert!(attrs.index().is_none());
-                Idx::N(i64::MAX)
+                Index::Num(Idx::N(i64::MAX))
             } else if let Some(i) = attrs.index() {
                 debug_assert!(!attrs.skip());
-                i
+                i.clone()
             } else if parents.last().map(|p| p.transparent()).unwrap_or(false) {
-                Idx::N(i64::MAX)
+                Index::Num(Idx::N(i64::MAX))
             } else {
                 let s = f.ident.as_ref().map(|i| i.span()).unwrap_or_else(|| f.ty.span());
-                return Err(syn::Error::new(s, "missing `#[n(...)]` or `#[b(...)]` attribute"))
+                return Err(syn::Error::new(s, "missing `#[n(...)]`, `#[b(...)]`, or `#[s(...)]` attribute"))
             };
-            if index.val().is_negative() && encoding.is_array() {
+            if let Index::Str(_) = index && encoding.is_array() {
+                let s = attrs.span(Kind::Index)
+                    .or_else(|| f.ident.as_ref().map(|i| i.span()))
+                    .unwrap_or_else(|| f.ty.span());
+                return Err(syn::Error::new(s, "array encoding does not support fields with string indices"))
+            }
+            if let Index::Num(idx) = index && idx.val().is_negative() && encoding.is_array() {
                 let s = attrs.span(Kind::Index)
                     .or_else(|| f.ident.as_ref().map(|i| i.span()))
                     .unwrap_or_else(|| f.ty.span());
@@ -62,6 +72,9 @@ impl Fields {
                 Some(n) => (n.clone(), true),
                 None    => (quote::format_ident!("_{}", pos), false)
             };
+
+            has_str_index |= index.is_str();
+
             let typ  = f.ty.clone();
             let skip = attrs.skip();
             let fld  = Field { pos, index, ident, is_name, typ, attrs, orig: f.clone() };
@@ -73,10 +86,17 @@ impl Fields {
             }
         }
 
-        fields.sort_unstable_by_key(|f| f.index.bytewise_lexicographic());
-        idx::check_uniq(span, fields.iter().map(|f| f.index))?;
+        // Sort field indices by putting strings after numbers:
+        fields.sort_unstable_by(|a, b| match (&a.index, &b.index) {
+            (Index::Num(i), Index::Num(j)) => i.bytewise_lexicographic().cmp(&j.bytewise_lexicographic()),
+            (Index::Str(a), Index::Str(b)) => a.cmp(b),
+            (Index::Str(_), Index::Num(_)) => Ordering::Greater,
+            (Index::Num(_), Index::Str(_)) => Ordering::Less
+        });
 
-        Ok(Fields { fields, skipped })
+        idx::check_uniq(span, fields.iter().map(|f| &f.index))?;
+
+        Ok(Fields { fields, skipped, has_str_index })
     }
 
     pub fn fields(&self) -> FieldIter<'_> {
@@ -85,6 +105,10 @@ impl Fields {
 
     pub fn skipped(&self) -> FieldIter<'_> {
         FieldIter(&self.skipped, 0)
+    }
+
+    pub fn has_str_index(&self) -> bool {
+        self.has_str_index
     }
 
     /// Order all identifiers by position and replace skipped ones with `_`.
@@ -133,8 +157,8 @@ impl<'a> FieldIter<'a> {
         self.clone().map(|f| &f.typ)
     }
 
-    pub fn indices(&self) -> impl Iterator<Item = Idx> + use<'a> {
-        self.clone().map(|f| f.index)
+    pub fn indices(&self) -> impl Iterator<Item = &'a Index> + use<'a> {
+        self.clone().map(|f| &f.index)
     }
 
     pub fn positions(&self) -> impl Iterator<Item = usize> + use<'a> {

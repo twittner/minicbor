@@ -2,6 +2,49 @@ use proc_macro2::Span;
 use quote::{ToTokens, TokenStreamExt, quote};
 use std::collections::HashSet;
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Index {
+    Num(Idx),
+    Str(String)
+}
+
+impl Index {
+    pub fn is_str(&self) -> bool {
+        matches!(self, Self::Str(_))
+    }
+
+    pub fn is_num(&self) -> bool {
+        matches!(self, Self::Num(_))
+    }
+
+    pub fn is_b(&self) -> bool {
+        matches!(self, Self::Num(Idx::B(_)))
+    }
+
+    pub fn unwrap_numeric(&self) -> Idx {
+        if let Self::Num(idx) = self {
+            return *idx
+        }
+        panic!("Index is not numeric")
+    }
+
+    pub fn to_method(&self) -> proc_macro2::TokenStream {
+        match self {
+            Self::Num(_) => quote!(i64),
+            Self::Str(_) => quote!(str)
+        }
+    }
+}
+
+impl ToTokens for Index {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        match self {
+            Self::Num(i) => i.to_tokens(tokens),
+            Self::Str(s) => tokens.append(proc_macro2::Literal::string(s))
+        }
+    }
+}
+
 /// The index attribute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Idx {
@@ -24,11 +67,6 @@ impl ToTokens for Idx {
 }
 
 impl Idx {
-    /// Test if `Idx` is the `B` variant.
-    pub fn is_b(self) -> bool {
-        matches!(self, Idx::B(_))
-    }
-
     /// Get the numeric index value.
     pub fn val(self) -> i64 {
         match self {
@@ -44,19 +82,35 @@ impl Idx {
 }
 
 /// Check that there are no duplicate `Idx` values in `iter`.
-pub fn check_uniq<I>(s: Span, iter: I) -> syn::Result<()>
+pub fn check_uniq<'a, I>(s: Span, iter: I) -> syn::Result<()>
 where
-    I: IntoIterator<Item = Idx>
+    I: IntoIterator<Item = &'a Index>
 {
-    let mut set = HashSet::new();
-    let mut ctr = 0;
-    for u in iter {
-        set.insert(u.val());
-        ctr += 1;
+    let mut numeric = HashSet::new();
+    let mut strings = HashSet::new();
+    let mut num_ctr = 0;
+    let mut str_ctr = 0;
+
+    for idx in iter {
+        match idx {
+            Index::Num(i) => {
+                numeric.insert(i.val());
+                num_ctr += 1;
+            }
+            Index::Str(s) => {
+                strings.insert(s);
+                str_ctr += 1
+            }
+        }
     }
-    if ctr != set.len() {
+
+    if num_ctr != numeric.len() {
         return Err(syn::Error::new(s, "duplicate index numbers"))
     }
+    if str_ctr != strings.len() {
+        return Err(syn::Error::new(s, "duplicate index names"))
+    }
+
     Ok(())
 }
 

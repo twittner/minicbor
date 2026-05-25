@@ -100,25 +100,26 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let con = &var.ident;
         let encoding = attrs.encoding().unwrap_or(enum_encoding);
         let tag = encode_tag(attrs);
+        let fun = idx.to_method();
         let row = match &var.fields {
             syn::Fields::Unit => match encoding {
                 Encoding::Array | Encoding::Map if index_only => quote! {
                     #name::#con => {
-                        __e777.i64(#idx)?;
+                        __e777.#fun(#idx)?;
                         Ok(())
                     }
                 },
                 Encoding::Array if flat => quote! {
                     #name::#con => {
                         __e777.array(1)?;
-                        __e777.i64(#idx)?;
+                        __e777.#fun(#idx)?;
                         Ok(())
                     }
                 },
                 Encoding::Array => quote! {
                     #name::#con => {
                         __e777.array(2)?;
-                        __e777.i64(#idx)?;
+                        __e777.#fun(#idx)?;
                         #tag
                         __e777.array(0)?;
                         Ok(())
@@ -127,7 +128,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 Encoding::Map => quote! {
                     #name::#con => {
                         __e777.array(2)?;
-                        __e777.i64(#idx)?;
+                        __e777.#fun(#idx)?;
                         #tag
                         __e777.map(0)?;
                         Ok(())
@@ -148,7 +149,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         } else {
                             __e777.array(1)?;
                         }
-                        __e777.i64(#idx)?;
+                        __e777.#fun(#idx)?;
                         #statements
                     }
                 }
@@ -160,7 +161,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con{#(#idents,)* ..} => {
                         #tests
                         __e777.array(2)?;
-                        __e777.i64(#idx)?;
+                        __e777.#fun(#idx)?;
                         #tag
                         #statements
                     }
@@ -180,7 +181,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                         } else {
                             __e777.array(1)?;
                         }
-                        __e777.i64(#idx)?;
+                        __e777.#fun(#idx)?;
                         #statements
                     }
                 }
@@ -193,7 +194,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     #name::#con(#(#idents,)*) => {
                         #tests
                         __e777.array(2)?;
-                        __e777.i64(#idx)?;
+                        __e777.#fun(#idx)?;
                         #tag
                         #statements
                     }
@@ -268,9 +269,10 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                 if field.attrs.skip() {
                     continue
                 }
+                let index = field.index.unwrap_numeric();
                 let is_nil = is_nil(&field.typ, field.attrs.codec());
-                assert!(field.index.val() >= 0);
-                let n = field.index.val() as u64;
+                assert!(index.val() >= 0);
+                let n = index.val() as u64;
                 let ident = &field.ident;
                 let expr =
                     if has_self {
@@ -360,12 +362,13 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
             let tag   = encode_tag(&field.attrs);
             let ident = &field.ident;
             let idx   = &field.index;
+            let fun   = idx.to_method();
             let statement =
                 match (field.is_name, has_self) {
                     // struct
                     (IS_NAME, HAS_SELF) => quote! {
                         if !#is_nil(&self.#ident) {
-                            __e777.i64(#idx)?;
+                            __e777.#fun(#idx)?;
                             #tag
                             #encode_fn(&self.#ident, __e777, __ctx777)?
                         }
@@ -373,7 +376,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     // tuple struct
                     (IS_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
-                            __e777.i64(#idx)?;
+                            __e777.#fun(#idx)?;
                             #tag
                             #encode_fn(#ident, __e777, __ctx777)?
                         }
@@ -383,7 +386,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                         let i = syn::Index::from(field.pos);
                         quote! {
                             if !#is_nil(&self.#i) {
-                                __e777.i64(#idx)?;
+                                __e777.#fun(#idx)?;
                                 #tag
                                 #encode_fn(&self.#i, __e777, __ctx777)?
                             }
@@ -392,7 +395,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     // enum tuple
                     (NO_NAME, NO_SELF) => quote! {
                         if !#is_nil(&#ident) {
-                            __e777.i64(#idx)?;
+                            __e777.#fun(#idx)?;
                             #tag
                             #encode_fn(#ident, __e777, __ctx777)?
                         }
@@ -414,7 +417,7 @@ fn encode_fields(fields: &Fields, has_self: bool, encoding: Encoding, flat: bool
                     .and_then(|f| f.to_encode_path())
                     .unwrap_or_else(|| default_encode_fn.clone());
                 let tag = encode_tag(&field.attrs);
-                let idx = &field.index;
+                let idx = field.index.unwrap_numeric();
                 assert!(idx.val() >= 0);
                 let gaps = if first {
                     first = false;
