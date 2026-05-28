@@ -45,6 +45,7 @@ extern crate alloc;
 
 mod de;
 mod ser;
+pub mod tag;
 pub mod error;
 
 pub use de::{Deserializer, from_slice};
