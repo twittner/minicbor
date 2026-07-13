@@ -572,21 +572,6 @@ enum Mode {
     Length
 }
 
-/// Wrap `tokens` in a `const _: () = { use #path as minicbor; ... };` block
-/// when the user has supplied `#[cbor(crate = "...")]`.
-fn wrap_in_crate_alias(path: Option<&syn::Path>, tokens: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-    if let Some(p) = path {
-        quote::quote! {
-            const _: () = {
-                use #p as minicbor;
-                #tokens
-            };
-        }
-    } else {
-        tokens
-    }
-}
-
 /// Derive the `minicbor::CborLen` trait for a struct or enum.
 ///
 /// See the [crate] documentation for details.
@@ -801,4 +786,18 @@ fn is_phantom_data(t: &syn::Type) -> bool {
     let a = ["marker", "std"];
     let b = ["marker", "core"];
     prefix.clone().zip(a).all(|(p, a)| p == a) || prefix.zip(b).all(|(p, b)| p == b)
+}
+
+/// Wrap `tokens` in a `const _: () = { use #path as minicbor; ... };` block.
+fn wrap_in_crate_alias(path: Option<&syn::Path>, tokens: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    if let Some(p) = path {
+        quote::quote! {
+            const _: () = {
+                use #p as minicbor;
+                #tokens
+            };
+        }
+    } else {
+        tokens
+    }
 }
