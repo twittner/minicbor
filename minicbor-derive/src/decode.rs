@@ -83,7 +83,8 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             return Err(syn::Error::new(inp.ident.span(), msg))
         }
         let f = fields.fields().next().expect("struct has 1 field");
-        return make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause)
+        let tokens = make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause)?;
+        return Ok(crate::wrap_in_crate_alias(attrs.cbor_crate(), tokens))
     }
 
     let statements = gen_statements(&fields, attrs.encoding().unwrap_or_default(), false)?;
@@ -120,7 +121,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     let tag = decode_tag(&attrs);
 
-    Ok(quote! {
+    Ok(crate::wrap_in_crate_alias(attrs.cbor_crate(), quote! {
         impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
             fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #tag
@@ -129,7 +130,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
                 #result
             }
         }
-    })
+    }))
 }
 
 /// Create a `Decode` impl for enums.
@@ -273,7 +274,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let tag = decode_tag(&enum_attrs);
 
-    Ok(quote! {
+    Ok(crate::wrap_in_crate_alias(enum_attrs.cbor_crate(), quote! {
         impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
             fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #tag
@@ -284,7 +285,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 }
             }
         }
-    })
+    }))
 }
 
 /// Generate decoding statements for every item.

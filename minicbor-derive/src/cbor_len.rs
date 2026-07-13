@@ -57,13 +57,14 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             return Err(syn::Error::new(inp.ident.span(), msg))
         }
         let f = fields.fields().next().expect("struct has 1 field");
-        return make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause)
+        let tokens = make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause)?;
+        return Ok(crate::wrap_in_crate_alias(attrs.cbor_crate(), tokens))
     }
 
     let tag = on_tag(&attrs);
     let steps = on_fields(&fields, true, attrs.encoding().unwrap_or_default())?;
 
-    Ok(quote! {
+    Ok(crate::wrap_in_crate_alias(attrs.cbor_crate(), quote! {
         impl #impl_generics minicbor::CborLen<Ctx> for #name #typ_generics #where_clause {
             fn cbor_len(&self, __ctx777: &mut Ctx) -> usize {
                 #tag +
@@ -72,7 +73,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
                 }
             }
         }
-    })
+    }))
 }
 
 fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
@@ -182,7 +183,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let tag = on_tag(&enum_attrs);
 
-    Ok(quote! {
+    Ok(crate::wrap_in_crate_alias(enum_attrs.cbor_crate(), quote! {
         impl #impl_generics minicbor::CborLen<Ctx> for #name #typ_generics #where_clause {
             fn cbor_len(&self, __ctx777: &mut Ctx) -> usize {
                 #tag +
@@ -191,7 +192,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 }
             }
         }
-    })
+    }))
 }
 
 fn on_fields(fields: &Fields, has_self: bool, encoding: Encoding) -> syn::Result<Vec<proc_macro2::TokenStream>> {

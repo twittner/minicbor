@@ -46,7 +46,8 @@ pub enum Kind {
     Skip,
     SkipIf,
     Flat,
-    Default
+    Default,
+    Crate
 }
 
 #[derive(Debug, Clone)]
@@ -67,7 +68,8 @@ enum Value {
     Skip(proc_macro2::Span),
     SkipIf(Option<syn::ExprPath>, proc_macro2::Span),
     Flat(proc_macro2::Span),
-    Default(proc_macro2::Span)
+    Default(proc_macro2::Span),
+    Crate(syn::Path, proc_macro2::Span)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -374,6 +376,9 @@ impl Attributes {
                 attrs.try_insert(Kind::Flat, Value::Flat(meta.path.span()))?
             } else if meta.path.is_ident("default") {
                 attrs.try_insert(Kind::Default, Value::Default(meta.path.span()))?
+            } else if meta.path.is_ident("crate") {
+                let s: LitStr = meta.value()?.parse()?;
+                attrs.try_insert(Kind::Crate, Value::Crate(s.parse()?, meta.path.span()))?
             } else {
                 return Err(meta.error("unsupported attribute"))
             }
@@ -443,6 +448,13 @@ impl Attributes {
         self.contains_key(Kind::Default)
     }
 
+    pub fn cbor_crate(&self) -> Option<&syn::Path> {
+        match self.get(Kind::Crate) {
+            Some(Value::Crate(p, _)) => Some(p),
+            _ => None
+        }
+    }
+
     fn contains_key(&self, k: Kind) -> bool {
         self.attrs.contains_key(&k)
     }
@@ -466,6 +478,7 @@ impl Attributes {
                 | Kind::Transparent
                 | Kind::ContextBound
                 | Kind::Tag
+                | Kind::Crate
                 => {}
                 | Kind::Borrow
                 | Kind::TypeParam
@@ -504,6 +517,7 @@ impl Attributes {
                 | Kind::Transparent
                 | Kind::ContextBound
                 | Kind::Flat
+                | Kind::Crate
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.level);
                     return Err(syn::Error::new(val.span(), msg))
@@ -515,6 +529,7 @@ impl Attributes {
                 | Kind::ContextBound
                 | Kind::Tag
                 | Kind::Flat
+                | Kind::Crate
                 => {}
                 | Kind::Borrow
                 | Kind::TypeParam
@@ -552,6 +567,7 @@ impl Attributes {
                 | Kind::SkipIf
                 | Kind::Flat
                 | Kind::Default
+                | Kind::Crate
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.level);
                     return Err(syn::Error::new(val.span(), msg))
@@ -728,7 +744,8 @@ impl Value {
             Value::Skip(s)            => *s,
             Value::SkipIf(_, s)       => *s,
             Value::Flat(s)            => *s,
-            Value::Default(s)         => *s
+            Value::Default(s)         => *s,
+            Value::Crate(_, s)        => *s
         }
     }
 
