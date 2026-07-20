@@ -54,13 +54,14 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
             return Err(syn::Error::new(inp.ident.span(), msg))
         }
         let f = fields.fields().next().expect("struct has 1 field");
-        return make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause)
+        let tokens = make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause)?;
+        return Ok(crate::wrap_in_crate_alias(attrs.cbor_crate(), tokens))
     }
 
     let tag = encode_tag(&attrs);
     let (tests, statements) = encode_fields(&fields, true, encoding, false)?;
 
-    Ok(quote! {
+    Ok(crate::wrap_in_crate_alias(attrs.cbor_crate(), quote! {
         impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {
             fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut Ctx) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
@@ -71,7 +72,7 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
                 #statements
             }
         }
-    })
+    }))
 }
 
 /// Create an `Encode` impl for enums.
@@ -229,7 +230,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let tag = encode_tag(&enum_attrs);
 
-    Ok(quote! {
+    Ok(crate::wrap_in_crate_alias(enum_attrs.cbor_crate(), quote! {
         impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {
             fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut Ctx) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
@@ -239,7 +240,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 #body
             }
         }
-    })
+    }))
 }
 
 /// The encoding logic of fields.
