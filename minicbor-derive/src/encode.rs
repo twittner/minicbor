@@ -2,7 +2,7 @@ use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
 
 use crate::blacklist::Blacklist;
-use crate::Mode;
+use crate::{Mode, wrap_in_crate_alias};
 use crate::{add_bound_to_type_params, is_option};
 use crate::{add_typeparam, gen_ctx_param};
 use crate::attrs::{Attributes, CustomCodec, Encoding, Level};
@@ -55,13 +55,13 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
         }
         let f = fields.fields().next().expect("struct has 1 field");
         let tokens = make_transparent_impl(&inp.ident, f, impl_generics, typ_generics, where_clause)?;
-        return Ok(crate::wrap_in_crate_alias(attrs.cbor_crate(), tokens))
+        return Ok(wrap_in_crate_alias(attrs.cbor_crate(), tokens))
     }
 
     let tag = encode_tag(&attrs);
     let (tests, statements) = encode_fields(&fields, true, encoding, false)?;
 
-    Ok(crate::wrap_in_crate_alias(attrs.cbor_crate(), quote! {
+    Ok(wrap_in_crate_alias(attrs.cbor_crate(), quote! {
         impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {
             fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut Ctx) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
@@ -230,7 +230,7 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let tag = encode_tag(&enum_attrs);
 
-    Ok(crate::wrap_in_crate_alias(enum_attrs.cbor_crate(), quote! {
+    Ok(wrap_in_crate_alias(enum_attrs.cbor_crate(), quote! {
         impl #impl_generics minicbor::Encode<Ctx> for #name #typ_generics #where_clause {
             fn encode<__W777>(&self, __e777: &mut minicbor::Encoder<__W777>, __ctx777: &mut Ctx) -> core::result::Result<(), minicbor::encode::Error<__W777::Error>>
             where
