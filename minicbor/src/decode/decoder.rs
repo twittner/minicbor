@@ -1,7 +1,7 @@
 #![allow(clippy::unusual_byte_groupings)]
 
 use crate::{ARRAY, BREAK, BYTES, MAP, SIGNED, SIMPLE, TAGGED, TEXT, UNSIGNED};
-use crate::data::{Int, Tag, Type};
+use crate::data::{IanaTag, Int, Tag, Type};
 use crate::decode::{Decode, Error};
 use core::{marker, str};
 
@@ -197,7 +197,7 @@ impl<'b> Decoder<'b> {
             UNSIGNED => self.u64().map(u128::from),
             TAGGED => {
                 let t = self.tag()?;
-                if t.as_u64() != 2 {
+                if t != IanaTag::PosBignum {
                     return Err(Error::tag_mismatch(t)
                         .with_message("expected positive bignum tag (2)")
                         .at(p))
@@ -224,15 +224,15 @@ impl<'b> Decoder<'b> {
             SIGNED   => self.int().map(i128::from),
             TAGGED   => {
                 let t = self.tag()?;
-                match t.as_u64() {
-                    2 => {
+                match t.try_into() {
+                    Ok(IanaTag::PosBignum) => {
                         let n = decode_bignum_u128(self, p)?;
                         if n > i128::MAX as u128 {
                             return Err(Error::message("positive bignum exceeds i128 range").at(p))
                         }
                         Ok(n as i128)
                     }
-                    3 => {
+                    Ok(IanaTag::NegBignum) => {
                         let n = decode_bignum_u128(self, p)?;
                         if n > i128::MAX as u128 {
                             return Err(Error::message("negative bignum exceeds i128 range").at(p))
@@ -1150,10 +1150,14 @@ where
 /// Leading zero bytes are tolerated; values that would not fit into 16
 /// bytes after stripping leading zeros are rejected.
 fn decode_bignum_u128(d: &mut Decoder<'_>, pos: usize) -> Result<u128, Error> {
-    let mut bytes = d.bytes()?;
-    while let Some((&0, rest)) = bytes.split_first() {
-        bytes = rest;
-    }
+    let bytes = {
+        let bs = d.bytes()?;
+        if bs.is_empty() {
+            return Ok(0)
+        }
+        let start = bs.iter().position(|&b| b != 0).unwrap_or_else(|| bs.len() - 1);
+        &bs[start ..]
+    };
     if bytes.len() > 16 {
         return Err(Error::message("bignum exceeds 128 bits").at(pos))
     }

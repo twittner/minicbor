@@ -1,6 +1,6 @@
 use serde::de::{self, DeserializeSeed, EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor};
 
-use minicbor::data::Type;
+use minicbor::data::{IanaTag, Type};
 use minicbor::decode::{Decoder, Error};
 
 use crate::error::DecodeError;
@@ -118,10 +118,10 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             Type::Int => self.deserialize_i128(visitor),
 
             Type::Tag => {
-                let tag = self.decoder.probe().tag()?.as_u64();
-                match tag {
-                    2 => self.deserialize_u128(visitor),
-                    3 => self.deserialize_i128(visitor),
+                let tag = self.decoder.probe().tag()?;
+                match tag.try_into() {
+                    Ok(IanaTag::PosBignum) => self.deserialize_u128(visitor),
+                    Ok(IanaTag::NegBignum) => self.deserialize_i128(visitor),
                     _ => Err(Error::type_mismatch(Type::Tag)
                         .with_message("unexpected type")
                         .at(self.decoder.position())

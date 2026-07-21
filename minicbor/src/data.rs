@@ -165,6 +165,18 @@ impl IanaTag {
     }
 }
 
+impl PartialEq<Tag> for IanaTag {
+    fn eq(&self, other: &Tag) -> bool {
+        self.tag() == *other
+    }
+}
+
+impl PartialEq<IanaTag> for Tag {
+    fn eq(&self, other: &IanaTag) -> bool {
+        *self == other.tag()
+    }
+}
+
 impl TryFrom<Tag> for IanaTag {
     type Error = UnknownTag;
 

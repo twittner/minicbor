@@ -142,7 +142,7 @@ impl<W: Write> Encoder<W> {
         }
         self.tag(IanaTag::PosBignum)?;
         let bytes = x.to_be_bytes();
-        let start = bytes.iter().position(|&b| b != 0).unwrap_or(bytes.len() - 1);
+        let start = (x.leading_zeros() / 8) as usize;
         self.bytes(&bytes[start..])
     }
 
@@ -156,23 +156,16 @@ impl<W: Write> Encoder<W> {
     /// [1]: https://www.rfc-editor.org/rfc/rfc8949.html#section-3.4.3
     pub fn i128(&mut self, x: i128) -> Result<&mut Self, Error<W::Error>> {
         if x >= 0 {
-            let u = x as u128;
-            if u <= u64::MAX as u128 {
-                return self.u64(u as u64)
-            }
-            self.tag(IanaTag::PosBignum)?;
-            let bytes = u.to_be_bytes();
-            let start = bytes.iter().position(|&b| b != 0).unwrap_or(bytes.len() - 1);
-            return self.bytes(&bytes[start..])
+            return self.u128(x as u128)
         }
-        // `!(x as u128) == (-1 - x) as u128` for any negative `x: i128` and avoids overflow.
+        // `!(x as u128) == (-1 - x) as u128` for any negative `x: i128`.
         let n = !(x as u128);
         if n <= u64::MAX as u128 {
             return self.int(Int::neg(n as u64))
         }
         self.tag(IanaTag::NegBignum)?;
         let bytes = n.to_be_bytes();
-        let start = bytes.iter().position(|&b| b != 0).unwrap_or(bytes.len() - 1);
+        let start = (n.leading_zeros() / 8) as usize;
         self.bytes(&bytes[start..])
     }
 
