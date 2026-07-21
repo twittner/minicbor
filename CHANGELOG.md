@@ -7,6 +7,17 @@
 
 # minicbor
 
+## `2.2.3`
+
+- The `std` feature is no longer required for:
+    - `IpAddr`,
+    - `Ipv4Addr`,
+    - `Ipv6Addr`,
+    - `SocketAddr`,
+    - `SocketAddrV4`,
+    - `SocketAddrV6`.
+- Depends on `minicbor-derive-0.19.5`.
+
 ## `2.2.2`
 
 - Fixes bugs related to `CborLen` calculation, see commit cb19b238e5245729932a9cf9611818be1dc20ab6
@@ -27,8 +38,7 @@
 
 ## `2.1.2`
 
-- Replaces `build.rs` with `target_has_atomic`. See pull request
-  [#47](https://github.com/twittner/minicbor/pull/47) by @dtolnay for details.
+- Replaces `build.rs` with `target_has_atomic`. See pull request [47][pr47] by @dtolnay for details.
 
 ## `2.1.1`
 
@@ -75,13 +85,13 @@
 
 - Implementations of `Iterator::size_hint` for `decode::{ArrayIter, ArrayIterWithCtx},
   `decode::{MapIter, MapIterWithCtx}` and `decode::{BytesIter, StrIter}` (see pull request
-  [#27](https://github.com/twittner/minicbor/pull/27) by @carloskiki for details).
+  [27][pr27] by @carloskiki for details).
 - Fixes an issue with `decode::{BytesIter, StrIter}`, both of which would yield `None` for
   definite but empty bytes or text. They now yield `Some(&[])` or `Some("")` respectively.
   Note that the behaviour for non-empty definite bytes or text values and for indefinite ones
   does not change.
 - Implements `EncodeBytes`, `DecodeBytes` and `CborLenBytes` for `Box<[u8]>` (see pull request
-  [#28](https://github.com/twittner/minicbor/pull/28) by @carloskiki for details).
+  [28][pr28] by @carloskiki for details).
 
 ## `0.26.3`
 
@@ -89,8 +99,7 @@
 
 ## `0.26.2`
 
-- Fixes issue with `minicbor::display` (see issue
-  [#25](https://github.com/twittner/minicbor/issues/25)) for details.
+- Fixes issue with `minicbor::display` (see issue [25][i25]) for details.
 - Depends on `minicbor-derive-0.16.1`.
 
 ## `0.26.1`
@@ -100,10 +109,9 @@
   a parameter, leaving their encoding to the application. This mirrors the approach of
   `Encoder::array` and `Encoder::map`, which also encode only the CBOR item head, with applications
   encoding the elements via subsequent encoder method calls. For further details, see pull request
-  [#16](https://github.com/twittner/minicbor/pull/16) by @carloskiki.
+  [16][pr16] by @carloskiki.
 - `Encode` and `Decode` impls for `usize`, `isize`, `NonZeroUsize` and `NonZeroIsize` on 16-bit
-  architectures have been added by @chrysn. See pull request
-  [#19](https://github.com/twittner/minicbor/pull/19) for details.
+  architectures have been added by @chrysn. See pull request [19][pr19] for details.
 
 ## `0.26.0`
 
@@ -451,13 +459,21 @@
 
 # minicbor-derive
 
+## Unreleased
+
+## `0.19.5`
+
+- Adds `#[cbor(crate = "<path>")]` to allow re-exporters of the derive macros to point the generated
+  code at a different path for the `minicbor` crate. See pull request [62][pr62] by @sdbondi for
+  details.
+
 ## `0.19.4`
 
 - Fixes `CborLen` related bugs, see commit 7d0b368cc92ca3be0acae5364461f5cae9df7cdd for details.
 
 ## `0.19.3`
 
-- Bugfix release. Fixes issue [#54](https://github.com/twittner/minicbor/issues/54).
+- Bugfix release. Fixes issue [54][i54].
 
 ## `0.19.2`
 
@@ -469,13 +485,11 @@
 
 ## `0.19.0`
 
-- Adds attribute `skip_if`. See issue [#43](https://github.com/twittner/minicbor/issues/43) for
-  details.
+- Adds attribute `skip_if`. See issue [43][i43] for details.
 
 ## `0.18.3`
 
-- Fixes feature-handling, see pull request [#48](https://github.com/twittner/minicbor/pull/48) by
-  @dtolnay for details.
+- Fixes feature-handling, see pull request [48][pr48] by @dtolnay for details.
 
 ## `0.18.2`
 
@@ -491,13 +505,13 @@
 ## `0.18.0`
 
 - ⚠️ **Breaking** ⚠️ `#[cbor(transparent)]` implements `Decode::nil` and `Encode::is_nil` by
-  forwarding to the inner type (see issue [#32](https://github.com/twittner/minicbor/issues/32)
-  for details). Note that this may be a breaking change. If for example a type
-  `struct Foo(Option<u8>)` would derive `Encode` or `Decode` with `#[cbor(transparent)]`, it
-  would now use the `nil`/`is_nil` implementations of `Option`, meaning that a `Foo(None)` value
-  may not be encoded as a CBOR null value, whereas in previous versions it always would.
+  forwarding to the inner type (see issue [32][igh32] for details). Note that this may be a breaking
+  change. If for example a type `struct Foo(Option<u8>)` would derive `Encode` or `Decode` with
+  `#[cbor(transparent)]`, it would now use the `nil`/`is_nil` implementations of `Option`, meaning
+  that a `Foo(None)` value may not be encoded as a CBOR null value, whereas in previous versions it
+  always would.
 - `#[cbor(skip)]` and `PhantomData` no longer require `Encode`, `Decode` or `CborLen` type
-  parameter bounds (see issue #[30](https://github.com/twittner/minicbor/issues/30) for details).
+  parameter bounds (see issue [30][i30] for details).
 - `#[cbor(cbor_len_bound)]` has been added to allow specifying type parameter bounds when
   deriving `CborLen`.
 - Adding `#[cbor(cbor_len = "..."))]` no longer adds a bound for `CborLen` to type parameters
@@ -510,31 +524,26 @@
 
 ## `0.16.2`
 
-- Bugfix release (see pull request [#26](https://github.com/twittner/minicbor/pull/26) by
-  @carloskiki for details)
+- Bugfix release (see pull request [26][pr26] by @carloskiki for details)
 
 ## `0.16.1`
 
 - Added attribute `default` for fields which uses `Default::default()` when encountering
-  missing values during decoding. See pull request
-  [#24](https://github.com/twittner/minicbor/pull/24) for details.
+  missing values during decoding. See pull request [24][pr24] for details.
 
 ## `0.16.0`
 
 - Indices of fields and constructors can now also be negative when map encoding is used. Note
   that previous versions would always error when encontering a negative index value (e.g. for an
   enum variant). This version will decode the numeric index successfully but errors just like with
-  any other unexpected index. Further details can be found in the respective GitHub issue
-  [#8](https://github.com/twittner/minicbor/issues/8) and original pull request
-  [#9](https://github.com/twittner/minicbor/pull/9) by @chrysn.
+  any other unexpected index. Further details can be found in the respective GitHub issue [8][i8]
+  and original pull request [9][pr9] by @chrysn.
 - A new attribute `flat` has been added that can be attached to enums and changes the encoding
   of enum variants to inline the fields. The attribute is only available for array encodings.
-  See the documentation and pull request [#12](https://github.com/twittner/minicbor/pull/12) by
-  @sterraf for details.
+  See the documentation and pull request [12][pr12] by @sterraf for details.
 - A new attribute `borrow` has been added. It is similar to the one found in serde. As a
   consequence, the existing attribute `b` can now be thought of as an alias for `#[cbor(n(...),
-  borrow)]`. See the documentation and pull request
-  [#15](https://github.com/twittner/minicbor/pull/15) for details.
+  borrow)]`. See the documentation and pull request [15][pr15] for details.
 
 ## `0.15.3`
 
@@ -661,6 +670,11 @@
 - Added `#[cbor(map)]` and `#[cbor(array)]` attributes (see commit 40e8b240 for details).
 
 # minicbor-io
+
+## `0.23.1`
+
+- Provides access to buffers in `Reader`s and `Writer`s, see pull request [64][pr64] by @cbandy for
+  details.
 
 ## `0.23.0`
 
@@ -809,15 +823,19 @@
 
 # minicbor-serde
 
+## `0.7.0`
+
+- Adds support for custom tags. See pull request [49][pr49] by @mpanav for details.
+
 ## `0.6.2`
 
-- Adds `EncodeError::as_write` to allow access to an underlying `Write` error.
-  See issue [#45](https://github.com/twittner/minicbor/issues/45) for details.
+- Adds `EncodeError::as_write` to allow access to an underlying `Write` error. See issue [45][i45]
+  for details.
 
 ## `0.6.1`
 
-- Implements `size_hint` for sequential and map access. See pull request
-  [#41](https://github.com/twittner/minicbor/pull/41) by @Finistere for details.
+- Implements `size_hint` for sequential and map access. See pull request [41][pr41] by @Finistere
+  for details.
 
 ## `0.6.0`
 
@@ -831,7 +849,7 @@
 ## `0.4.1`
 
 - The option to serialize the unit value as null has been added to `Serializer` by @Finistere.
-  See pull request [#20](https://github.com/twittner/minicbor/pull/20) for details.
+  See pull request [20][pr20] for details.
 - Requires `minicbor-0.26.1`.
 
 ## `0.4.0`
@@ -897,7 +915,25 @@
 [mr47]: https://gitlab.com/twittner/minicbor/-/merge_requests/47
 [mr48]: https://gitlab.com/twittner/minicbor/-/merge_requests/48
 
+[pr9]: https://github.com/twittner/minicbor/pull/9
+[pr12]: https://github.com/twittner/minicbor/pull/12
+[pr15]: https://github.com/twittner/minicbor/pull/15
+[pr16]: https://github.com/twittner/minicbor/pull/16
+[pr19]: https://github.com/twittner/minicbor/pull/19
+[pr20]: https://github.com/twittner/minicbor/pull/20
+[pr24]: https://github.com/twittner/minicbor/pull/24
+[pr26]: https://github.com/twittner/minicbor/pull/26
+[pr27]: https://github.com/twittner/minicbor/pull/27
+[pr28]: https://github.com/twittner/minicbor/pull/28
+[pr41]: https://github.com/twittner/minicbor/pull/41
+[pr47]: https://github.com/twittner/minicbor/pull/47
+[pr48]: https://github.com/twittner/minicbor/pull/48
+[pr49]: https://github.com/twittner/minicbor/pull/49
+[pr62]: https://github.com/twittner/minicbor/pull/62
+[pr64]: https://github.com/twittner/minicbor/pull/64
+
 [i4]: https://gitlab.com/twittner/minicbor/-/issues/4
+[i8]: https://github.com/twittner/minicbor/issues/8
 [i9]: https://gitlab.com/twittner/minicbor/-/issues/9
 [i10]: https://gitlab.com/twittner/minicbor/-/issues/10
 [i11]: https://gitlab.com/twittner/minicbor/-/issues/11
@@ -905,5 +941,11 @@
 [i14]: https://gitlab.com/twittner/minicbor/-/issues/14
 [i18]: https://gitlab.com/twittner/minicbor/-/issues/18
 [i21]: https://gitlab.com/twittner/minicbor/-/issues/21
+[i25]: https://github.com/twittner/minicbor/issues/25
 [i26]: https://gitlab.com/twittner/minicbor/-/issues/26
+[i30]: https://github.com/twittner/minicbor/issues/30
 [i32]: https://gitlab.com/twittner/minicbor/-/issues/32
+[igh32]: https://github.com/twittner/minicbor/issues/32
+[i43]: https://github.com/twittner/minicbor/issues/43
+[i45]: https://github.com/twittner/minicbor/issues/45
+[i54]: https://github.com/twittner/minicbor/issues/54

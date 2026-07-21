@@ -1,9 +1,9 @@
-use minicbor::encode::{Encoder, Write};
+use minicbor::encode::{self, Encoder, Write};
 use serde::Serialize;
 use serde::ser::{self, SerializeSeq, SerializeTuple, SerializeTupleStruct};
 use serde::ser::{SerializeMap, SerializeStruct, SerializeStructVariant, SerializeTupleVariant};
 
-use crate::error::EncodeError;
+use crate::{error::EncodeError, tag::{TAG_CONTAINER_IDENTIFIER, TAG_IDENTIFIER, NO_TAG_IDENTIFIER}};
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
@@ -198,7 +198,7 @@ where
 
     fn serialize_newtype_variant<T>
         ( self
-        , _name: &'static str
+        , name: &'static str
         , _index: u32
         , variant: &'static str
         , value: &T
@@ -206,6 +206,10 @@ where
     where
         T: Serialize + ?Sized
     {
+        if name == TAG_CONTAINER_IDENTIFIER && variant == NO_TAG_IDENTIFIER {
+            return value.serialize(self);
+        }
+
         self.encoder.map(1)?.str(variant)?;
         value.serialize(self)
     }
@@ -216,12 +220,12 @@ where
         } else {
             self.encoder.begin_array()?;
         }
-        Ok(SeqSerializer { serializer: self, indefinite: len.is_none() })
+        Ok(SeqSerializer { serializer: self, indefinite: len.is_none(), tagged: false })
     }
 
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
         self.encoder.array(len as u64)?;
-        Ok(SeqSerializer { serializer: self, indefinite: false })
+        Ok(SeqSerializer { serializer: self, indefinite: false, tagged: false })
     }
 
     fn serialize_tuple_struct
@@ -235,12 +239,15 @@ where
 
     fn serialize_tuple_variant
         ( self
-        , _name: &'static str
+        , name: &'static str
         , _index: u32
         , variant: &'static str
         , len: usize
         ) -> Result<Self::SerializeTupleVariant, Self::Error>
     {
+        if name == TAG_CONTAINER_IDENTIFIER && variant == TAG_IDENTIFIER {
+            return Ok(SeqSerializer { serializer: self, indefinite: false, tagged: true });
+        }
         self.encoder.map(1)?.str(variant)?;
         self.serialize_tuple(len)
     }
@@ -251,7 +258,7 @@ where
         } else {
             self.encoder.begin_map()?;
         }
-        Ok(SeqSerializer { serializer: self, indefinite: len.is_none() })
+        Ok(SeqSerializer { serializer: self, indefinite: len.is_none(), tagged: false })
     }
 
     fn serialize_struct
@@ -261,7 +268,7 @@ where
         ) -> Result<Self::SerializeStruct, Self::Error>
     {
         self.encoder.map(len as u64)?;
-        Ok(SeqSerializer { serializer: self, indefinite: false })
+        Ok(SeqSerializer { serializer: self, indefinite: false, tagged: false })
     }
 
     fn serialize_struct_variant
@@ -288,7 +295,8 @@ where
 
 pub struct SeqSerializer<'a, W: 'a> {
     serializer: &'a mut Serializer<W>,
-    indefinite: bool
+    indefinite: bool,
+    tagged: bool,
 }
 
 impl<'a, W: Write> SerializeSeq for SeqSerializer<'a, W>
@@ -350,7 +358,16 @@ where
     type Error = EncodeError<W::Error>;
 
     fn serialize_field<T: Serialize + ?Sized>(&mut self, x: &T) -> Result<(), Self::Error> {
-        x.serialize(&mut *self.serializer)
+        if self.tagged {
+            self.tagged = false;
+
+            let tag = x.serialize(TagExtractor::<W>::new())?;
+            self.serializer.encoder.tag(minicbor::data::Tag::new(tag))?;
+
+            Ok(())
+        } else {
+            x.serialize(&mut *self.serializer)
+        }
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -418,5 +435,153 @@ where
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
         Ok(())
+    }
+}
+
+/// Captures a tag from [`Serializer`] and passes it to [`Encoder::tag`]
+struct TagExtractor<W: Write>(core::marker::PhantomData<W>);
+
+impl<W: Write> TagExtractor<W>
+where
+    <W as Write>::Error: core::error::Error + 'static  {
+    fn new() -> Self {
+        TagExtractor(core::marker::PhantomData)
+    }
+}
+
+impl<W: Write> ser::Serializer for TagExtractor<W>
+where
+    <W as Write>::Error: core::error::Error + 'static {
+
+    type Ok = u64;
+    type Error = EncodeError<W::Error>;
+
+    type SerializeSeq = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeTuple = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeTupleStruct = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeTupleVariant = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeMap = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeStruct = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeStructVariant = ser::Impossible<Self::Ok, Self::Error>;
+
+    fn serialize_u64(self, v: u64) -> Result<u64, Self::Error> {
+        Ok(v)
+    }
+
+    fn serialize_u8(self, v: u8) -> Result<u64, Self::Error> {
+        Ok(v.into())
+    }
+
+    fn serialize_u16(self, v: u16) -> Result<u64, Self::Error> {
+        Ok(v.into())
+    }
+
+    fn serialize_u32(self, v: u32) -> Result<u64, Self::Error> {
+        Ok(v.into())
+    }
+
+    fn serialize_bool(self, _: bool) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_i8(self, _: i8) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_i16(self, _: i16) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_i32(self, _: i32) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_i64(self, _: i64) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_f32(self, _: f32) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_f64(self, _: f64) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_char(self, _: char) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_str(self, _: &str) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_bytes(self, _: &[u8]) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_none(self) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_some<T: Serialize + ?Sized>(self, _: &T) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_unit(self) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_unit_struct(self, _: &'static str) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_unit_variant(self, _: &'static str, _: u32, _: &'static str) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_newtype_struct<T: Serialize + ?Sized>(self, _: &'static str, _: &T) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_newtype_variant<T: Serialize + ?Sized>(self, _: &'static str, _: u32, _: &'static str, _: &T) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_seq(self, _: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_tuple(self, _: usize) -> Result<Self::SerializeTuple, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_tuple_struct(self, _: &'static str, _: usize) -> Result<Self::SerializeTupleStruct, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_tuple_variant(self, _: &'static str, _: u32, _: &'static str, _: usize) -> Result<Self::SerializeTupleVariant, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_map(self, _: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_struct(self, _: &'static str, _: usize) -> Result<Self::SerializeStruct, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn serialize_struct_variant(self, _: &'static str, _: u32, _: &'static str, _: usize) -> Result<Self::SerializeStructVariant, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
+    }
+
+    fn is_human_readable(&self) -> bool {
+        false
+    }
+
+    #[cfg(not(feature = "alloc"))]
+    fn collect_str<T: core::fmt::Display + ?Sized>(self, _: &T) -> Result<u64, Self::Error> {
+        Err(EncodeError::from(encode::Error::message("expected u64")))
     }
 }

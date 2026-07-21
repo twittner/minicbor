@@ -29,6 +29,16 @@ impl<R> Reader<R> {
         self.max_len = val as usize
     }
 
+    /// Get a reference to the inner buffer.
+    pub fn buffer(&self) -> &Vec<u8> {
+        &self.buffer
+    }
+
+    /// Get a mutable reference to the inner buffer.
+    pub fn buffer_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.buffer
+    }
+
     /// Get a reference to the inner reader.
     pub fn reader(&self) -> &R {
         &self.reader

@@ -656,8 +656,7 @@ impl<'b, C> Decode<'b, C> for std::path::PathBuf {
     }
 }
 
-#[cfg(feature = "std")]
-impl<'b, C> Decode<'b, C> for std::net::IpAddr {
+impl<'b, C> Decode<'b, C> for core::net::IpAddr {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(2) != d.array()? {
@@ -665,31 +664,28 @@ impl<'b, C> Decode<'b, C> for std::net::IpAddr {
         }
         let p = d.position();
         match d.i64()? {
-            0 => Ok(std::net::Ipv4Addr::decode(d, ctx)?.into()),
-            1 => Ok(std::net::Ipv6Addr::decode(d, ctx)?.into()),
+            0 => Ok(core::net::Ipv4Addr::decode(d, ctx)?.into()),
+            1 => Ok(core::net::Ipv6Addr::decode(d, ctx)?.into()),
             n => Err(Error::unknown_variant(n).at(p))
         }
     }
 }
 
-#[cfg(feature = "std")]
-impl<'b, C> Decode<'b, C> for std::net::Ipv4Addr {
+impl<'b, C> Decode<'b, C> for core::net::Ipv4Addr {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let octets: crate::bytes::ByteArray<4> = Decode::decode(d, ctx)?;
         Ok(<[u8; 4]>::from(octets).into())
     }
 }
 
-#[cfg(feature = "std")]
-impl<'b, C> Decode<'b, C> for std::net::Ipv6Addr {
+impl<'b, C> Decode<'b, C> for core::net::Ipv6Addr {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let octets: crate::bytes::ByteArray<16> = Decode::decode(d, ctx)?;
         Ok(<[u8; 16]>::from(octets).into())
     }
 }
 
-#[cfg(feature = "std")]
-impl<'b, C> Decode<'b, C> for std::net::SocketAddr {
+impl<'b, C> Decode<'b, C> for core::net::SocketAddr {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let p = d.position();
         if Some(2) != d.array()? {
@@ -697,32 +693,30 @@ impl<'b, C> Decode<'b, C> for std::net::SocketAddr {
         }
         let p = d.position();
         match d.i64()? {
-            0 => Ok(std::net::SocketAddrV4::decode(d, ctx)?.into()),
-            1 => Ok(std::net::SocketAddrV6::decode(d, ctx)?.into()),
+            0 => Ok(core::net::SocketAddrV4::decode(d, ctx)?.into()),
+            1 => Ok(core::net::SocketAddrV6::decode(d, ctx)?.into()),
             n => Err(Error::unknown_variant(n).at(p))
         }
     }
 }
 
-#[cfg(feature = "std")]
-impl<'b, C> Decode<'b, C> for std::net::SocketAddrV4 {
+impl<'b, C> Decode<'b, C> for core::net::SocketAddrV4 {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         decode_fields! { d ctx |
-            0 ip   => std::net::Ipv4Addr ; "SocketAddrV4::ip"
-            1 port => u16                ; "SocketAddrV4::port"
+            0 ip   => core::net::Ipv4Addr ; "SocketAddrV4::ip"
+            1 port => u16                 ; "SocketAddrV4::port"
         }
-        Ok(std::net::SocketAddrV4::new(ip, port))
+        Ok(core::net::SocketAddrV4::new(ip, port))
     }
 }
 
-#[cfg(feature = "std")]
-impl<'b, C> Decode<'b, C> for std::net::SocketAddrV6 {
+impl<'b, C> Decode<'b, C> for core::net::SocketAddrV6 {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         decode_fields! { d ctx |
-            0 ip   => std::net::Ipv6Addr ; "SocketAddrV6::ip"
-            1 port => u16                ; "SocketAddrV6::port"
+            0 ip   => core::net::Ipv6Addr ; "SocketAddrV6::ip"
+            1 port => u16                 ; "SocketAddrV6::port"
         }
-        Ok(std::net::SocketAddrV6::new(ip, port, 0, 0))
+        Ok(core::net::SocketAddrV6::new(ip, port, 0, 0))
     }
 }
 

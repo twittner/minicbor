@@ -892,78 +892,69 @@ impl<C> CborLen<C> for std::path::PathBuf {
     }
 }
 
-#[cfg(feature = "std")]
-impl<C> Encode<C> for std::net::IpAddr {
+impl<C> Encode<C> for core::net::IpAddr {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         e.array(2)?;
         match self {
-            std::net::IpAddr::V4(a) => e.u32(0)?.encode_with(a, ctx)?.ok(),
-            std::net::IpAddr::V6(a) => e.u32(1)?.encode_with(a, ctx)?.ok()
+            core::net::IpAddr::V4(a) => e.u32(0)?.encode_with(a, ctx)?.ok(),
+            core::net::IpAddr::V6(a) => e.u32(1)?.encode_with(a, ctx)?.ok()
         }
     }
 }
 
-#[cfg(feature = "std")]
-impl<C> CborLen<C> for std::net::IpAddr {
+impl<C> CborLen<C> for core::net::IpAddr {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         1 + match self {
-            std::net::IpAddr::V4(a) => 1 + a.cbor_len(ctx),
-            std::net::IpAddr::V6(a) => 1 + a.cbor_len(ctx),
+            core::net::IpAddr::V4(a) => 1 + a.cbor_len(ctx),
+            core::net::IpAddr::V6(a) => 1 + a.cbor_len(ctx),
         }
     }
 }
 
-#[cfg(feature = "std")]
-impl<C> Encode<C> for std::net::Ipv4Addr {
+impl<C> Encode<C> for core::net::Ipv4Addr {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), Error<W::Error>> {
         e.bytes(&self.octets())?.ok()
     }
 }
 
-#[cfg(feature = "std")]
-impl<C> CborLen<C> for std::net::Ipv4Addr {
+impl<C> CborLen<C> for core::net::Ipv4Addr {
     fn cbor_len(&self, _: &mut C) -> usize {
         5
     }
 }
 
-#[cfg(feature = "std")]
-impl<C> Encode<C> for std::net::Ipv6Addr {
+impl<C> Encode<C> for core::net::Ipv6Addr {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, _: &mut C) -> Result<(), Error<W::Error>> {
         e.bytes(&self.octets())?.ok()
     }
 }
 
-#[cfg(feature = "std")]
-impl<C> CborLen<C> for std::net::Ipv6Addr {
+impl<C> CborLen<C> for core::net::Ipv6Addr {
     fn cbor_len(&self, _: &mut C) -> usize {
         17
     }
 }
 
-#[cfg(feature = "std")]
-impl<C> Encode<C> for std::net::SocketAddr {
+impl<C> Encode<C> for core::net::SocketAddr {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         e.array(2)?;
         match self {
-            std::net::SocketAddr::V4(a) => e.u32(0)?.encode_with(a, ctx)?.ok(),
-            std::net::SocketAddr::V6(a) => e.u32(1)?.encode_with(a, ctx)?.ok()
+            core::net::SocketAddr::V4(a) => e.u32(0)?.encode_with(a, ctx)?.ok(),
+            core::net::SocketAddr::V6(a) => e.u32(1)?.encode_with(a, ctx)?.ok()
         }
     }
 }
 
-#[cfg(feature = "std")]
-impl<C> CborLen<C> for std::net::SocketAddr {
+impl<C> CborLen<C> for core::net::SocketAddr {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         1 + match self {
-            std::net::SocketAddr::V4(a) => 1 + a.cbor_len(ctx),
-            std::net::SocketAddr::V6(a) => 1 + a.cbor_len(ctx),
+            core::net::SocketAddr::V4(a) => 1 + a.cbor_len(ctx),
+            core::net::SocketAddr::V6(a) => 1 + a.cbor_len(ctx),
         }
     }
 }
 
-#[cfg(feature = "std")]
-impl<C> Encode<C> for std::net::SocketAddrV4 {
+impl<C> Encode<C> for core::net::SocketAddrV4 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         e.array(2)?
             .encode_with(self.ip(), ctx)?
@@ -972,15 +963,13 @@ impl<C> Encode<C> for std::net::SocketAddrV4 {
     }
 }
 
-#[cfg(feature = "std")]
-impl<C> CborLen<C> for std::net::SocketAddrV4 {
+impl<C> CborLen<C> for core::net::SocketAddrV4 {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         1 + self.ip().cbor_len(ctx) + self.port().cbor_len(ctx)
     }
 }
 
-#[cfg(feature = "std")]
-impl<C> Encode<C> for std::net::SocketAddrV6 {
+impl<C> Encode<C> for core::net::SocketAddrV6 {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         e.array(2)?
             .encode_with(self.ip(), ctx)?
@@ -989,8 +978,7 @@ impl<C> Encode<C> for std::net::SocketAddrV6 {
     }
 }
 
-#[cfg(feature = "std")]
-impl<C> CborLen<C> for std::net::SocketAddrV6 {
+impl<C> CborLen<C> for core::net::SocketAddrV6 {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         1 + self.ip().cbor_len(ctx) + self.port().cbor_len(ctx)
     }

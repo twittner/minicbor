@@ -109,6 +109,7 @@
 //! - [`#[cbor(bound)]`](#cborbound)
 //! - [`#[cbor(context_bound)]`](#cborcontext_bound--)
 //! - [`#[cbor(cbor_len)]`](#cborcbor_len--path)
+//! - [`#[cbor(crate = "...")]`](#cborcrate--path)
 //!
 //! ## `#[n(...)]` and `#[b(...)]` (or `#[cbor(n(...))]` and `#[cbor(b(...))]`)
 //!
@@ -317,6 +318,12 @@
 //! [`#[cbor(decode_bound = "...")]`](#cbordecode_bound--) and
 //! [`#[cbor(cbor_len_bound = "...")]`](#cborcbor_len_bound--), i.e. the bound applies
 //! to the derived `Encode`, `Decode` and `CborLen` impls.
+//!
+//! ## `#[cbor(crate = "<path>")]`
+//!
+//! On a struct or enum, overrides the path used by the derived impls to
+//! reach the `minicbor` crate. Useful for crates that re-export the derive
+//! macros from a different module path.
 //!
 //! ## `#[cbor(context_bound = "...")]`
 //!
@@ -779,4 +786,18 @@ fn is_phantom_data(t: &syn::Type) -> bool {
     let a = ["marker", "std"];
     let b = ["marker", "core"];
     prefix.clone().zip(a).all(|(p, a)| p == a) || prefix.zip(b).all(|(p, b)| p == b)
+}
+
+/// Wrap `tokens` in a `const _: () = { use #path as minicbor; ... };` block.
+fn wrap_in_crate_alias(path: Option<&syn::Path>, tokens: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    if let Some(p) = path {
+        quote::quote! {
+            const _: () = {
+                use #p as minicbor;
+                #tokens
+            };
+        }
+    } else {
+        tokens
+    }
 }

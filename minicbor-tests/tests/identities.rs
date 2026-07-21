@@ -321,37 +321,37 @@ fn duration() {
 
 #[test]
 fn ip() {
-    quickcheck(identity as fn(std::net::IpAddr) -> bool)
+    quickcheck(identity as fn(core::net::IpAddr) -> bool)
 }
 
 #[test]
 fn ipv4() {
-    quickcheck(identity as fn(std::net::Ipv4Addr) -> bool)
+    quickcheck(identity as fn(core::net::Ipv4Addr) -> bool)
 }
 
 #[test]
 fn ipv6() {
-    quickcheck(identity as fn(std::net::Ipv6Addr) -> bool)
+    quickcheck(identity as fn(core::net::Ipv6Addr) -> bool)
 }
 
 #[test]
 fn socketaddr() {
-    quickcheck(identity as fn(std::net::SocketAddr) -> bool)
+    quickcheck(identity as fn(core::net::SocketAddr) -> bool)
 }
 
 #[test]
 fn socketaddrv4() {
-    quickcheck(identity as fn(std::net::SocketAddrV4) -> bool)
+    quickcheck(identity as fn(core::net::SocketAddrV4) -> bool)
 }
 
 #[test]
 fn socketaddrv6() {
-    fn property(mut x: std::net::SocketAddrV6) -> bool {
+    fn property(mut x: core::net::SocketAddrV6) -> bool {
         x.set_flowinfo(0);
         x.set_scope_id(0);
         identity(x)
     }
-    quickcheck(property as fn(std::net::SocketAddrV6) -> bool)
+    quickcheck(property as fn(core::net::SocketAddrV6) -> bool)
 }
 
 #[test]
