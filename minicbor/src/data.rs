@@ -298,6 +298,12 @@ impl From<&IanaTag> for u64 {
 #[derive(Debug)]
 pub struct UnknownTag(Tag);
 
+impl UnknownTag {
+    pub fn tag(&self) -> Tag {
+        self.0
+    }
+}
+
 impl fmt::Display for UnknownTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "unknown tag: {:#x}", self.0.as_u64())

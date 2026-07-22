@@ -580,7 +580,6 @@ impl<C> CborLen<C> for u128 {
         if *self <= u64::MAX as u128 {
             (*self as u64).cbor_len(ctx)
         } else {
-            // tag (1) + byte string header (1) + payload bytes
             let bytes = 16 - (self.leading_zeros() / 8) as usize;
             2 + bytes
         }
@@ -589,7 +588,11 @@ impl<C> CborLen<C> for u128 {
 
 impl<C> CborLen<C> for i128 {
     fn cbor_len(&self, ctx: &mut C) -> usize {
-        let n = if *self >= 0 { *self as u128 } else { !(*self as u128) };
+        let n = if *self >= 0 {
+            *self as u128
+        } else {
+            !(*self as u128)
+        };
         if n <= u64::MAX as u128 {
             (n as u64).cbor_len(ctx)
         } else {

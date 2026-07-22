@@ -237,7 +237,6 @@ impl<'b> Decoder<'b> {
                         if n > i128::MAX as u128 {
                             return Err(Error::message("negative bignum exceeds i128 range").at(p))
                         }
-                        // `!n as i128 == -1 - n` for `n <= i128::MAX as u128`.
                         Ok((!n) as i128)
                     }
                     _ => Err(Error::tag_mismatch(t)
@@ -1158,10 +1157,12 @@ fn decode_bignum_u128(d: &mut Decoder<'_>, pos: usize) -> Result<u128, Error> {
         let start = bs.iter().position(|&b| b != 0).unwrap_or_else(|| bs.len() - 1);
         &bs[start ..]
     };
+
     if bytes.len() > 16 {
         return Err(Error::message("bignum exceeds 128 bits").at(pos))
     }
+
     let mut buf = [0u8; 16];
-    buf[16 - bytes.len()..].copy_from_slice(bytes);
+    buf[16 - bytes.len() ..].copy_from_slice(bytes);
     Ok(u128::from_be_bytes(buf))
 }

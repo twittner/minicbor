@@ -158,7 +158,6 @@ impl<W: Write> Encoder<W> {
         if x >= 0 {
             return self.u128(x as u128)
         }
-        // `!(x as u128) == (-1 - x) as u128` for any negative `x: i128`.
         let n = !(x as u128);
         if n <= u64::MAX as u128 {
             return self.int(Int::neg(n as u64))
