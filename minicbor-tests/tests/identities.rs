@@ -59,6 +59,16 @@ fn i64() {
 }
 
 #[test]
+fn u128() {
+    quickcheck(identity as fn(u128) -> bool)
+}
+
+#[test]
+fn i128() {
+    quickcheck(identity as fn(i128) -> bool)
+}
+
+#[test]
 fn int() {
     assert!(identity(Int::try_from(-2_i128.pow(64)).unwrap()));
     assert!(identity(Int::from(-1_i64)));
@@ -85,6 +95,23 @@ fn nonzero_u32() {
 #[test]
 fn nonzero_u64() {
     quickcheck(identity as fn(core::num::NonZeroU64) -> bool)
+}
+
+#[test]
+fn nonzero_u128() {
+    quickcheck(identity as fn(core::num::NonZeroU128) -> bool)
+}
+
+#[test]
+fn nonzero_i128() {
+    // quickcheck has no `Arbitrary` impl for `NonZeroI128`, so combine two `i64`s
+    // to cover the full `i128` range (including the bignum path).
+    fn property(hi: i64, lo: u64) -> bool {
+        let raw = (i128::from(hi) << 64) | i128::from(lo);
+        let n = core::num::NonZeroI128::new(raw).unwrap_or(core::num::NonZeroI128::new(1).unwrap());
+        identity(n)
+    }
+    quickcheck(property as fn(i64, u64) -> bool)
 }
 
 #[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]

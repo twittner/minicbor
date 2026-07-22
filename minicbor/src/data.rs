@@ -165,6 +165,18 @@ impl IanaTag {
     }
 }
 
+impl PartialEq<Tag> for IanaTag {
+    fn eq(&self, other: &Tag) -> bool {
+        self.tag() == *other
+    }
+}
+
+impl PartialEq<IanaTag> for Tag {
+    fn eq(&self, other: &IanaTag) -> bool {
+        *self == other.tag()
+    }
+}
+
 impl TryFrom<Tag> for IanaTag {
     type Error = UnknownTag;
 
@@ -285,6 +297,12 @@ impl From<&IanaTag> for u64 {
 /// Error indicating that a tag value is unknown to [`IanaTag`].
 #[derive(Debug)]
 pub struct UnknownTag(Tag);
+
+impl UnknownTag {
+    pub fn tag(&self) -> Tag {
+        self.0
+    }
+}
 
 impl fmt::Display for UnknownTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
