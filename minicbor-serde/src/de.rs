@@ -128,14 +128,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 match tag.try_into() {
                     Ok(IanaTag::PosBignum) => self.deserialize_u128(visitor),
                     Ok(IanaTag::NegBignum) => self.deserialize_i128(visitor),
-                    Ok(other) => Err(Error::tag_mismatch(other.into())
-                        .with_message("unexpected iana tag")
-                        .at(self.decoder.position())
-                        .into()),
-                    Err(unknown) => Err(Error::tag_mismatch(unknown.tag())
-                        .with_message("unexpected tag")
-                        .at(self.decoder.position())
-                        .into()),
+                    _ => Err(Error::tag_mismatch(tag).at(self.decoder.position()).into())
                 }
             }
 
