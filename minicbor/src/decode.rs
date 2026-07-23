@@ -341,7 +341,7 @@ macro_rules! decode_basic {
     }
 }
 
-decode_basic!(u8 i8 u16 i16 u32 i32 u64 i64 bool f32 f64 char);
+decode_basic!(u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 bool f32 f64 char);
 
 macro_rules! decode_nonzero {
     ($($t:ty, $msg:expr)*) => {
@@ -357,14 +357,16 @@ macro_rules! decode_nonzero {
 }
 
 decode_nonzero! {
-    core::num::NonZeroU8,  "unexpected 0 when decoding a `NonZeroU8`"
-    core::num::NonZeroU16, "unexpected 0 when decoding a `NonZeroU16`"
-    core::num::NonZeroU32, "unexpected 0 when decoding a `NonZeroU32`"
-    core::num::NonZeroU64, "unexpected 0 when decoding a `NonZeroU64`"
-    core::num::NonZeroI8,  "unexpected 0 when decoding a `NonZeroI8`"
-    core::num::NonZeroI16, "unexpected 0 when decoding a `NonZeroI16`"
-    core::num::NonZeroI32, "unexpected 0 when decoding a `NonZeroI32`"
-    core::num::NonZeroI64, "unexpected 0 when decoding a `NonZeroI64`"
+    core::num::NonZeroU8,   "unexpected 0 when decoding a `NonZeroU8`"
+    core::num::NonZeroU16,  "unexpected 0 when decoding a `NonZeroU16`"
+    core::num::NonZeroU32,  "unexpected 0 when decoding a `NonZeroU32`"
+    core::num::NonZeroU64,  "unexpected 0 when decoding a `NonZeroU64`"
+    core::num::NonZeroU128, "unexpected 0 when decoding a `NonZeroU128`"
+    core::num::NonZeroI8,   "unexpected 0 when decoding a `NonZeroI8`"
+    core::num::NonZeroI16,  "unexpected 0 when decoding a `NonZeroI16`"
+    core::num::NonZeroI32,  "unexpected 0 when decoding a `NonZeroI32`"
+    core::num::NonZeroI64,  "unexpected 0 when decoding a `NonZeroI64`"
+    core::num::NonZeroI128, "unexpected 0 when decoding a `NonZeroI128`"
 }
 
 #[cfg(any(target_pointer_width = "16", target_pointer_width = "32", target_pointer_width = "64"))]

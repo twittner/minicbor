@@ -7,6 +7,10 @@
 
 # minicbor
 
+## `2.3.0`
+
+- Adds support for `u128`/`i128`. See pull request [63][pr63] by @sdbondi for details.
+
 ## `2.2.3`
 
 - The `std` feature is no longer required for:
@@ -823,6 +827,11 @@
 
 # minicbor-serde
 
+## `0.7.1`
+
+- Adds support for `u128`/`i128`. See pull request [63][pr63] by @sdbondi for details.
+- Depends on `minicbor-2.3.0`.
+
 ## `0.7.0`
 
 - Adds support for custom tags. See pull request [49][pr49] by @mpanav for details.
@@ -930,6 +939,7 @@
 [pr48]: https://github.com/twittner/minicbor/pull/48
 [pr49]: https://github.com/twittner/minicbor/pull/49
 [pr62]: https://github.com/twittner/minicbor/pull/62
+[pr63]: https://github.com/twittner/minicbor/pull/63
 [pr64]: https://github.com/twittner/minicbor/pull/64
 
 [i4]: https://gitlab.com/twittner/minicbor/-/issues/4

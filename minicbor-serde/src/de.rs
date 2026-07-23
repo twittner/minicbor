@@ -3,7 +3,7 @@ use serde::de::{
     value::{BorrowedStrDeserializer, U64Deserializer},
 };
 
-use minicbor::data::{Tag, Type};
+use minicbor::data::{IanaTag, Tag, Type};
 use minicbor::decode::{Decoder, Error};
 
 use crate::{
@@ -121,10 +121,19 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             t @ (Type::BytesIndef | Type::StringIndef) =>
                 Err(Error::type_mismatch(t).with_message("unexpected type").at(self.decoder.position()).into()),
 
+            Type::Int => self.deserialize_i128(visitor),
+
+            Type::Tag => {
+                let tag = self.decoder.probe().tag()?;
+                match tag.try_into() {
+                    Ok(IanaTag::PosBignum) => self.deserialize_u128(visitor),
+                    Ok(IanaTag::NegBignum) => self.deserialize_i128(visitor),
+                    _ => Err(Error::tag_mismatch(tag).at(self.decoder.position()).into())
+                }
+            }
+
             t @ (
                 | Type::Undefined
-                | Type::Tag
-                | Type::Int
                 | Type::Simple
                 | Type::Break
                 | Type::Unknown(_)
@@ -166,6 +175,14 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
 
     fn deserialize_u64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
         visitor.visit_u64(self.decoder.u64()?)
+    }
+
+    fn deserialize_i128<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        visitor.visit_i128(self.decoder.i128()?)
+    }
+
+    fn deserialize_u128<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        visitor.visit_u128(self.decoder.u128()?)
     }
 
     fn deserialize_f32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
