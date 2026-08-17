@@ -7,6 +7,14 @@
 
 # minicbor
 
+## Unreleased
+
+- `Decode` is implemented for `Box<[T]>`, complementing the existing `Encode` and `CborLen`
+  impls of `Box<T: ?Sized>`.
+- `Encode`, `Decode` and `CborLen` are implemented for `Box<ByteSlice>`, and `EncodeBytes`,
+  `DecodeBytes` and `CborLenBytes` for `Box<[u8]>` and `Box<ByteSlice>`, so boxed slices can
+  be encoded as CBOR bytes with `#[cbor(with = "minicbor::bytes")]`.
+
 ## `2.3.0`
 
 - Adds support for `u128`/`i128`. See pull request [63][pr63] by @sdbondi for details.

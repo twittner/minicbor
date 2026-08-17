@@ -46,6 +46,19 @@ struct Vector {
 }
 
 #[derive(Encode, Decode)]
+struct BoxedSlice {
+    #[n(0)]
+    #[cbor(with = "minicbor::bytes")]
+    field: Box<[u8]>
+}
+
+#[derive(Encode, Decode)]
+struct BoxedByteSlice {
+    #[n(0)]
+    field: Box<ByteSlice>
+}
+
+#[derive(Encode, Decode)]
 struct CowVector<'a> {
     #[n(0)]
     field: Cow<'a, ByteVec>

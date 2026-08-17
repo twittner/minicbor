@@ -9,20 +9,20 @@
 //! If the feature "derive" is present, specialised traits `EncodeBytes` and
 //! `DecodeBytes` are also provided. These are implemented for the
 //! aforementioned newtypes as well as for their `Option` variations, regular
-//! `&[u8]`, `[u8; N]`, `Vec<u8>` and for `Cow<'_, [u8]>` if the alloc feature
-//! is given. They enable the direct use of `&[u8]`, `[u8; N]`, `Vec<u8>` and
-//! `Cow<'_, [u8]>` in types deriving `Encode` and `Decode` if used with a
-//! `#[cbor(with = "minicbor::bytes")]` annotation.
+//! `&[u8]`, `[u8; N]`, `Vec<u8>`, `Box<[u8]>` and for `Cow<'_, [u8]>` if the
+//! alloc feature is given. They enable the direct use of `&[u8]`, `[u8; N]`,
+//! `Vec<u8>`, `Box<[u8]>` and `Cow<'_, [u8]>` in types deriving `Encode` and
+//! `Decode` if used with a `#[cbor(with = "minicbor::bytes")]` annotation.
 
 use crate::decode::{self, Decode, Decoder};
 use crate::encode::{self, Encode, Encoder, Write, CborLen};
 use core::ops::{Deref, DerefMut};
 
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 
 #[cfg(all(feature = "alloc", feature = "derive"))]
-use alloc::{boxed::Box, borrow::{Cow, ToOwned}};
+use alloc::borrow::{Cow, ToOwned};
 
 /// Newtype for `[u8]`.
 ///
@@ -44,6 +44,24 @@ impl<'a> From<&'a mut [u8]> for &'a mut ByteSlice {
     fn from(xs: &'a mut [u8]) -> Self {
         unsafe {
             &mut *(xs as *mut [u8] as *mut ByteSlice)
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl From<Box<[u8]>> for Box<ByteSlice> {
+    fn from(xs: Box<[u8]>) -> Self {
+        unsafe {
+            Box::from_raw(Box::into_raw(xs) as *mut ByteSlice)
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl From<Box<ByteSlice>> for Box<[u8]> {
+    fn from(xs: Box<ByteSlice>) -> Self {
+        unsafe {
+            Box::from_raw(Box::into_raw(xs) as *mut [u8])
         }
     }
 }
@@ -77,6 +95,13 @@ impl AsMut<[u8]> for ByteSlice {
 impl<'a, 'b: 'a, C> Decode<'b, C> for &'a ByteSlice {
     fn decode(d: &mut Decoder<'b>, _: &mut C) -> Result<Self, decode::Error> {
         d.bytes().map(<&ByteSlice>::from)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<C> Decode<'_, C> for Box<ByteSlice> {
+    fn decode(d: &mut Decoder<'_>, _: &mut C) -> Result<Self, decode::Error> {
+        d.bytes().map(|b| Box::<[u8]>::from(b).into())
     }
 }
 
@@ -397,6 +422,27 @@ impl<C> CborLenBytes<C> for Box<[u8]> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         let n = self.len();
         n.cbor_len(ctx) + n
+    }
+}
+
+#[cfg(all(feature = "alloc", feature = "derive"))]
+impl<C> EncodeBytes<C> for Box<ByteSlice> {
+    fn encode_bytes<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), encode::Error<W::Error>> {
+        ByteSlice::encode(self, e, ctx)
+    }
+}
+
+#[cfg(all(feature = "alloc", feature = "derive"))]
+impl<C> DecodeBytes<'_, C> for Box<ByteSlice> {
+    fn decode_bytes(d: &mut Decoder<'_>, ctx: &mut C) -> Result<Self, decode::Error> {
+        Self::decode(d, ctx)
+    }
+}
+
+#[cfg(all(feature = "alloc", feature = "derive"))]
+impl<C> CborLenBytes<C> for Box<ByteSlice> {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        <ByteSlice as CborLen<C>>::cbor_len(self, ctx)
     }
 }
 
