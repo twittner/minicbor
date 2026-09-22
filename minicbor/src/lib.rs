@@ -130,6 +130,33 @@
 //! # Ok::<_, Box<dyn core::error::Error>>(())
 //! ```
 //!
+//! # Decoding untrusted input
+//!
+//! Decoding a self-referential type recurses as deeply as the input demands,
+//! which can overflow the stack. To bound this, types deriving [`Decode`] can
+//! declare a nesting limit:
+//!
+//! ```
+//! # #[cfg(feature = "derive")] {
+//! #[derive(minicbor::Decode)]
+//! #[cbor(map, max_depth(64))]
+//! struct Tree {
+//!     #[n(0)] value: u64,
+//!     #[n(1)] children: Vec<Tree>
+//! }
+//! # }
+//! ```
+//!
+//! Decoding fails with [`decode::Error::depth_limit_exceeded`] once 64 `Tree`
+//! values are nested within one another. See the `max_depth` section of
+//! [`minicbor_derive`] for the exact semantics.
+//!
+//! The limit only counts types which declare it. Nesting made up of other
+//! types -- an input of arrays within arrays, say -- is not counted, nor is
+//! anything decoded by a hand-written [`Decode`] impl which does not consult
+//! [`Decoder::remaining_depth`]. Neither [`Decoder::skip`] nor tokenization
+//! recurse, so both are safe to use on arbitrary input.
+//!
 //! [CBOR]: https://datatracker.ietf.org/doc/html/rfc8949
 //! [serde]: https://serde.rs
 
