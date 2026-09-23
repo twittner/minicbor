@@ -1,9 +1,15 @@
-use minicbor::encode::{self, Encoder, Write};
+use minicbor::encode::{
+    self, Encoder, Write,
+    write::{Cursor, EndOfSlice},
+};
 use serde::Serialize;
 use serde::ser::{self, SerializeSeq, SerializeTuple, SerializeTupleStruct};
 use serde::ser::{SerializeMap, SerializeStruct, SerializeStructVariant, SerializeTupleVariant};
 
-use crate::{error::EncodeError, tag::{TAG_CONTAINER_IDENTIFIER, TAG_IDENTIFIER, NO_TAG_IDENTIFIER}};
+use crate::{
+    error::EncodeError,
+    tag::{NO_TAG_IDENTIFIER, TAG_CONTAINER_IDENTIFIER, TAG_IDENTIFIER},
+};
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
@@ -14,6 +20,13 @@ pub fn to_vec<T: Serialize>(val: T) -> Result<Vec<u8>, EncodeError<core::convert
     let mut v = Vec::new();
     val.serialize(&mut Serializer::new(&mut v))?;
     Ok(v)
+}
+
+/// Serialise a type implementing [`serde::Serialize`] to a slice and return the number of bytes written.
+pub fn to_slice<T: Serialize>(val: T, b: &mut [u8]) -> Result<usize, EncodeError<EndOfSlice>> {
+    let mut s = Serializer::new(Cursor::new(b));
+    val.serialize(&mut s)?;
+    Ok(s.encoder().writer().position())
 }
 
 /// An implementation of [`serde::Serializer`] using a [`minicbor::Encoder`].
