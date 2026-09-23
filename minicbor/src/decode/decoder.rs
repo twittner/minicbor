@@ -363,6 +363,15 @@ impl<'b> Decoder<'b> {
     /// See [`Decoder::str_iter`] for indefinite string slice support.
     pub fn str(&mut self) -> Result<&'b str, Error> {
         let p = self.pos;
+        // Fast path: strings up to 23 bytes store their length in the head byte.
+        if let Some(&b @ 0x60 ..= 0x77) = self.buf.get(p) {
+            let end = p + 1 + usize::from(b - 0x60);
+            if let Some(d) = self.buf.get(p + 1 .. end) {
+                let s = str::from_utf8(d).map_err(|e| Error::utf8(e).at(p))?;
+                self.pos = end;
+                return Ok(s)
+            }
+        }
         let b = self.read()?;
         if TEXT != type_of(b) || info_of(b) == 31 {
             return Err(Error::type_mismatch(self.type_of(b)?)

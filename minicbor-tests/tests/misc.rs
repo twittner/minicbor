@@ -492,3 +492,31 @@ fn check_type_of(i: i64) -> bool {
         _         => false
     }
 }
+
+#[test]
+fn str_lengths_around_head_byte_limit() {
+    for n in [0, 1, 23, 24, 255, 256] {
+        let s = "a".repeat(n);
+        let mut v = Vec::new();
+        Encoder::new(&mut v).str(&s).unwrap();
+        let mut d = Decoder::new(&v);
+        assert_eq!(d.str().unwrap(), s);
+        assert_eq!(d.position(), v.len())
+    }
+}
+
+#[test]
+fn str_short_truncated() {
+    let input = b"\x65abc";
+    let mut d = Decoder::new(&input[..]);
+    assert!(d.str().unwrap_err().is_end_of_input())
+}
+
+#[test]
+fn str_short_invalid_utf8() {
+    let input = b"\x62\xc3\x28";
+    let mut d = Decoder::new(&input[..]);
+    let e = d.str().unwrap_err();
+    assert_eq!(e.position(), Some(0));
+    assert_eq!(d.position(), 0)
+}
