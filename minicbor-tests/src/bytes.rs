@@ -1,6 +1,6 @@
 #![cfg(feature = "std")]
 
-use minicbor::{Encode, Decode};
+use minicbor::{Encode, Decode, CborLen};
 use minicbor::bytes::{ByteArray, ByteSlice, ByteVec};
 use std::borrow::Cow;
 
@@ -43,6 +43,25 @@ struct Vector {
     #[n(0)]
     #[cbor(with = "minicbor::bytes")]
     field: Vec<u8>
+}
+
+#[derive(Encode, Decode, CborLen)]
+struct BoxedSlice {
+    #[n(0)]
+    #[cbor(with = "minicbor::bytes")]
+    field: Box<[u8]>
+}
+
+#[derive(Encode, Decode, CborLen)]
+struct BoxedSlice2 {
+    #[n(0)]
+    field: Box<[u8]>
+}
+
+#[derive(Encode, Decode, CborLen)]
+struct BoxedByteSlice {
+    #[n(0)]
+    field: Box<ByteSlice>
 }
 
 #[derive(Encode, Decode)]

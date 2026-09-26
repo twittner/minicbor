@@ -272,6 +272,34 @@ fn byte_vec() {
 }
 
 #[test]
+fn boxed_slice() {
+    fn property(arg: Vec<u32>) -> bool {
+        identity(arg.into_boxed_slice())
+    }
+
+    quickcheck(property as fn(Vec<u32>) -> bool)
+}
+
+#[test]
+fn boxed_byte_slice() {
+    use minicbor::bytes::ByteSlice;
+
+    fn property(arg: Vec<u8>) -> bool {
+        let arg: Box<ByteSlice> = arg.into_boxed_slice().into();
+        let vec = minicbor::to_vec(&arg).unwrap();
+        assert_eq!(minicbor::len(&arg), vec.len());
+        let mut dec = Decoder::new(&vec);
+        assert_eq!(Some(Type::Bytes), dec.datatype().ok());
+        dec.set_position(0);
+        let val: Box<ByteSlice> = dec.decode().unwrap();
+        assert_eq!(dec.position(), vec.len());
+        arg == val
+    }
+
+    quickcheck(property as fn(Vec<u8>) -> bool)
+}
+
+#[test]
 fn vecdeque() {
     quickcheck(identity as fn(std::collections::VecDeque<u32>) -> bool)
 }

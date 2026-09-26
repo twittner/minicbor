@@ -120,6 +120,13 @@ impl<'b, C> Decode<'b, C> for alloc::boxed::Box<str> {
     }
 }
 
+#[cfg(feature = "alloc")]
+impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for alloc::boxed::Box<[T]> {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        alloc::vec::Vec::<T>::decode(d, ctx).map(Into::into)
+    }
+}
+
 impl<'b, C, T: Decode<'b, C>> Decode<'b, C> for Option<T> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         if crate::data::Type::Null == d.datatype()? {
