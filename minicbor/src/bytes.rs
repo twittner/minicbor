@@ -9,10 +9,11 @@
 //! If the feature "derive" is present, specialised traits `EncodeBytes` and
 //! `DecodeBytes` are also provided. These are implemented for the
 //! aforementioned newtypes as well as for their `Option` variations, regular
-//! `&[u8]`, `[u8; N]`, `Vec<u8>`, `Box<[u8]>` and for `Cow<'_, [u8]>` if the
-//! alloc feature is given. They enable the direct use of `&[u8]`, `[u8; N]`,
-//! `Vec<u8>`, `Box<[u8]>` and `Cow<'_, [u8]>` in types deriving `Encode` and
-//! `Decode` if used with a `#[cbor(with = "minicbor::bytes")]` annotation.
+//! `&[u8]`, `[u8; N]`, and – if the alloc feature is given – `Vec<u8>`,
+//! `Box<[u8]>` and `Cow<'_, [u8]>`. They enable the direct use of `&[u8]`,
+//! `[u8; N]`, `Vec<u8>`, `Box<[u8]>` and `Cow<'_, [u8]>` in types deriving
+//! `Encode` and `Decode` if used with a `#[cbor(with = "minicbor::bytes")]`
+//! annotation.
 
 use crate::decode::{self, Decode, Decoder};
 use crate::encode::{self, Encode, Encoder, Write, CborLen};
