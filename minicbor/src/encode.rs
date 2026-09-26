@@ -54,6 +54,51 @@ pub trait CborLen<C> {
     fn cbor_len(&self, ctx: &mut C) -> usize;
 }
 
+/// A type whose maximum CBOR encoding length is known at compile time.
+///
+/// This is useful for allocating fixed-size buffers in `no_std` environments
+/// without `alloc`.
+///
+/// # Example
+///
+/// ```
+/// use minicbor::encode::MaxCborLen;
+///
+/// fn send<T: minicbor::Encode<()> + MaxCborLen>(val: T) {
+///     let mut buf = [0u8; T::MAX_CBOR_LEN];
+///     minicbor::encode(val, buf.as_mut_slice()).unwrap();
+/// }
+/// ```
+pub trait MaxCborLen {
+    /// The maximum number of bytes the CBOR encoding of this type can produce.
+    const MAX_CBOR_LEN: usize;
+}
+
+/// Computes the CBOR encoded length of an unsigned integer value at compile time.
+///
+/// Useful for computing array/map header sizes and index key sizes as constants.
+pub const fn unsigned_cbor_len(n: u64) -> usize {
+    if n <= 0x17 { 1 }
+    else if n <= 0xff { 2 }
+    else if n <= 0xffff { 3 }
+    else if n <= 0xffff_ffff { 5 }
+    else { 9 }
+}
+
+/// Computes the CBOR encoded length of a signed integer value at compile time.
+pub const fn signed_cbor_len(n: i64) -> usize {
+    if n >= 0 {
+        unsigned_cbor_len(n as u64)
+    } else {
+        unsigned_cbor_len((-1 - n) as u64)
+    }
+}
+
+/// Returns the larger of two `usize` values. Usable in const contexts.
+pub const fn const_max(a: usize, b: usize) -> usize {
+    if a > b { a } else { b }
+}
+
 impl<C, T: Encode<C> + ?Sized> Encode<C> for &T {
     fn encode<W: Write>(&self, e: &mut Encoder<W>, ctx: &mut C) -> Result<(), Error<W::Error>> {
         (**self).encode(e, ctx)
@@ -614,6 +659,63 @@ impl<C> CborLen<C> for f64 {
     }
 }
 
+// --- MaxCborLen impls ---
+//
+// Uses unsigned_cbor_len / signed_cbor_len (the const equivalents of CborLen)
+// applied to worst-case values, so encoding size logic isn't duplicated.
+
+macro_rules! max_cbor_len {
+    (unsigned: $($t:ty),*) => {
+        $(impl MaxCborLen for $t {
+            const MAX_CBOR_LEN: usize = unsigned_cbor_len(<$t>::MAX as u64);
+        })*
+    };
+    (signed: $($t:ty),*) => {
+        $(impl MaxCborLen for $t {
+            const MAX_CBOR_LEN: usize = signed_cbor_len(<$t>::MIN as i64);
+        })*
+    };
+    (const: $($t:ty = $n:expr;)*) => {
+        $(impl MaxCborLen for $t { const MAX_CBOR_LEN: usize = $n; })*
+    };
+    (forward: $($t:ty => $inner:ty;)*) => {
+        $(impl MaxCborLen for $t {
+            const MAX_CBOR_LEN: usize = <$inner as MaxCborLen>::MAX_CBOR_LEN;
+        })*
+    };
+}
+
+// Integers: max cbor len = cbor len of worst-case value (no cfg needed — const evaluates per target)
+max_cbor_len!(unsigned: u8, u16, u32, u64, usize);
+max_cbor_len!(signed:   i8, i16, i32, i64, isize);
+max_cbor_len!(const: bool = 1; f32 = 5; f64 = 9; () = 1;);
+max_cbor_len!(forward:
+    core::num::NonZeroU8  => u8;  core::num::NonZeroU16 => u16;
+    core::num::NonZeroU32 => u32; core::num::NonZeroU64 => u64;
+    core::num::NonZeroI8  => i8;  core::num::NonZeroI16 => i16;
+    core::num::NonZeroI32 => i32; core::num::NonZeroI64 => i64;
+);
+#[cfg(any(target_pointer_width = "16", target_pointer_width = "32", target_pointer_width = "64"))]
+max_cbor_len!(forward: core::num::NonZeroUsize => usize; core::num::NonZeroIsize => isize;);
+
+impl MaxCborLen for char { const MAX_CBOR_LEN: usize = unsigned_cbor_len(char::MAX as u64); }
+impl<T> MaxCborLen for core::marker::PhantomData<T>   { const MAX_CBOR_LEN: usize = 1; }
+impl<T: MaxCborLen> MaxCborLen for core::num::Wrapping<T> { const MAX_CBOR_LEN: usize = T::MAX_CBOR_LEN; }
+impl<T: MaxCborLen> MaxCborLen for core::cell::Cell<T>    { const MAX_CBOR_LEN: usize = T::MAX_CBOR_LEN; }
+impl<T: MaxCborLen> MaxCborLen for core::cell::RefCell<T> { const MAX_CBOR_LEN: usize = T::MAX_CBOR_LEN; }
+
+impl<T: MaxCborLen> MaxCborLen for Option<T>                  { const MAX_CBOR_LEN: usize = const_max(1, T::MAX_CBOR_LEN); }
+impl<T: MaxCborLen, const N: usize> MaxCborLen for [T; N]     { const MAX_CBOR_LEN: usize = unsigned_cbor_len(N as u64) + N * T::MAX_CBOR_LEN; }
+impl<T: MaxCborLen, E: MaxCborLen> MaxCborLen for Result<T, E> { const MAX_CBOR_LEN: usize = 1 + 1 + const_max(T::MAX_CBOR_LEN, E::MAX_CBOR_LEN); }
+impl MaxCborLen for core::time::Duration                       { const MAX_CBOR_LEN: usize = 1 + u64::MAX_CBOR_LEN + u32::MAX_CBOR_LEN; }
+
+impl<T: MaxCborLen> MaxCborLen for core::ops::Range<T>            { const MAX_CBOR_LEN: usize = 1 + 2 * T::MAX_CBOR_LEN; }
+impl<T: MaxCborLen> MaxCborLen for core::ops::RangeInclusive<T>   { const MAX_CBOR_LEN: usize = 1 + 2 * T::MAX_CBOR_LEN; }
+impl<T: MaxCborLen> MaxCborLen for core::ops::RangeFrom<T>        { const MAX_CBOR_LEN: usize = 1 + T::MAX_CBOR_LEN; }
+impl<T: MaxCborLen> MaxCborLen for core::ops::RangeTo<T>          { const MAX_CBOR_LEN: usize = 1 + T::MAX_CBOR_LEN; }
+impl<T: MaxCborLen> MaxCborLen for core::ops::RangeToInclusive<T> { const MAX_CBOR_LEN: usize = 1 + T::MAX_CBOR_LEN; }
+impl<T: MaxCborLen> MaxCborLen for core::ops::Bound<T>            { const MAX_CBOR_LEN: usize = 1 + 1 + const_max(T::MAX_CBOR_LEN, 1); }
+
 macro_rules! encode_nonzero {
     ($($t:ty)*) => {
         $(
@@ -773,6 +875,11 @@ macro_rules! encode_tuples {
                 fn cbor_len(&self, ctx: &mut Ctx) -> usize {
                     $len.cbor_len(ctx) $(+ self.$idx.cbor_len(ctx))+
                 }
+            }
+
+            impl<$($T: MaxCborLen),+> MaxCborLen for ($($T,)+) {
+                const MAX_CBOR_LEN: usize =
+                    unsigned_cbor_len($len) $(+ <$T as MaxCborLen>::MAX_CBOR_LEN)+;
             }
         )+
     }

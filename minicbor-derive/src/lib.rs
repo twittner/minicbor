@@ -540,6 +540,7 @@ extern crate proc_macro;
 mod decode;
 mod encode;
 mod cbor_len;
+mod max_cbor_len;
 
 pub(crate) mod attrs;
 pub(crate) mod fields;
@@ -578,6 +579,18 @@ enum Mode {
 #[proc_macro_derive(CborLen, attributes(n, b, cbor))]
 pub fn derive_cbor_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     cbor_len::derive_from(input)
+}
+
+/// Derive the `minicbor::MaxCborLen` trait for a struct or enum.
+///
+/// Computes the maximum possible CBOR encoding length as a compile-time constant.
+/// This is useful for allocating fixed-size buffers in `no_std` environments
+/// without `alloc`. All field types must also implement `MaxCborLen`.
+///
+/// See the [crate] documentation for details.
+#[proc_macro_derive(MaxCborLen, attributes(n, b, cbor))]
+pub fn derive_max_cbor_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    max_cbor_len::derive_from(input)
 }
 
 // Helpers ////////////////////////////////////////////////////////////////////
