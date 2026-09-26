@@ -49,7 +49,7 @@ pub mod tag;
 pub mod error;
 
 pub use de::{Deserializer, from_slice};
-pub use ser::Serializer;
+pub use ser::{Serializer, to_slice};
 
 #[cfg(feature = "alloc")]
 pub use ser::to_vec;
