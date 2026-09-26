@@ -121,13 +121,28 @@ fn on_struct(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream
 
     let tag = decode_tag(&attrs);
 
+    let body =
+        if let Some((enter, restore)) = decode_max_depth(&attrs) {
+            quote! {
+                let __p777 = __d777.position();
+                #enter
+                #statements
+                #restore
+                #result
+            }
+        } else {
+            quote! {
+                let __p777 = __d777.position();
+                #statements
+                #result
+            }
+        };
+
     Ok(wrap_in_crate_alias(attrs.cbor_crate(), quote! {
         impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
             fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
                 #tag
-                let __p777 = __d777.position();
-                #statements
-                #result
+                #body
             }
         }
     }))
@@ -274,15 +289,33 @@ fn on_enum(inp: &mut syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let tag = decode_tag(&enum_attrs);
 
-    Ok(wrap_in_crate_alias(enum_attrs.cbor_crate(), quote! {
-        impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
-            fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
-                #tag
+    let body =
+        if let Some((enter, restore)) = decode_max_depth(&enum_attrs) {
+            quote! {
+                #check
+                #enter
+                let __r777 = match __d777.i64()? {
+                    #(#rows)*
+                    n => Err(minicbor::decode::Error::unknown_variant(n).at(__p778))
+                };
+                #restore
+                __r777
+            }
+        } else {
+            quote! {
                 #check
                 match __d777.i64()? {
                     #(#rows)*
                     n => Err(minicbor::decode::Error::unknown_variant(n).at(__p778))
                 }
+            }
+        };
+
+    Ok(wrap_in_crate_alias(enum_attrs.cbor_crate(), quote! {
+        impl #impl_generics minicbor::Decode<'bytes, Ctx> for #name #typ_generics #where_clause {
+            fn decode(__d777: &mut minicbor::Decoder<'bytes>, __ctx777: &mut Ctx) -> core::result::Result<#name #typ_generics, minicbor::decode::Error> {
+                #tag
+                #body
             }
         }
     }))
@@ -314,6 +347,8 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
             .and_then(CustomCodec::to_decode_path)
             .unwrap_or_else(|| default_decode_fn.clone());
 
+        // Decoding continues after this error, so any nesting budget the
+        // failed attempt consumed has to be given back.
         let unknown_var_err =
             if let Some(cd) = field.attrs.codec() {
                 if let Some(expr) = cd.to_nil_expr() {
@@ -327,27 +362,42 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
                             let __nil777: Option<#ty> = #nil;
                             __nil777.is_some()
                         } => {
+                            __d777.set_remaining_depth(__b777);
                             __d777.skip()?
                         }
                     }
                 } else if is_option(&field.typ, |_| true) {
                     quote! {
-                        Err(e) if e.is_unknown_variant() => __d777.skip()?,
+                        Err(e) if e.is_unknown_variant() => {
+                            __d777.set_remaining_depth(__b777);
+                            __d777.skip()?
+                        }
                     }
                 } else {
                     quote!()
                 }
             } else if is_option(&field.typ, |_| true) {
                 quote! {
-                    Err(e) if e.is_unknown_variant() => __d777.skip()?,
+                    Err(e) if e.is_unknown_variant() => {
+                        __d777.set_remaining_depth(__b777);
+                        __d777.skip()?
+                    }
                 }
             } else {
                 let ty = &field.typ;
                 quote! {
                     Err(e) if e.is_unknown_variant() && <#ty as minicbor::Decode::<Ctx>>::nil().is_some() => {
+                        __d777.set_remaining_depth(__b777);
                         __d777.skip()?
                     }
                 }
+            };
+
+        let depth_save =
+            if unknown_var_err.is_empty() {
+                quote!()
+            } else {
+                quote!(let __b777 = __d777.remaining_depth();)
             };
 
             let value =
@@ -368,6 +418,7 @@ fn gen_statements(fields: &Fields, encoding: Encoding, flat: bool) -> syn::Resul
 
             quote! {{
                 #tag
+                #depth_save
                 match #decode_fn(__d777, __ctx777) {
                     Ok(__v777) => #name = #value,
                     #unknown_var_err
@@ -597,6 +648,32 @@ fn nil(f: &Field) -> proc_macro2::TokenStream {
         let ty = &f.typ;
         quote!(<#ty as minicbor::Decode::<Ctx>>::nil())
     }
+}
+
+
+// Generate the statements entering and leaving one level of nesting.
+//
+// The budget is clamped to the declared maximum on entry, so a nested type
+// with a smaller `max_depth` constrains its own subtree without ever raising
+// the budget of an enclosing one.
+fn decode_max_depth(a: &Attributes)
+    -> Option<(proc_macro2::TokenStream, proc_macro2::TokenStream)>
+{
+    let max = a.max_depth()?;
+    let enter = quote! {
+        let __m777 = __d777.remaining_depth();
+        __d777.set_remaining_depth({
+            let __n777 = core::cmp::min(__m777, #max);
+            if __n777 == 0 {
+                return Err(minicbor::decode::Error::depth_limit_exceeded().at(__p777))
+            }
+            __n777 - 1
+        });
+    };
+    let restore = quote! {
+        __d777.set_remaining_depth(__m777);
+    };
+    Some((enter, restore))
 }
 
 fn decode_tag(a: &Attributes) -> proc_macro2::TokenStream {
