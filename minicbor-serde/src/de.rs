@@ -315,6 +315,18 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     }
 
     fn deserialize_identifier<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        // Names up to 23 bytes carry their length in the head byte. They are
+        // passed as bytes, which serde's derived visitors match without UTF-8
+        // validation.
+        let p = self.decoder.position();
+        let input = self.decoder.input();
+        if let Some(&b @ 0x60 ..= 0x77) = input.get(p) {
+            let end = p + 1 + usize::from(b - 0x60);
+            if let Some(name) = input.get(p + 1 .. end) {
+                self.decoder.set_position(end);
+                return visitor.visit_borrowed_bytes(name)
+            }
+        }
         self.deserialize_str(visitor)
     }
 
