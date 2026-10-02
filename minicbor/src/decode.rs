@@ -604,11 +604,14 @@ macro_rules! decode_fields {
 
 impl<'b, C> Decode<'b, C> for core::time::Duration {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        let p = d.position();
         decode_fields! { d ctx |
             0 secs  => u64 ; "Duration::secs"
             1 nanos => u32 ; "Duration::nanos"
         }
-        Ok(core::time::Duration::new(secs, nanos))
+        core::time::Duration::from_secs(secs)
+            .checked_add(core::time::Duration::from_nanos(nanos.into()))
+            .ok_or_else(|| Error::message("duration value overflow").at(p))
     }
 }
 

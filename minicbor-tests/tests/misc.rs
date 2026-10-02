@@ -492,3 +492,19 @@ fn check_type_of(i: i64) -> bool {
         _         => false
     }
 }
+
+#[test]
+fn duration_overflow_is_error() {
+    // [u64::MAX, 1_000_000_000]
+    let input = b"\x82\x1B\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x1A\x3B\x9A\xCA\x00";
+    assert!(minicbor::decode::<std::time::Duration>(input).is_err());
+    assert!(minicbor::decode::<std::time::SystemTime>(input).is_err())
+}
+
+#[test]
+fn duration_excess_nanos_carry() {
+    // [1, 1_500_000_000]
+    let input = b"\x82\x01\x1A\x59\x68\x2F\x00";
+    let d: std::time::Duration = minicbor::decode(input).unwrap();
+    assert_eq!(d, std::time::Duration::new(2, 500_000_000))
+}
