@@ -55,6 +55,24 @@ impl<'b> Decoder<'b> {
         }
     }
 
+    /// Decode a CBOR item's head, i.e. its type and length.
+    pub fn read_head(&mut self) -> Result<(Type, u64), Error> {
+        let p = self.pos;
+        let b = self.read()?;
+        let t = self.type_of(b)?;
+        let n = self.unsigned(info_of(b), p)?;
+        Ok((t, n))
+    }
+
+    /// Consume and return *n* bytes starting at the current position.
+    pub fn read_slice(&mut self, n: usize) -> Result<&'b [u8], Error> {
+        if let Some(b) = self.pos.checked_add(n).and_then(|end| self.buf.get(self.pos .. end)) {
+            self.pos += n;
+            return Ok(b)
+        }
+        Err(Error::end_of_input())
+    }
+
     /// Decode a `bool` value.
     pub fn bool(&mut self) -> Result<bool, Error> {
         let p = self.pos;
@@ -753,15 +771,6 @@ impl<'b> Decoder<'b> {
             .ok_or_else(Error::end_of_input)
     }
 
-    /// Consume and return *n* bytes starting at the current position.
-    fn read_slice(&mut self, n: usize) -> Result<&'b [u8], Error> {
-        if let Some(b) = self.pos.checked_add(n).and_then(|end| self.buf.get(self.pos .. end)) {
-            self.pos += n;
-            return Ok(b)
-        }
-        Err(Error::end_of_input())
-    }
-
     /// Consume and return *N* bytes starting at the current position.
     fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Error> {
         self.read_slice(N).map(|slice| {
@@ -1128,7 +1137,7 @@ pub(crate) fn type_of(b: u8) -> u8 {
     b & 0b111_00000
 }
 
-/// Get the additionl type info of the given byte (lowest 5 bits).
+/// Get the additional type info of the given byte (lowest 5 bits).
 pub(crate) fn info_of(b: u8) -> u8 {
     b & 0b000_11111
 }
