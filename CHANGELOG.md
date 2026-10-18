@@ -7,6 +7,12 @@
 
 # minicbor
 
+## `2.3.1`
+
+- Fixes potential overflow panic when decoding `std::time::Duration`.
+  See pull request [75][pr75] by @sdbondi for details.
+- Adds support for `Box<[T]>`. See pull request [69][pr69] by @sdbondi for details.
+
 ## `2.3.0`
 
 - Adds support for `u128`/`i128`. See pull request [63][pr63] by @sdbondi for details.
@@ -827,6 +833,11 @@
 
 # minicbor-serde
 
+## `0.7.2`
+
+- Adds `to_slice` function (see pull request [72][pr72] by @DanNixon for details).
+- Depends on `minicbor-2.3.1`.
+
 ## `0.7.1`
 
 - Adds support for `u128`/`i128`. See pull request [63][pr63] by @sdbondi for details.
@@ -941,6 +952,9 @@
 [pr62]: https://github.com/twittner/minicbor/pull/62
 [pr63]: https://github.com/twittner/minicbor/pull/63
 [pr64]: https://github.com/twittner/minicbor/pull/64
+[pr69]: https://github.com/twittner/minicbor/pull/69
+[pr72]: https://github.com/twittner/minicbor/pull/72
+[pr75]: https://github.com/twittner/minicbor/pull/75
 
 [i4]: https://gitlab.com/twittner/minicbor/-/issues/4
 [i8]: https://github.com/twittner/minicbor/issues/8
