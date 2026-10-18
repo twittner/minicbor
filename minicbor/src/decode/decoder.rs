@@ -9,13 +9,14 @@ use core::{marker, str};
 #[derive(Debug, Clone)]
 pub struct Decoder<'b> {
     buf: &'b [u8],
-    pos: usize
+    pos: usize,
+    depth: u32
 }
 
 impl<'b> Decoder<'b> {
     /// Construct a `Decoder` for the given byte slice.
     pub fn new(bytes: &'b [u8]) -> Self {
-        Decoder { buf: bytes, pos: 0 }
+        Decoder { buf: bytes, pos: 0, depth: u32::MAX }
     }
 
     /// Decode any type that implements [`Decode`].
@@ -41,6 +42,26 @@ impl<'b> Decoder<'b> {
     /// Get a reference to the input bytes.
     pub fn input(&self) -> &'b [u8] {
         self.buf
+    }
+
+    /// Get the remaining nesting depth budget.
+    ///
+    /// Types deriving [`Decode`] with the `max_depth` attribute consume one
+    /// unit of this budget each and decoding fails with
+    /// [`Error::depth_limit_exceeded`] when it is exhausted. `u32::MAX` means
+    /// unlimited, which is the initial value.
+    ///
+    /// Types not using `max_depth` do not consume this budget, hence lowering
+    /// it here only constrains those that do.
+    pub fn remaining_depth(&self) -> u32 {
+        self.depth
+    }
+
+    /// Set the remaining nesting depth budget.
+    ///
+    /// See [`Decoder::remaining_depth`].
+    pub fn set_remaining_depth(&mut self, depth: u32) {
+        self.depth = depth
     }
 
     /// Get a decoding probe to look ahead what is coming next.

@@ -47,7 +47,8 @@ pub enum Kind {
     SkipIf,
     Flat,
     Default,
-    Crate
+    Crate,
+    MaxDepth
 }
 
 #[derive(Debug, Clone)]
@@ -69,7 +70,8 @@ enum Value {
     SkipIf(Option<syn::ExprPath>, proc_macro2::Span),
     Flat(proc_macro2::Span),
     Default(proc_macro2::Span),
-    Crate(syn::Path, proc_macro2::Span)
+    Crate(syn::Path, proc_macro2::Span),
+    MaxDepth(u32, proc_macro2::Span)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -125,6 +127,16 @@ impl Attributes {
             }
             if this.contains_key(Kind::Transparent) {
                 return Err(syn::Error::new(*s, "`tag` and `transparent` are mutually exclusive"))
+            }
+        }
+        if let Some(Value::MaxDepth(_, s)) = this.get(Kind::MaxDepth) {
+            if this.contains_key(Kind::IndexOnly) {
+                let msg = "`max_depth` and `index_only` are mutually exclusive";
+                return Err(syn::Error::new(*s, msg))
+            }
+            if this.contains_key(Kind::Transparent) {
+                let msg = "`max_depth` and `transparent` are mutually exclusive";
+                return Err(syn::Error::new(*s, msg))
             }
         }
         if this.contains_key(Kind::Skip)
@@ -370,6 +382,17 @@ impl Attributes {
                 let n: LitInt = content.parse()?;
                 let i = n.base10_parse()?;
                 attrs.try_insert(Kind::Tag, Value::Tag(i, meta.path.span()))?
+            } else if meta.path.is_ident("max_depth") {
+                let content;
+                syn::parenthesized!(content in meta.input);
+                let n: LitInt = content.parse()?;
+                let d = n.base10_parse().map_err(|_| {
+                    syn::Error::new(n.span(), "expected `u32` value")
+                })?;
+                if d == 0 {
+                    return Err(syn::Error::new(n.span(), "`max_depth` must be greater than 0"))
+                }
+                attrs.try_insert(Kind::MaxDepth, Value::MaxDepth(d, meta.path.span()))?
             } else if meta.path.is_ident("skip") {
                 attrs.try_insert(Kind::Skip, Value::Skip(meta.path.span()))?
             } else if meta.path.is_ident("flat") {
@@ -455,6 +478,10 @@ impl Attributes {
         }
     }
 
+    pub fn max_depth(&self) -> Option<u32> {
+        self.get(Kind::MaxDepth).and_then(|v| v.max_depth())
+    }
+
     fn contains_key(&self, k: Kind) -> bool {
         self.attrs.contains_key(&k)
     }
@@ -479,6 +506,7 @@ impl Attributes {
                 | Kind::ContextBound
                 | Kind::Tag
                 | Kind::Crate
+                | Kind::MaxDepth
                 => {}
                 | Kind::Borrow
                 | Kind::TypeParam
@@ -518,6 +546,7 @@ impl Attributes {
                 | Kind::ContextBound
                 | Kind::Flat
                 | Kind::Crate
+                | Kind::MaxDepth
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.level);
                     return Err(syn::Error::new(val.span(), msg))
@@ -530,6 +559,7 @@ impl Attributes {
                 | Kind::Tag
                 | Kind::Flat
                 | Kind::Crate
+                | Kind::MaxDepth
                 => {}
                 | Kind::Borrow
                 | Kind::TypeParam
@@ -568,6 +598,7 @@ impl Attributes {
                 | Kind::Flat
                 | Kind::Default
                 | Kind::Crate
+                | Kind::MaxDepth
                 => {
                     let msg = format!("attribute is not supported on {}-level", self.level);
                     return Err(syn::Error::new(val.span(), msg))
@@ -745,7 +776,8 @@ impl Value {
             Value::SkipIf(_, s)       => *s,
             Value::Flat(s)            => *s,
             Value::Default(s)         => *s,
-            Value::Crate(_, s)        => *s
+            Value::Crate(_, s)        => *s,
+            Value::MaxDepth(_, s)     => *s
         }
     }
 
@@ -807,6 +839,14 @@ impl Value {
 
     fn tag(&self) -> Option<u64> {
         if let Value::Tag(x, _) = self {
+            Some(*x)
+        } else {
+            None
+        }
+    }
+
+    fn max_depth(&self) -> Option<u32> {
+        if let Value::MaxDepth(x, _) = self {
             Some(*x)
         } else {
             None
