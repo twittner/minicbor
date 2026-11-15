@@ -527,8 +527,11 @@ impl<'b> Decoder<'b> {
         let p = self.pos;
         match self.read()? {
             n @ SIMPLE ..= 0xf3 => Ok(n - SIMPLE),
-            0xf8 => self.read(),
-            n    => Err(Error::type_mismatch(self.type_of(n)?)
+            0xf8 => match self.read()? {
+                .. 32 => Err(Error::message("invalid simple value").at(p)),
+                n     => Ok(n)
+            }
+            n => Err(Error::type_mismatch(self.type_of(n)?)
                 .with_message("expected simple value")
                 .at(p))
         }
@@ -792,10 +795,15 @@ impl<'b> Decoder<'b> {
             0xa0 ..= 0xbb        => Type::Map,
             0xbf                 => Type::MapIndef,
             0xc0 ..= 0xdb        => Type::Tag,
-            0xe0 ..= 0xf3 | 0xf8 => Type::Simple,
+            0xe0 ..= 0xf3        => Type::Simple,
             0xf4 | 0xf5          => Type::Bool,
             0xf6                 => Type::Null,
             0xf7                 => Type::Undefined,
+            0xf8                 => if self.peek()? < 0x20 {
+                return Err(Error::message("invalid simple value"))
+            } else {
+                Type::Simple
+            }
             0xf9                 => Type::F16,
             0xfa                 => Type::F32,
             0xfb                 => Type::F64,

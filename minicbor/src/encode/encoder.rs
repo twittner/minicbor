@@ -195,11 +195,14 @@ impl<W: Write> Encoder<W> {
     }
 
     /// Encode a CBOR simple value.
+    ///
+    /// Values 24 ..= 31 are reserved and an attempt to encode them
+    /// results in an `Error`.
     pub fn simple(&mut self, x: u8) -> Result<&mut Self, Error<W::Error>> {
-        if x < 0x14 {
-            self.put(&[SIMPLE | x])
-        } else {
-            self.put(&[SIMPLE | 24, x])
+        match x {
+            .. 24    => self.put(&[SIMPLE | x]),
+            24 .. 32 => Err(Error::message("simple values 24 ..= 31 are reserved")),
+            32 ..    => self.put(&[SIMPLE | 24, x])
         }
     }
 

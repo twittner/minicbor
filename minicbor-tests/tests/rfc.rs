@@ -86,7 +86,7 @@ fn rfc_tv_small() {
     roundtrip!(bool, "f4", false);
     roundtrip!(bool, "f5", true);
     roundtrip!(simple, "f0", 16);
-    roundtrip!(simple, "f818", 24);
+    roundtrip!(simple, "f820", 32);
     roundtrip!(simple, "f8ff", 255);
 
     let x = hex::decode("f6").unwrap();

@@ -224,7 +224,7 @@ impl<'b, C> CborLen<C> for Token<'b> {
             Token::Array(val)  => val.cbor_len(ctx),
             Token::Map(val)    => val.cbor_len(ctx),
             Token::Tag(val)    => val.cbor_len(ctx),
-            Token::Simple(val) => if *val < 0x14 { 1 } else { 2 },
+            Token::Simple(val) => if *val < 24 { 1 } else { 2 },
             Token::Break       => 1,
             Token::Null        => 1,
             Token::Undefined   => 1,
