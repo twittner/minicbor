@@ -2,7 +2,7 @@
 
 /// A type that writes byte slices.
 pub trait Write {
-    type Error;
+    type Error: core::error::Error + 'static;
 
     /// Write the whole byte slice.
     fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error>;
