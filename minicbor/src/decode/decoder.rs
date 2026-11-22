@@ -795,15 +795,10 @@ impl<'b> Decoder<'b> {
             0xa0 ..= 0xbb        => Type::Map,
             0xbf                 => Type::MapIndef,
             0xc0 ..= 0xdb        => Type::Tag,
-            0xe0 ..= 0xf3        => Type::Simple,
+            0xe0 ..= 0xf3 | 0xf8 => Type::Simple,
             0xf4 | 0xf5          => Type::Bool,
             0xf6                 => Type::Null,
             0xf7                 => Type::Undefined,
-            0xf8                 => if self.peek()? < 0x20 {
-                return Err(Error::message("invalid simple value"))
-            } else {
-                Type::Simple
-            }
             0xf9                 => Type::F16,
             0xfa                 => Type::F32,
             0xfb                 => Type::F64,
