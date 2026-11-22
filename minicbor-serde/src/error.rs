@@ -22,9 +22,21 @@ impl<E> From<encode::Error<E>> for EncodeError<E> {
     }
 }
 
+impl<E> From<EncodeError<E>> for encode::Error<E> {
+    fn from(e: EncodeError<E>) -> Self {
+        e.0
+    }
+}
+
 impl From<decode::Error> for DecodeError {
     fn from(e: decode::Error) -> Self {
         Self(e)
+    }
+}
+
+impl From<DecodeError> for decode::Error {
+    fn from(e: DecodeError) -> Self {
+        e.0
     }
 }
 
