@@ -156,7 +156,7 @@ const SIMPLE: u8   = 0xe0;
 const BREAK: u8    = 0xff;
 
 pub use decode::{Decode, Decoder};
-pub use encode::{Encode, Encoder, CborLen};
+pub use encode::{Encode, Encoder, CborLen, MaxCborLen};
 
 #[cfg(feature = "derive")]
 pub use minicbor_derive::*;
