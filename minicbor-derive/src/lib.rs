@@ -97,6 +97,7 @@
 //! - [`#[cbor(skip_if)]`](#cborskip_if--path)
 //! - [`#[cbor(default)]`](#cbordefault)
 //! - [`#[cbor(tag(...))]`](#cbortag)
+//! - [`#[cbor(max_depth(...))]`](#cbormax_depth)
 //! - [`#[cbor(decode_with)]`](#cbordecode_with--path)
 //! - [`#[cbor(encode_with)]`](#cborencode_with--path)
 //! - [`#[cbor(with)]`](#cborwith--path)
@@ -207,6 +208,41 @@
 //! This attribute can be attached to structs, enums and their fields. Its argument
 //! is a base-10 unsigned integer which is encoded as the CBOR tag of the value.
 //! Decoding will also attempt to read the tag and fails otherwise.
+//!
+//! ## `#[cbor(max_depth(...))]`
+//!
+//! This attribute can be attached to structs and enums. Its argument is a
+//! base-10 `u32` greater than 0 and limits how deeply values of this type may
+//! be nested within one another when decoding, which bounds the recursion a
+//! self-referential type performs on untrusted input. Exceeding the limit
+//! fails with [`minicbor::decode::Error::depth_limit_exceeded`][dle].
+//!
+//! ```
+//! #[derive(minicbor::Decode)]
+//! #[cbor(map, max_depth(64))]
+//! struct Tree {
+//!     #[n(0)] value: u64,
+//!     #[n(1)] children: Vec<Tree>
+//! }
+//! ```
+//!
+//! Here at most 64 `Tree` values may enclose one another; the `Vec` in between
+//! does not itself count. Limits apply relative to where decoding of the type
+//! begins and compose by nesting, so a type declaring a smaller limit further
+//! down constrains its own subtree and never widens an enclosing limit.
+//!
+//! Only types declaring this attribute consume the budget. Nesting made up of
+//! other types is not counted, nor is anything decoded through
+//! [`#[cbor(decode_with)]`](#cbordecode_with--path) or
+//! [`#[cbor(with)]`](#cborwith--path), or by a hand-written `Decode` impl
+//! which does not consult
+//! [`minicbor::Decoder::remaining_depth`][rd].
+//!
+//! [dle]: https://docs.rs/minicbor/latest/minicbor/decode/struct.Error.html#method.depth_limit_exceeded
+//! [rd]: https://docs.rs/minicbor/latest/minicbor/decode/struct.Decoder.html#method.remaining_depth
+//!
+//! The attribute is ignored when deriving `Encode` or `CborLen`, and is
+//! mutually exclusive with `transparent` and `index_only`.
 //!
 //! ## `#[cbor(decode_with = "<path>")]`
 //!

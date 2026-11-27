@@ -96,6 +96,17 @@ impl Error {
         }
     }
 
+    /// The maximum nesting depth has been exceeded.
+    ///
+    /// See [`Decoder::remaining_depth`][crate::Decoder::remaining_depth].
+    pub fn depth_limit_exceeded() -> Self {
+        Error {
+            err: ErrorImpl::DepthLimitExceeded,
+            pos: None,
+            msg: Default::default()
+        }
+    }
+
     /// A value, expected at the given index, was missing.
     #[doc(hidden)]
     pub fn missing_value(idx: i64) -> Self {
@@ -174,6 +185,10 @@ impl Error {
         matches!(self.err, ErrorImpl::Message)
     }
 
+    pub fn is_depth_limit_exceeded(&self) -> bool {
+        matches!(self.err, ErrorImpl::DepthLimitExceeded)
+    }
+
     /// Byte index of the input at which the error occurred.
     pub fn position(&self) -> Option<usize> {
         self.pos
@@ -214,6 +229,8 @@ enum ErrorImpl {
     UnknownVariant(i64),
     /// A value was missing at the specified index.
     MissingValue(i64),
+    /// The maximum nesting depth was exceeded.
+    DepthLimitExceeded,
     /// Generic error message.
     Message,
     /// Custom error.
@@ -289,6 +306,13 @@ impl fmt::Display for Error {
                     (m, None)     => write!(f, "missing value at index {n} ({m})"),
                     (m, Some(p))  => write!(f, "missing value at index {n} ({m}) in map or array starting at position {p}")
                 }
+            ErrorImpl::DepthLimitExceeded =>
+                match (self.msg.as_ref(), self.pos) {
+                    ("", None)    => write!(f, "depth limit exceeded"),
+                    ("", Some(p)) => write!(f, "depth limit exceeded at position {p}"),
+                    (m, None)     => write!(f, "depth limit exceeded: {m}"),
+                    (m, Some(p))  => write!(f, "depth limit exceeded at position {p}: {m}")
+                }
             ErrorImpl::Message =>
                 if let Some(p) = self.pos {
                     write!(f, "decode error at position {p}: {}", self.msg)
@@ -317,6 +341,7 @@ impl core::error::Error for Error {
             | ErrorImpl::TagMismatch(_)
             | ErrorImpl::UnknownVariant(_)
             | ErrorImpl::MissingValue(_)
+            | ErrorImpl::DepthLimitExceeded
             | ErrorImpl::Message
             => None,
             ErrorImpl::Utf8(e)   => Some(e),
